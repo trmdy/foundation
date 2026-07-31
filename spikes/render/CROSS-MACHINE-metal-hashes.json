@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-07-31T13:45:31.687Z",
+  "machine": {
+    "hostname": "trmd-metal-1",
+    "platform": "linux",
+    "arch": "x64",
+    "release": "6.8.0-101-generic",
+    "cpuModel": "AMD EPYC 9454P 48-Core Processor"
+  },
+  "browserVersion": "151.0.7922.34",
+  "playwrightVersion": "1.62.0",
+  "flags": [
+    "--disable-gpu",
+    "--disable-gpu-compositing",
+    "--use-gl=angle",
+    "--use-angle=swiftshader",
+    "--force-color-profile=srgb",
+    "--disable-lcd-text",
+    "--font-render-hinting=none",
+    "--run-all-compositor-stages-before-draw",
+    "--disable-partial-raster",
+    "--disable-checker-imaging",
+    "--disable-image-animation-resync",
+    "--disable-skia-runtime-opts",
+    "--force-prefers-reduced-motion",
+    "--hide-scrollbars",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-domain-reliability",
+    "--disable-component-update",
+    "--js-flags=--random-seed=1"
+  ],
+  "contextOptions": {
+    "deviceScaleFactor": 1,
+    "colorScheme": "light",
+    "reducedMotion": "reduce",
+    "forcedColors": "none",
+    "timezoneId": "UTC",
+    "locale": "en-US"
+  },
+  "frozenEpochIso": "2026-07-31T12:00:00.000Z",
+  "viewports": {
+    "mobile-390x844": {
+      "width": 390,
+      "height": 844,
+      "bitIdentical": true,
+      "layoutIdentical": true,
+      "pngSha256Run1": "af986896dabc3157535b34629998adc6bf204f66fa6d42088a8ab65cfe59d93b",
+      "pngSha256Run2": "af986896dabc3157535b34629998adc6bf204f66fa6d42088a8ab65cfe59d93b",
+      "layoutSha256Run1": "670bc1ae83b15b79e95d4760ea3f819cd064e54e9d2089136a3d6b805655384c",
+      "layoutSha256Run2": "670bc1ae83b15b79e95d4760ea3f819cd064e54e9d2089136a3d6b805655384c",
+      "exactDiffPixels": 0,
+      "pixelmatchDiffPixels": 0
+    },
+    "tablet-834x1194": {
+      "width": 834,
+      "height": 1194,
+      "bitIdentical": true,
+      "layoutIdentical": true,
+      "pngSha256Run1": "f05864577df101d5b71bec7f2d83bbfdc464d66ed3b69c5f70367aa7119ffffd",
+      "pngSha256Run2": "f05864577df101d5b71bec7f2d83bbfdc464d66ed3b69c5f70367aa7119ffffd",
+      "layoutSha256Run1": "cc5f2c573b3e48f9e46e84e26ed184ae941c29e5d77f6eefe893939dfd0491a7",
+      "layoutSha256Run2": "cc5f2c573b3e48f9e46e84e26ed184ae941c29e5d77f6eefe893939dfd0491a7",
+      "exactDiffPixels": 0,
+      "pixelmatchDiffPixels": 0
+    },
+    "desktop-1440x900": {
+      "width": 1440,
+      "height": 900,
+      "bitIdentical": true,
+      "layoutIdentical": true,
+      "pngSha256Run1": "b3e306c4f6e70b69e923a8cfe6482e0acb3c462674c7b60f8da0ce6d0b47cd49",
+      "pngSha256Run2": "b3e306c4f6e70b69e923a8cfe6482e0acb3c462674c7b60f8da0ce6d0b47cd49",
+      "layoutSha256Run1": "55517e761421f36c5c5ec3c1620ab92a53b8b3f6e18db37a66fd937008957052",
+      "layoutSha256Run2": "55517e761421f36c5c5ec3c1620ab92a53b8b3f6e18db37a66fd937008957052",
+      "exactDiffPixels": 0,
+      "pixelmatchDiffPixels": 0
+    }
+  }
+}

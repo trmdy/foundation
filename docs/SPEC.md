@@ -225,8 +225,11 @@ Alternatives rejected:
 Live collaboration needs the chain (D2). Agents, repos, editors, and PR review need
 text. Both are served by one rule:
 
-- Every document state has exactly one **canonical projection**: a deterministic,
-  stable-ordered, whitespace-normalized text serialization in the subset grammar
+- Every document has exactly one **canonical projection**: a deterministic,
+  stable-ordered, whitespace-normalized text serialization in the subset grammar —
+  the **unresolved template form** (parameterized content symbolic; resolved
+  per-state trees are derived bake artifacts, not canonical text — open question 10,
+  resolved)
   (proposed extension: `.fdn.html` — HTML-flavored so browsers and existing tooling can
   still open it; see §7).
 - Any edit to projected text — by an agent with a file tool, a human in an editor, a PR
@@ -298,7 +301,22 @@ Intent: pixel output is a pure function of (projection hash × render-config has
 Pinned browser engine revision, bundled font set, frozen clock, seeded PRNG, animations
 disabled, declared viewport set and DPR. Output: per-state PNG + layout report (node
 geometry) addressable by content hash — cacheable and comparable across machines and
-time. To fill: exact pinning mechanism, the layout-report schema, capsule hydration rules
+time.
+
+**Resolved 2026-07-31 (spikes: `spikes/render/RESULTS.md`, `CROSS-MACHINE.md`,
+macOS-arm64 vs linux-x86_64):** renders are bit-identical run-to-run per (platform,
+pinned browser). Cross-machine, **bundled fonts are the determinism boundary**: with
+the same embedded font file, element geometry is float-exact across OS text stacks
+(CoreText vs FreeType); all observed divergence came from OS system-font resolution.
+The contract therefore: (1) render-time font resolution never touches OS fonts —
+generic families map deterministically onto the pinned bundled set; (2) **layout
+identity is a hard cross-machine guarantee** (pending adversarial font fixtures —
+ligatures, fallback, CJK — before 1.0); (3) pixels are two-tier — byte-identical per
+platform, with **linux-x86_64 headless as the reference platform** producing canonical
+pixels for freeze verification and QA diffing; renders elsewhere are previews compared
+under pixelmatch tolerance.
+
+To fill: exact pinning mechanism, the layout-report schema, capsule hydration rules
 at render time.
 
 ## 6. Diff semantics — *skeleton*
@@ -399,31 +417,26 @@ To fill: the fixtures.
    repeated declaration sets become a shared named style vs stay node-attached?
    (Lean: node-attached by default; named-style extraction is an explicit verb or an
    importer heuristic with a report line — never silent.)
-9. **Interpolation and the expression budget** (grammar spike, findings b.1/b.2 —
-   found more foundational than `when`/`each`): what may appear inside `{{ … }}` in
-   text and attribute values? Candidate budget: property/data references, a ternary
-   or `when`-equivalent, and a bounded lookup/map primitive for enum→value mapping —
-   still non-Turing, fully auditable. Without interpolation, props are inert metadata.
-10. **Projection semantics for parameterized content** (findings a.3/b.5 — one-way-
-    door-adjacent, interacts with D2 hashing and D4): does canonical text carry the
-    unresolved template tree (one document, all states) or fully resolved per-state
-    trees (N projections)? The spike's working hybrid — hidden template definitions
-    plus resolved literal instances in one file — satisfies browser-openability but
-    creates two sources of truth per instance with nothing keeping them in sync.
-    A real engine must pick one meaning of "the projection" and enforce coherence
-    (e.g. resolved instances are engine-generated, never hand-edited, validated
-    against their template).
-11. **Interaction-state styling** (findings §e — the largest unresolved gap): `:hover`
-    / `:focus` / `:active` / `:disabled` have no answer under "no selectors"; both
-    source boards needed hover styling on nearly every clickable row (`.dc.html`
-    itself invented a `style-hover=""` attribute). Candidates: sanctioned per-state
-    style attributes (`style-hover=""`-shaped, validator-owned — ironically the
-    `.dc.html` answer), state planes inside named styles, or pushing all interaction
-    states to sealed capsules (in tension with D3's native-by-default stance). Must be
-    resolved before the grammar freezes; product chrome is mostly hover states.
-12. **Named styles' rendering home** (finding b.3): with no selectors allowed, a
-    named style has no browser-native application mechanism, forcing dual-carry
-    (reference attribute + identical inline `style`), which can silently drift.
-    Lean: the projection always materializes named styles inline; `data-fdn-style`
-    is the audit/dedup handle; any divergence between the two is a validation error
-    the engine detects mechanically.
+9. ~~Interpolation and the expression budget~~ — **resolved 2026-07-31**: `{{ … }}`
+   admits exactly: property/data references, one ternary, and references into
+   **declared lookup tables** (the enum→value mapping primitive; syntax TBD in L1).
+   No arithmetic, no method calls, no string operations — the spike's one `.split()`
+   need is answered by real `list`/`record` prop types (§4), not expressions.
+   Non-Turing, fully auditable.
+10. ~~Projection semantics for parameterized content~~ — **resolved 2026-07-31**:
+    the canonical projection is the **unresolved template document** — one file, one
+    hash, all states; parameterized content stays symbolic. Fully resolved per-state
+    trees are **derived artifacts** the engine bakes on demand (for serving,
+    rendering, review), never hand-edited, marked as generated wherever embedded.
+    A bake with no state selected uses each param's declared `default`; a param
+    without a default renders empty and is flagged in the conformance report. The
+    grammar spike's dual-form hybrid is retired.
+11. ~~Interaction-state styling~~ — **resolved 2026-07-31**: sanctioned, enumerated
+    per-state style attributes — `style-hover`, `style-focus`, `style-active`,
+    `style-disabled` — validator-owned, same value grammar as `style`, no other
+    pseudo-class mechanism. (The `.dc.html` precedent, adopted deliberately.) Named
+    styles may grow matching state planes in L1 if duplication demands it.
+12. ~~Named styles' rendering home~~ — **dissolved by the resolution of Q10**: the
+    canonical (template) form keeps named styles symbolic — no dual-carry, so drift
+    is impossible rather than detected; only derived baked artifacts inline the
+    resolved styles, and those are engine-generated by definition.

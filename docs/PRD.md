@@ -197,8 +197,11 @@ for after Phase C; noted so nothing in L0 accidentally forecloses it.
 Inherited from `SPEC.md` (chain tech, subset boundary, embed interactivity budget,
 extension naming, `.dc.html` importer, spec governance), plus product-level:
 
-1. Repo/home and licensing: spec + engine public (MIT?) with house surfaces private?
-   Where does it live relative to Valhall?
+1. ~~Repo/home and licensing~~ — **resolved 2026-07-31**: MIT (LICENSE in repo);
+   home is `trmdy/foundation` in the new honeybee area; npm packages land under a
+   honeybee org scope when that org is created. Product name "Foundation" noted as
+   colliding with Zurb Foundation in the web-design space — accepted; package names
+   will disambiguate.
 2. Does Foundation-in-Apiary earn its RailKind at Phase C, or start as a served page in
    the browser sidecar until the surface proves it isn't "the Browser pane in different
    clothes"? (Portal test — current lean: start in the sidecar, promote on evidence.)
