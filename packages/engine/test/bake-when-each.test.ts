@@ -51,10 +51,24 @@ describe('bake: when', () => {
 })
 
 describe('bake: each', () => {
+  it('REGRESSION (GRAMMAR-FINDINGS.md (g) finding 2): each="alias in data.<name>" — the dotted form validate requires and every board uses — resolves the declared data set, not zero items', () => {
+    const d = doc({
+      data: [{ name: 'rows', items: [{ label: 'a' }, { label: 'b' }, { label: 'c' }] }],
+      body: [node({ id: 'row', tag: 'li', each: 'item in data.rows', text: '{{ item.label }}' })],
+    })
+    const result = bakeDocument(d)
+    expect(result.tree.map((n) => n.text)).toEqual(['a', 'b', 'c'])
+    expect(result.tree.every((n) => n.tag === 'li')).toBe(true)
+    // ids must be unique per iteration
+    expect(new Set(result.tree.map((n) => n.id)).size).toBe(3)
+    // the sanctioned dotted form is not deprecated: no report noise
+    expect(result.report.lines.some((l) => l.code === 'each-bare-data-source')).toBe(false)
+  })
+
   it('expands over a declared data set with the default "item" binding', () => {
     const d = doc({
       data: [{ name: 'rows', items: [{ label: 'a' }, { label: 'b' }, { label: 'c' }] }],
-      body: [node({ id: 'row', tag: 'li', each: 'item in rows', text: '{{ item.label }}' })],
+      body: [node({ id: 'row', tag: 'li', each: 'item in data.rows', text: '{{ item.label }}' })],
     })
     const tree = bakeDocument(d).tree
     expect(tree.map((n) => n.text)).toEqual(['a', 'b', 'c'])
@@ -66,10 +80,30 @@ describe('bake: each', () => {
   it('supports a named binding instead of "item"', () => {
     const d = doc({
       data: [{ name: 'rows', items: [{ label: 'x' }, { label: 'y' }] }],
-      body: [node({ id: 'row', tag: 'li', each: 'row in rows', text: '{{ row.label }}' })],
+      body: [node({ id: 'row', tag: 'li', each: 'row in data.rows', text: '{{ row.label }}' })],
     })
     const tree = bakeDocument(d).tree
     expect(tree.map((n) => n.text)).toEqual(['x', 'y'])
+  })
+
+  it('back-compat: a bare data-set name (no "data." prefix) still resolves, but reports the each-bare-data-source deprecation', () => {
+    const d = doc({
+      data: [{ name: 'rows', items: [{ label: 'x' }, { label: 'y' }] }],
+      body: [node({ id: 'row', tag: 'li', each: 'item in rows', text: '{{ item.label }}' })],
+    })
+    const result = bakeDocument(d)
+    expect(result.tree.map((n) => n.text)).toEqual(['x', 'y'])
+    const line = result.report.lines.find((l) => l.code === 'each-bare-data-source')
+    expect(line).toBeDefined()
+    expect(line?.severity).toBe('warning')
+    expect(line?.message).toContain('data.rows')
+  })
+
+  it('each="alias in data.<name>" over an undeclared data set reports unknown-ref and renders nothing', () => {
+    const d = doc({ body: [node({ id: 'row', tag: 'li', each: 'item in data.missing', text: 'x' })] })
+    const result = bakeDocument(d)
+    expect(result.tree).toEqual([])
+    expect(result.report.lines.some((l) => l.code === 'unknown-ref')).toBe(true)
   })
 
   it('each over a list-typed param ref', () => {

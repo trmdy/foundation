@@ -1,617 +1,794 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Apiary · System — Help Center — Foundation grammar re-draw</title>
-
-<!-- ONLY :root tokens live here — see inbox-unified.fdn.html header comment
-     for the full rationale; not repeated verbatim per file (see
-     GRAMMAR-FINDINGS.md (b) "no cross-document token inheritance"). -->
+  <meta charset="utf-8">
+  <title>System — Help Center</title>
 <style>
-:root {
-  --color-bg: #F5F4F1;
-  --color-surface: #FFFFFF;
-  --color-surface-alt: #FAFAF8;
-  --color-border: #E7E5E0;
-  --color-border-subtle: #ECEAE5;
-  --color-border-hairline: #F1EFEB;
-  --color-selected-bg: #EEEDE9;
-  --color-text-primary: #2E2B27;
-  --color-text-secondary: #4A463F;
-  --color-text-tertiary: #6F6B63;
-  --color-text-muted: #8A877F;
-  --color-text-faint: #A8A59E;
-  --color-text-disabled: #B5B1A9;
-  --color-text-placeholder: #B4AEA4;
-  --color-text-ghost: #C5BEB3;
-  --color-caret: #9A8E78;
-  --color-accent: #9C6A1C;
-
-  --font-sans: 'Hanken Grotesk', sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
-  --font-serif: 'Spectral', serif; /* declared, imported — never actually used
-    by this design (board 6: "Serif: unused"); kept as a token so the audit
-    plane can flag it as a dead import — see findings (d). */
-
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
-  --radius-2xl: 12px;
-
-  --shadow-panel: 0 24px 64px rgba(40,35,30,.30);
-  --shadow-card:  0 10px 30px rgba(40,35,30,.10);
-  --shadow-card-lg: 0 16px 44px rgba(40,35,30,.14);
-}
-
-*        { box-sizing: border-box; }
-html,body{ margin: 0; }
-body     { background: var(--color-bg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  :root {
+    --color-accent: #9C6A1C;
+    --color-bg: #F5F4F1;
+    --color-border: #E7E5E0;
+    --color-border-hairline: #F1EFEB;
+    --color-border-subtle: #ECEAE5;
+    --color-caret: #9A8E78;
+    --color-selected-bg: #EEEDE9;
+    --color-surface: #FFFFFF;
+    --color-surface-alt: #FAFAF8;
+    --color-text-disabled: #B5B1A9;
+    --color-text-faint: #A8A59E;
+    --color-text-ghost: #C5BEB3;
+    --color-text-muted: #8A877F;
+    --color-text-placeholder: #B4AEA4;
+    --color-text-primary: #2E2B27;
+    --color-text-secondary: #4A463F;
+    --color-text-tertiary: #6F6B63;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-sans: 'Hanken Grotesk', sans-serif;
+    --font-serif: 'Spectral', serif;
+    --radius-2xl: 12px;
+    --radius-lg: 8px;
+    --radius-md: 6px;
+    --radius-xl: 10px;
+    --shadow-card: 0 10px 30px rgba(40,35,30,.10);
+    --shadow-card-lg: 0 16px 44px rgba(40,35,30,.14);
+    --shadow-panel: 0 24px 64px rgba(40,35,30,.30);
+  }
 </style>
 </head>
 <body>
-
-<!-- ==========================================================================
-     fdn-doc — header block
-     ========================================================================== -->
-<fdn-doc hidden style="display:none" data-fdn-spec-version="0.0.1-draft" data-fdn-title="System — Help Center">
-
-  <fdn-params>
-    <fdn-param name="entryContext" type="enum" values="agent-run,changes,fleet,none" default="agent-run"
-      description="focusedPaneId -> pane kind, per source board 2: which pane the ? was pressed in; drives which 'THIS PANE' section is pinned/tagged and scrolled-to"/>
-    <fdn-param name="dialogOpen" type="boolean" default="true"/>
-    <fdn-param name="searchQuery" type="string" default=""
-      description="empty = sectioned catalog view; non-empty = board 3's flat ranked list"/>
-    <fdn-param name="rowBindingState" type="enum" values="default,multi,override,disabled,recording,conflict" default="default"
-      description="board 4's row-grammar catalog — one row per binding lifecycle state"/>
-  </fdn-params>
-
-  <fdn-data name="guideTopics">
-    <fdn-item id="getting-started" label="Getting started"/>
-    <fdn-item id="bees-fleet"      label="Bees &amp; the fleet"/>
-    <fdn-item id="yards-quests"    label="Yards &amp; quests"/>
-    <fdn-item id="reviewing"       label="Reviewing changes"/>
-    <fdn-item id="loops"           label="Loops"/>
-  </fdn-data>
-
-  <fdn-data name="referenceTopics">
-    <fdn-item id="keyboard-shortcuts" label="Keyboard shortcuts"/>
-    <fdn-item id="command-palette"    label="Command palette"/>
-    <fdn-item id="message-delivery"   label="Message delivery"/>
-  </fdn-data>
-
-  <fdn-data name="thisPaneShortcuts">
-    <fdn-item id="reply"      label="Reply" note="queued · delivered when the turn ends" keys="↵"/>
-    <fdn-item id="interrupt"  label="Interrupt &amp; send now" note="" keys="⌘↵"/>
-    <fdn-item id="surface"    label="Surface a card" note="changes · browser · terminal · swarm" keys="⌥D · ⌥B · ⌥T · ⌥S"/>
-    <fdn-item id="archive"    label="Archive agent" note="" keys="e · ⌘⇧E"/>
-    <fdn-item id="important"  label="Toggle important" note="feeds needs-me + jump" keys="⌘⌥J"/>
-    <fdn-item id="copy-id"    label="Copy bee id" note="" keys="⌘⇧C"/>
-    <fdn-item id="self-seal"  label="Ask agent to self-seal" note="" keys="⌘⌥⇧L"/>
-    <fdn-item id="back"       label="Back to previous view" note="" keys="⌘←"/>
-  </fdn-data>
-
-  <fdn-data name="globalShortcuts">
-    <fdn-item id="palette"      label="Command palette" note="" keys="⌘K"/>
-    <fdn-item id="new-agent"    label="New agent — quick compose" note="from any view · layout untouched" keys="⌘⇧N"/>
-    <fdn-item id="jump-pane"    label="Jump to pane — picker" note="" keys="⌘S"/>
-    <fdn-item id="jump-imp"     label="Jump to most important" note="" keys="⌘⇧S · ⌘J"/>
-    <fdn-item id="needs-me"     label="Needs me — triage" note="" keys="g j"/>
-    <fdn-item id="search-all"   label="Search everything" note="" keys="/"/>
-    <fdn-item id="sidebar"      label="Toggle sidebar" note="" keys="⌘B"/>
-    <fdn-item id="switch"       label="Switch workspace · switch yard" note="" keys="o w · o y"/>
-    <fdn-item id="new-tab"      label="New window tab" note="" keys="⌘T"/>
-    <fdn-item id="cycle-tab"    label="Next · previous window tab" note="" keys="⌃⇥ · ⌃⇧⇥"/>
-    <fdn-item id="help"         label="Keyboard shortcuts — this panel" note="" keys="?"/>
-  </fdn-data>
-
-  <fdn-states>
-    <fdn-state name="dialog-agent-run" dialogOpen="true" entryContext="agent-run"/>
-    <fdn-state name="dialog-changes"   dialogOpen="true" entryContext="changes"/>
-    <fdn-state name="dialog-fleet"     dialogOpen="true" entryContext="fleet"/>
-    <fdn-state name="dialog-none"      dialogOpen="true" entryContext="none"/>
-    <fdn-state name="dialog-search"    dialogOpen="true" searchQuery="split"/>
-    <fdn-state name="row-grammar"      rowBindingState="default"/>
-  </fdn-states>
-
-  <fdn-matrix>
-    <fdn-viewport name="canvas" width="1480" height="900"/>
-    <fdn-cell state="dialog-agent-run" viewport="canvas"/>
-    <fdn-cell state="dialog-changes"   viewport="canvas"/>
-    <fdn-cell state="dialog-fleet"     viewport="canvas"/>
-    <fdn-cell state="dialog-none"      viewport="canvas"/>
-    <fdn-cell state="dialog-search"    viewport="canvas"/>
-    <fdn-cell state="row-grammar"      viewport="canvas"/>
-  </fdn-matrix>
-
-</fdn-doc>
-
-<!-- ==========================================================================
-     fdn-styles — named styles. Most of these map ~1:1 onto the source
-     .dc.html's own global <style> classes (.kc, .snote, .slab, .sechead,
-     .cap) — a pure-typography, no-structure reuse that is exactly what a
-     named style is for. See findings (a.2), (c) for the .srow / .navrow
-     cases that turned out to need componentization instead.
-     ========================================================================== -->
-<fdn-styles hidden style="display:none">
-  <fdn-style name="kbd-cap"     display="inline-flex" align-items="center" height="18px" padding="0 5px" border="1px solid var(--color-border)" border-bottom-width="2px" border-radius="4px" background="var(--color-surface-alt)" font-family="var(--font-mono)" font-weight="500" font-size="10.5px" color="#5A564E" white-space="nowrap"/>
-  <fdn-style name="kbd-sep"     font-family="var(--font-mono)" font-weight="400" font-size="10px" color="var(--color-text-ghost)" margin="0 1px"/>
-  <fdn-style name="row-label"   font-family="var(--font-sans)" font-weight="400" font-size="13px" color="var(--color-text-primary)"/>
-  <fdn-style name="row-note"    font-family="var(--font-mono)" font-weight="400" font-size="10.5px" color="var(--color-text-faint)"/>
-  <fdn-style name="section-head" display="flex" align-items="center" gap="9px" font-family="var(--font-sans)" font-weight="600" font-size="10px" letter-spacing=".16em" color="var(--color-text-faint)" margin="18px 10px 6px"/>
-  <fdn-style name="caption"     font-family="var(--font-sans)" font-weight="400" font-size="11.5px" line-height="1.6" color="var(--color-text-muted)"/>
-</fdn-styles>
-
-<!-- ==========================================================================
-     fdn-component definitions
-     ========================================================================== -->
-
-<!-- Component 1 of 5: KbdCap — direct translation of .kc. Pure named-style
-     wrapper promoted to a component only because it takes child content
-     (the key label) rather than being a bare leaf — worth asking whether
-     this should have been a named style + raw <span> instead; see findings. -->
-<fdn-component name="KbdCap" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="keys"   type="string" required="true"/>
-    <fdn-prop name="height" type="number" default="18"/>
-  </fdn-props>
-  <span data-fdn-style="kbd-cap" style="height:{{ prop.height }}px">{{ prop.keys }}</span>
-</fdn-component>
-
-<!-- Component 2 of 5: ShortcutRow — .srow. Structural: label + optional note
-     + a variable-length run of KbdCap chips (some rows have 1 chord, some
-     have 2-4 separated by a middot). Multi-value `keys` is split on " · "
-     at the use site (see findings (b) — no list-typed prop in this grammar). -->
-<fdn-component name="ShortcutRow" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="label"     type="string" required="true"/>
-    <fdn-prop name="note"      type="string"/>
-    <fdn-prop name="keyGroups" type="string" required="true" description="middot-separated chord groups, e.g. '⌘D · ⌘⇧D'"/>
-    <fdn-prop name="dim"       type="boolean" default="false" description="row available in a different pane than the current context — shown, not hidden (discovery beats hiding, board 3)"/>
-    <fdn-prop name="highlighted" type="boolean" default="false"/>
-    <fdn-prop name="leadingTag" type="string" description="board 3 search state: the origin section name shown before the keys"/>
-  </fdn-props>
-  <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:{{ prop.highlighted ? 'var(--color-selected-bg)' : 'transparent' }};opacity:{{ prop.dim ? .5 : 1 }}">
-    <span data-fdn-style="row-label">{{ prop.label }}</span>
-    <span when="prop.note" data-fdn-style="row-note">{{ prop.note }}</span>
-    <span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none">
-      <span when="prop.leadingTag" data-fdn-style="row-note" style="margin-right:8px">{{ prop.leadingTag }}</span>
-      <!-- each over the split key-group string; degraded-browser note: this
-           split is a projection-time operation, not a runtime one — see (b) -->
-      <span each="group in prop.keyGroups.split(' · ')" style="display:inline-flex;align-items:center;gap:3px">
-        <fdn-use component="KbdCap" data-fdn-prop-keys="{{ group }}"/>
+  <fdn-doc hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="System — Help Center">
+    <fdn-params>
+      <fdn-param name="entryContext" type="enum" values="agent-run,changes,fleet,none" default="agent-run" description="focusedPaneId -> pane kind, per source board 2: which pane the ? was pressed in; drives which 'THIS PANE' section is pinned/tagged and scrolled-to"></fdn-param>
+      <fdn-param name="dialogOpen" type="boolean" default="true"></fdn-param>
+      <fdn-param name="searchQuery" type="string" default="" description="empty = sectioned catalog view; non-empty = board 3's flat ranked list"></fdn-param>
+      <fdn-param name="rowBindingState" type="enum" values="default,multi,override,disabled,recording,conflict" default="default" description="board 4's row-grammar catalog — one row per binding lifecycle state"></fdn-param>
+    </fdn-params>
+    <fdn-data name="guideTopics">
+      <fdn-item id="getting-started" label="Getting started"></fdn-item>
+      <fdn-item id="bees-fleet" label="Bees &amp; the fleet"></fdn-item>
+      <fdn-item id="yards-quests" label="Yards &amp; quests"></fdn-item>
+      <fdn-item id="reviewing" label="Reviewing changes"></fdn-item>
+      <fdn-item id="loops" label="Loops"></fdn-item>
+    </fdn-data>
+    <fdn-data name="referenceTopics">
+      <fdn-item id="keyboard-shortcuts" label="Keyboard shortcuts"></fdn-item>
+      <fdn-item id="command-palette" label="Command palette"></fdn-item>
+      <fdn-item id="message-delivery" label="Message delivery"></fdn-item>
+    </fdn-data>
+    <fdn-data name="thisPaneShortcuts">
+      <fdn-item id="reply" keys="[&quot;↵&quot;]" label="Reply" note="queued · delivered when the turn ends"></fdn-item>
+      <fdn-item id="interrupt" keys="[&quot;⌘↵&quot;]" label="Interrupt &amp; send now" note=""></fdn-item>
+      <fdn-item id="surface" keys="[&quot;⌥D&quot;, &quot;⌥B&quot;, &quot;⌥T&quot;, &quot;⌥S&quot;]" label="Surface a card" note="changes · browser · terminal · swarm"></fdn-item>
+      <fdn-item id="archive" keys="[&quot;e&quot;, &quot;⌘⇧E&quot;]" label="Archive agent" note=""></fdn-item>
+      <fdn-item id="important" keys="[&quot;⌘⌥J&quot;]" label="Toggle important" note="feeds needs-me + jump"></fdn-item>
+      <fdn-item id="copy-id" keys="[&quot;⌘⇧C&quot;]" label="Copy bee id" note=""></fdn-item>
+      <fdn-item id="self-seal" keys="[&quot;⌘⌥⇧L&quot;]" label="Ask agent to self-seal" note=""></fdn-item>
+      <fdn-item id="back" keys="[&quot;⌘←&quot;]" label="Back to previous view" note=""></fdn-item>
+    </fdn-data>
+    <fdn-data name="globalShortcuts">
+      <fdn-item id="palette" keys="[&quot;⌘K&quot;]" label="Command palette" note=""></fdn-item>
+      <fdn-item id="new-agent" keys="[&quot;⌘⇧N&quot;]" label="New agent — quick compose" note="from any view · layout untouched"></fdn-item>
+      <fdn-item id="jump-pane" keys="[&quot;⌘S&quot;]" label="Jump to pane — picker" note=""></fdn-item>
+      <fdn-item id="jump-imp" keys="[&quot;⌘⇧S&quot;, &quot;⌘J&quot;]" label="Jump to most important" note=""></fdn-item>
+      <fdn-item id="needs-me" keys="[&quot;g j&quot;]" label="Needs me — triage" note=""></fdn-item>
+      <fdn-item id="search-all" keys="[&quot;/&quot;]" label="Search everything" note=""></fdn-item>
+      <fdn-item id="sidebar" keys="[&quot;⌘B&quot;]" label="Toggle sidebar" note=""></fdn-item>
+      <fdn-item id="switch" keys="[&quot;o w&quot;, &quot;o y&quot;]" label="Switch workspace · switch yard" note=""></fdn-item>
+      <fdn-item id="new-tab" keys="[&quot;⌘T&quot;]" label="New window tab" note=""></fdn-item>
+      <fdn-item id="cycle-tab" keys="[&quot;⌃⇥&quot;, &quot;⌃⇧⇥&quot;]" label="Next · previous window tab" note=""></fdn-item>
+      <fdn-item id="help" keys="[&quot;?&quot;]" label="Keyboard shortcuts — this panel" note=""></fdn-item>
+    </fdn-data>
+    <fdn-states>
+      <fdn-state name="dialog-agent-run"></fdn-state>
+      <fdn-state name="dialog-changes"></fdn-state>
+      <fdn-state name="dialog-fleet"></fdn-state>
+      <fdn-state name="dialog-none"></fdn-state>
+      <fdn-state name="dialog-search"></fdn-state>
+      <fdn-state name="row-grammar"></fdn-state>
+    </fdn-states>
+    <fdn-matrix>
+      <fdn-viewport name="canvas" width="1480" height="900"></fdn-viewport>
+      <fdn-cell state="dialog-agent-run" viewport="canvas"></fdn-cell>
+      <fdn-cell state="dialog-changes" viewport="canvas"></fdn-cell>
+      <fdn-cell state="dialog-fleet" viewport="canvas"></fdn-cell>
+      <fdn-cell state="dialog-none" viewport="canvas"></fdn-cell>
+      <fdn-cell state="dialog-search" viewport="canvas"></fdn-cell>
+      <fdn-cell state="row-grammar" viewport="canvas"></fdn-cell>
+    </fdn-matrix>
+  </fdn-doc>
+  <fdn-styles hidden>
+    <fdn-style name="kbd-cap" align-items="center" background="var(--color-surface-alt)" border="1px solid var(--color-border)" border-bottom-left-radius="4px" border-bottom-right-radius="4px" border-bottom-width="2px" border-top-left-radius="4px" border-top-right-radius="4px" color="#5A564E" display="inline-flex" font-family="var(--font-mono)" font-size="10.5px" font-weight="500" height="18px" padding-bottom="0" padding-left="5px" padding-right="5px" padding-top="0" white-space="nowrap"></fdn-style>
+    <fdn-style name="kbd-sep" color="var(--color-text-ghost)" font-family="var(--font-mono)" font-size="10px" font-weight="400" margin-bottom="0" margin-left="1px" margin-right="1px" margin-top="0"></fdn-style>
+    <fdn-style name="row-label" color="var(--color-text-primary)" font-family="var(--font-sans)" font-size="13px" font-weight="400"></fdn-style>
+    <fdn-style name="row-note" color="var(--color-text-faint)" font-family="var(--font-mono)" font-size="10.5px" font-weight="400"></fdn-style>
+    <fdn-style name="section-head" align-items="center" color="var(--color-text-faint)" column-gap="9px" display="flex" font-family="var(--font-sans)" font-size="10px" font-weight="600" letter-spacing=".16em" margin-bottom="6px" margin-left="10px" margin-right="10px" margin-top="18px" row-gap="9px"></fdn-style>
+    <fdn-style name="caption" color="var(--color-text-muted)" font-family="var(--font-sans)" font-size="11.5px" font-weight="400" line-height="1.6"></fdn-style>
+  </fdn-styles>
+  <fdn-component name="AnchorLink" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="weight" type="enum" default="normal"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n15" style="color:{{ prop.weight == 'active' ? 'var(--color-text-primary)' : (prop.weight == 'dim' ? 'var(--color-text-tertiary)' : 'var(--color-text-faint)') }};display:block;font-family:var(--font-sans);font-size:11.5px;font-style:normal;font-variant:normal;font-weight:{{ prop.weight == 'active' ? 600 : 400 }};padding-bottom:3px;padding-left:0;padding-right:0;padding-top:3px">
+      {{ prop.label }}
+    </span>
+  </fdn-component>
+  <fdn-component name="GuideNav" hidden>
+    <fdn-props>
+      <fdn-prop name="activetopicid" type="string" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n16" style="background:var(--color-surface-alt);border-right:1px solid var(--color-border-subtle);display:flex;flex:none;flex-direction:column;padding-bottom:12px;padding-left:10px;padding-right:10px;padding-top:14px;width:232px">
+      <div data-fdn-id="n17" style="align-items:center;column-gap:8px;display:flex;padding-bottom:12px;padding-left:10px;padding-right:10px;padding-top:0;row-gap:8px">
+        <span data-fdn-id="n18" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:14px;font-style:normal;font-variant:normal;font-weight:600">
+          Help
+        </span>
+        <span data-fdn-id="n19" style="margin-left:auto">
+          <fdn-use data-fdn-id="n20" component="KbdCap" data-fdn-prop-keys="esc"></fdn-use>
+        </span>
+      </div>
+      <fdn-use data-fdn-id="n21" component="SectionHead" data-fdn-prop-text="GUIDE"></fdn-use>
+      <fdn-use data-fdn-id="n22" component="NavRow" data-fdn-prop-active="{{ topic.id == prop.activetopicid }}" data-fdn-prop-label="{{ topic.label }}" each="topic in data.guideTopics"></fdn-use>
+      <fdn-use data-fdn-id="n23" component="SectionHead" data-fdn-prop-text="REFERENCE"></fdn-use>
+      <fdn-use data-fdn-id="n24" component="NavRow" data-fdn-prop-active="{{ topic.id == prop.activetopicid }}" data-fdn-prop-label="{{ topic.label }}" each="topic in data.referenceTopics"></fdn-use>
+      <span data-fdn-id="n25" style="flex:1"></span>
+      <fdn-use data-fdn-id="n26" component="NavRow" data-fdn-prop-badge="0.4.2" data-fdn-prop-height="26" data-fdn-prop-label="What's new"></fdn-use>
+      <fdn-use data-fdn-id="n27" component="NavRow" data-fdn-prop-height="26" data-fdn-prop-label="About Apiary" data-fdn-prop-muted="true"></fdn-use>
+    </div>
+  </fdn-component>
+  <fdn-component name="KbdCap" hidden>
+    <fdn-props>
+      <fdn-prop name="keys" type="string" required="true"></fdn-prop>
+      <fdn-prop name="height" type="number" default="18"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n1" data-fdn-style="kbd-cap" style="height:{{ prop.height }}px">
+      {{ prop.keys }}
+    </span>
+  </fdn-component>
+  <fdn-component name="NavRow" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="active" type="boolean" default="false"></fdn-prop>
+      <fdn-prop name="badge" type="string"></fdn-prop>
+      <fdn-prop name="height" type="number" default="30"></fdn-prop>
+      <fdn-prop name="muted" type="boolean" default="false"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n12" style="align-items:center;background:{{ prop.active ? 'var(--color-selected-bg)' : 'transparent' }};border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);color:{{ prop.muted ? 'var(--color-text-faint)' : (prop.active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)') }};column-gap:9px;display:flex;font-family:var(--font-sans);font-size:13px;font-style:normal;font-variant:normal;font-weight:{{ prop.active ? '600' : '500' }};height:{{ prop.height }}px;padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:9px">
+      <span data-fdn-id="n13">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n14" when="prop.badge" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400;margin-left:auto">
+        {{ prop.badge }}
       </span>
     </span>
-  </div>
-</fdn-component>
-
-<!-- Component 3 of 5: SectionHead — .sechead, with an optional inline
-     de-emphasized trailing note (used for "· opened from drone-07" etc). -->
-<fdn-component name="SectionHead" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="text"    type="string" required="true"/>
-    <fdn-prop name="trailing" type="string"/>
-    <fdn-prop name="emphasis" type="enum" values="default,active" default="default"/>
-  </fdn-props>
-  <div data-fdn-style="section-head" style="color:{{ prop.emphasis == 'active' ? 'var(--color-text-tertiary)' : 'var(--color-text-faint)' }}">
-    {{ prop.text }}<span when="prop.trailing" style="font:400 10px var(--font-mono);letter-spacing:0;color:var(--color-text-faint);text-transform:none">{{ prop.trailing }}</span>
-  </div>
-</fdn-component>
-
-<!-- Component 4 of 5: NavRow — .navrow, the left-rail topic link. Structural
-     because of the optional trailing badge (version number) + active state. -->
-<fdn-component name="NavRow" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="label"    type="string" required="true"/>
-    <fdn-prop name="active"   type="boolean" default="false"/>
-    <fdn-prop name="badge"    type="string"/>
-    <fdn-prop name="height"   type="number" default="30"/>
-    <fdn-prop name="muted"    type="boolean" default="false"/>
-  </fdn-props>
-  <span style="display:flex;align-items:center;gap:9px;height:{{ prop.height }}px;padding:0 10px;border-radius:var(--radius-md);font:{{ prop.active ? '600' : '500' }} 13px var(--font-sans);color:{{ prop.muted ? 'var(--color-text-faint)' : (prop.active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)') }};background:{{ prop.active ? 'var(--color-selected-bg)' : 'transparent' }}">
-    {{ prop.label }}<span when="prop.badge" style="margin-left:auto;font:400 10.5px var(--font-mono);color:var(--color-text-faint)">{{ prop.badge }}</span>
-  </span>
-</fdn-component>
-
-<!-- Component 5 of 5: AnchorLink — .anchor, the right-hand section-jump rail. -->
-<fdn-component name="AnchorLink" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="label"  type="string" required="true"/>
-    <fdn-prop name="weight" type="enum" values="normal,active,dim" default="normal"/>
-  </fdn-props>
-  <span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:{{ prop.weight == 'active' ? 'var(--color-text-primary)' : (prop.weight == 'dim' ? 'var(--color-text-tertiary)' : 'var(--color-text-faint)') }};font-weight:{{ prop.weight == 'active' ? 600 : 400 }}">{{ prop.label }}</span>
-</fdn-component>
-
-<!-- ==========================================================================
-     GuideNav — the recurring left rail (topic rail), shared by board 1 and
-     board 5 verbatim in the source. Composes NavRow + SectionHead over the
-     doc-level data.guideTopics / data.referenceTopics.
-     ========================================================================== -->
-<fdn-component name="GuideNav" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="activeTopicId" type="string" required="true"/>
-  </fdn-props>
-  <div style="flex:none;width:232px;display:flex;flex-direction:column;background:var(--color-surface-alt);border-right:1px solid var(--color-border-subtle);padding:14px 10px 12px">
-    <div style="display:flex;align-items:center;gap:8px;padding:0 10px 12px">
-      <span style="font:600 14px var(--font-sans);color:var(--color-text-primary)">Help</span>
-      <span style="margin-left:auto"><fdn-use component="KbdCap" data-fdn-prop-keys="esc"/></span>
+  </fdn-component>
+  <fdn-component name="SectionHead" hidden>
+    <fdn-props>
+      <fdn-prop name="text" type="string" required="true"></fdn-prop>
+      <fdn-prop name="trailing" type="string"></fdn-prop>
+      <fdn-prop name="emphasis" type="enum" default="default"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n9" data-fdn-style="section-head" style="color:{{ prop.emphasis == 'active' ? 'var(--color-text-tertiary)' : 'var(--color-text-faint)' }}">
+      <span data-fdn-id="n10">
+        {{ prop.text }}
+      </span>
+      <span data-fdn-id="n11" when="prop.trailing" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10px;font-style:normal;font-variant:normal;font-weight:400;letter-spacing:0;text-transform:none">
+        {{ prop.trailing }}
+      </span>
     </div>
-    <fdn-use component="SectionHead" data-fdn-prop-text="GUIDE"/>
-    <fdn-use each="topic in data.guideTopics" component="NavRow" data-fdn-prop-label="{{ topic.label }}" data-fdn-prop-active="{{ topic.id == prop.activeTopicId }}"/>
-    <fdn-use component="SectionHead" data-fdn-prop-text="REFERENCE"/>
-    <fdn-use each="topic in data.referenceTopics" component="NavRow" data-fdn-prop-label="{{ topic.label }}" data-fdn-prop-active="{{ topic.id == prop.activeTopicId }}"/>
-    <span style="flex:1"></span>
-    <fdn-use component="NavRow" data-fdn-prop-label="What's new" data-fdn-prop-badge="0.4.2" data-fdn-prop-height="26"/>
-    <fdn-use component="NavRow" data-fdn-prop-label="About Apiary" data-fdn-prop-height="26" data-fdn-prop-muted="true"/>
-  </div>
-</fdn-component>
-
-<!-- ==========================================================================
-     document body
-     ========================================================================== -->
-<main style="padding:26px 32px 60px;display:flex;flex-direction:column;gap:64px;max-width:1560px">
-
-  <header style="display:flex;flex-direction:column;gap:4px">
-    <div style="font:500 13px var(--font-mono);color:var(--color-text-faint);letter-spacing:.04em">APIARY · SYSTEM — HELP CENTER · <fdn-use component="KbdCap" data-fdn-prop-keys="?" data-fdn-prop-height="16"><span data-fdn-style="kbd-cap" style="height:16px">?</span></fdn-use> opens a context-aware help dialog · topics in a rail · keyboard shortcuts as the flagship entry</div>
-    <div style="font:400 12px var(--font-sans);color:var(--color-text-placeholder)">key discovery today lives in ⌘K and the palette footers — never inline hint chrome (locked). <b style="font-weight:600;color:var(--color-text-muted)">?</b> adds the third surface: one large overlay (⌘K-palette shell — dimmed backdrop, esc / click-outside) with a topic rail on the left.</div>
-  </header>
-
-  <!-- ============================================================
-       BOARD 1 · THE DIALOG, opened from an agent-run pane.
-       This is the one FULLY DRAWN overlay instance in either source
-       board: role="dialog", centered, scrim + esc/click-outside
-       dismiss. See GRAMMAR-FINDINGS.md (c) for the overlay verdict
-       this instance (plus the toast in inbox-unified) is based on.
-       ============================================================ -->
-  <section data-fdn-state="dialog-agent-run">
-    <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px">1 · the dialog — ? pressed inside a running agent pane · the focused pane's section stays in its natural catalog slot; the dialog auto-scrolls there with a "this pane" tag</div>
-
-    <div style="position:relative;width:1480px;height:830px;border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:hidden;background:var(--color-bg)">
-      <!-- ghost app behind the overlay: ordinary flex chrome, NOT part of the overlay context -->
-      <div style="position:absolute;left:0;top:0;bottom:0;width:200px;border-right:1px solid var(--color-border-subtle);background:var(--color-bg)"></div>
-      <div style="position:absolute;left:212px;top:12px;bottom:12px;width:740px;background:var(--color-surface);border-radius:var(--radius-lg)"></div>
-      <div style="position:absolute;left:964px;top:12px;bottom:12px;right:12px;background:var(--color-surface);border-radius:var(--radius-lg)"></div>
-
-      <!-- fdn-overlay: INVENTED SYNTAX, proposal #4 (answers open question 2
-           for the "dialog" shape). Only inside an fdn-overlay may children use
-           position:absolute/fixed per D1's carve-out. role + dismiss are the
-           declarative behavior contract (no JS): dismiss list is descriptive
-           metadata for the engine/render surfaces, not executable. -->
-      <fdn-overlay data-fdn-role="dialog" data-fdn-dismiss="esc,backdrop-click" data-fdn-anchor="viewport-center" style="position:absolute;inset:0">
-        <div data-fdn-role="scrim" style="position:absolute;inset:0;background:rgba(46,43,39,.32)"></div>
-
-        <div data-fdn-role="panel" style="position:absolute;left:210px;top:52px;width:1060px;height:716px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-2xl);box-shadow:var(--shadow-panel);display:flex;overflow:hidden">
-
-          <fdn-use component="GuideNav" data-fdn-prop-activeTopicId="keyboard-shortcuts">    <div style="flex:none;width:232px;display:flex;flex-direction:column;background:var(--color-surface-alt);border-right:1px solid var(--color-border-subtle);padding:14px 10px 12px">
-      <div style="display:flex;align-items:center;gap:8px;padding:0 10px 12px">
-        <span style="font:600 14px var(--font-sans);color:var(--color-text-primary)">Help</span>
-        <span style="margin-left:auto"><span data-fdn-style="kbd-cap" style="height:18px">esc</span></span>
+  </fdn-component>
+  <fdn-component name="ShortcutRow" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="note" type="string"></fdn-prop>
+      <fdn-prop name="keygroups" type="list" required="true"></fdn-prop>
+      <fdn-prop name="dim" type="boolean" default="false"></fdn-prop>
+      <fdn-prop name="highlighted" type="boolean" default="false"></fdn-prop>
+      <fdn-prop name="leadingtag" type="string"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n2" style="align-items:center;background:{{ prop.highlighted ? 'var(--color-selected-bg)' : 'transparent' }};border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:10px;display:flex;min-height:30px;opacity:{{ prop.dim ? .5 : 1 }};padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:10px">
+      <span data-fdn-id="n3" data-fdn-style="row-label">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n4" when="prop.note" data-fdn-style="row-note">
+        {{ prop.note }}
+      </span>
+      <span data-fdn-id="n5" style="align-items:center;column-gap:3px;display:inline-flex;flex:none;margin-left:auto;row-gap:3px">
+        <span data-fdn-id="n6" when="prop.leadingtag" data-fdn-style="row-note" style="margin-right:8px">
+          {{ prop.leadingtag }}
+        </span>
+        <span data-fdn-id="n7" each="group in prop.keygroups" style="align-items:center;column-gap:3px;display:inline-flex;row-gap:3px">
+          <fdn-use data-fdn-id="n8" component="KbdCap" data-fdn-prop-keys="{{ group.value }}"></fdn-use>
+        </span>
+      </span>
+    </div>
+  </fdn-component>
+  <main>
+    <header data-fdn-id="n28" style="column-gap:4px;display:flex;flex-direction:column;row-gap:4px">
+      <div data-fdn-id="n29" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:13px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em">
+        <span data-fdn-id="n30">
+          APIARY · SYSTEM — HELP CENTER ·
+        </span>
+        <fdn-use data-fdn-id="n31" component="KbdCap" data-fdn-prop-height="16" data-fdn-prop-keys="?"></fdn-use>
+        <span data-fdn-id="n32">
+          opens a context-aware help dialog · topics in a rail · keyboard shortcuts as the flagship entry
+        </span>
       </div>
-      <div data-fdn-style="section-head" style="color:var(--color-text-faint)">GUIDE</div>
-        <fdn-use component="NavRow" data-fdn-prop-label="Getting started" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Getting started</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Bees &amp; the fleet" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Bees &amp; the fleet</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Yards &amp; quests" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Yards &amp; quests</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Reviewing changes" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Reviewing changes</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Loops" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Loops</span></fdn-use>
-      <div data-fdn-style="section-head" style="color:var(--color-text-faint)">REFERENCE</div>
-        <fdn-use component="NavRow" data-fdn-prop-label="Keyboard shortcuts" data-fdn-prop-active="true"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:600 13px var(--font-sans);color:var(--color-text-primary);background:var(--color-selected-bg)">Keyboard shortcuts</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Command palette" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Command palette</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Message delivery" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Message delivery</span></fdn-use>
-      <span style="flex:1"></span>
-      <fdn-use component="NavRow" data-fdn-prop-label="What's new" data-fdn-prop-badge="0.4.2" data-fdn-prop-height="26"><span style="display:flex;align-items:center;gap:9px;height:26px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">What's new<span style="margin-left:auto;font:400 10.5px var(--font-mono);color:var(--color-text-faint)">0.4.2</span></span></fdn-use>
-      <fdn-use component="NavRow" data-fdn-prop-label="About Apiary" data-fdn-prop-height="26" data-fdn-prop-muted="true"><span style="display:flex;align-items:center;gap:9px;height:26px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-faint);background:transparent">About Apiary</span></fdn-use>
-    </div></fdn-use>
-
-          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
-            <div style="flex:none;display:flex;align-items:center;gap:12px;padding:14px 20px 10px">
-              <div style="flex:1;display:flex;align-items:center;gap:9px;height:34px;padding:0 12px;border:1px solid var(--color-border);border-radius:var(--radius-lg)">
-                <span style="font:400 13.5px var(--font-sans);color:var(--color-text-placeholder)">Search shortcuts — command, key, or surface…</span>
-                <span style="display:inline-block;width:2px;height:16px;background:var(--color-caret);margin-left:-6px"></span>
-              </div>
-              <span style="font:400 10.5px var(--font-mono);color:var(--color-text-faint);flex:none">86 bindings · 10 surfaces</span>
-            </div>
-
-            <div style="flex:1;min-height:0;display:flex">
-              <div style="flex:1;min-width:0;overflow:hidden;padding:2px 10px 0 12px">
-
-                <!-- THIS PANE section: pinned/scrolled-to via when bound to param.entryContext -->
-                <div when="param.entryContext == 'agent-run'">
-                  <fdn-use component="SectionHead" data-fdn-prop-text="THIS PANE · AGENT RUN" data-fdn-prop-trailing="· opened from drone-07" data-fdn-prop-emphasis="active"><div data-fdn-style="section-head" style="color:var(--color-text-tertiary)">THIS PANE · AGENT RUN<span style="font:400 10px var(--font-mono);letter-spacing:0;color:var(--color-text-faint);text-transform:none">· opened from drone-07</span></div></fdn-use>
-                  <div style="border:1px solid var(--color-border-subtle);border-radius:var(--radius-lg);padding:4px 2px;margin:0 8px 2px">
-                    <fdn-use each="s in data.thisPaneShortcuts" component="ShortcutRow" data-fdn-prop-label="{{ s.label }}" data-fdn-prop-note="{{ s.note }}" data-fdn-prop-keyGroups="{{ s.keys }}">
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Reply</span><span data-fdn-style="row-note">queued · delivered when the turn ends</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">↵</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Interrupt &amp; send now</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘↵</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Surface a card</span><span data-fdn-style="row-note">changes · browser · terminal · swarm</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌥D</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌥B</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌥T</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌥S</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Archive agent</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">e</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧E</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Toggle important</span><span data-fdn-style="row-note">feeds needs-me + jump</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⌥J</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Copy bee id</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧C</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Ask agent to self-seal</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⌥⇧L</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Back to previous view</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘←</span></span></span></div>
-              </fdn-use>
-                  </div>
+      <div data-fdn-id="n33" style="color:var(--color-text-placeholder);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:400">
+        <span data-fdn-id="n34">
+          key discovery today lives in ⌘K and the palette footers — never inline hint chrome (locked).
+        </span>
+        <b data-fdn-id="n35" style="color:var(--color-text-muted);font-weight:600">
+          ?
+        </b>
+        <span data-fdn-id="n36">
+          adds the third surface: one large overlay (⌘K-palette shell — dimmed backdrop, esc / click-outside) with a topic rail on the left.
+        </span>
+      </div>
+    </header>
+    <section data-fdn-id="n37" data-fdn-state="dialog-agent-run">
+      <div data-fdn-id="n38" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px">
+        1 · the dialog — ? pressed inside a running agent pane · the focused pane's section stays in its natural catalog slot; the dialog auto-scrolls there with a "this pane" tag
+      </div>
+      <div data-fdn-id="n39" style="background:var(--color-bg);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-xl);border-bottom-right-radius:var(--radius-xl);border-top-left-radius:var(--radius-xl);border-top-right-radius:var(--radius-xl);column-gap:12px;display:flex;height:830px;overflow:hidden;position:relative;row-gap:12px;width:1480px">
+        <div data-fdn-id="n40" style="background:var(--color-bg);border-right:1px solid var(--color-border-subtle);flex:none;width:200px"></div>
+        <div data-fdn-id="n41" style="background:var(--color-surface);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);flex:none;margin-bottom:12px;margin-left:0;margin-right:0;margin-top:12px;width:740px"></div>
+        <div data-fdn-id="n42" style="background:var(--color-surface);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);flex:1;margin-bottom:12px;margin-left:0;margin-right:12px;margin-top:12px"></div>
+        <fdn-overlay data-fdn-id="n43" data-fdn-anchor="viewport-center" data-fdn-dismiss="esc,backdrop-click" data-fdn-role="dialog" style="bottom:0;left:0;position:absolute;right:0;top:0">
+          <div data-fdn-id="n44" data-fdn-role="scrim" style="background:rgba(46,43,39,.32);bottom:0;left:0;position:absolute;right:0;top:0"></div>
+          <div data-fdn-id="n45" data-fdn-role="panel" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-2xl);border-bottom-right-radius:var(--radius-2xl);border-top-left-radius:var(--radius-2xl);border-top-right-radius:var(--radius-2xl);box-shadow:var(--shadow-panel);display:flex;height:716px;left:210px;overflow:hidden;position:absolute;top:52px;width:1060px">
+            <fdn-use data-fdn-id="n46" component="GuideNav" data-fdn-prop-activetopicid="keyboard-shortcuts"></fdn-use>
+            <div data-fdn-id="n47" style="display:flex;flex:1;flex-direction:column;min-width:0">
+              <div data-fdn-id="n48" style="align-items:center;column-gap:12px;display:flex;flex:none;padding-bottom:10px;padding-left:20px;padding-right:20px;padding-top:14px;row-gap:12px">
+                <div data-fdn-id="n49" style="align-items:center;border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);column-gap:9px;display:flex;flex:1;height:34px;padding-bottom:0;padding-left:12px;padding-right:12px;padding-top:0;row-gap:9px">
+                  <span data-fdn-id="n50" style="color:var(--color-text-placeholder);font-family:var(--font-sans);font-size:13.5px;font-style:normal;font-variant:normal;font-weight:400">
+                    Search shortcuts — command, key, or surface…
+                  </span>
+                  <span data-fdn-id="n51" style="background:var(--color-caret);display:inline-block;height:16px;margin-left:-6px;width:2px"></span>
                 </div>
-
-                <fdn-use component="SectionHead" data-fdn-prop-text="GLOBAL"><div data-fdn-style="section-head" style="color:var(--color-text-faint)">GLOBAL</div></fdn-use>
-                <fdn-use each="s in data.globalShortcuts" component="ShortcutRow" data-fdn-prop-label="{{ s.label }}" data-fdn-prop-note="{{ s.note }}" data-fdn-prop-keyGroups="{{ s.keys }}">
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Command palette</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘K</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">New agent — quick compose</span><span data-fdn-style="row-note">from any view · layout untouched</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧N</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Jump to pane — picker</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘S</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Jump to most important</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧S</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘J</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Needs me — triage</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">g j</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Search everything</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">/</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Toggle sidebar</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘B</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Switch workspace · switch yard</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">o w</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">o y</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">New window tab</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘T</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Next · previous window tab</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌃⇥</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌃⇧⇥</span></span></span></div>
-                <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Keyboard shortcuts — this panel</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">?</span></span></span></div>
-              </fdn-use>
-
-                <fdn-use component="SectionHead" data-fdn-prop-text="PANES &amp; TABS"><div data-fdn-style="section-head" style="color:var(--color-text-faint)">PANES &amp; TABS</div></fdn-use>
-                <fdn-use component="ShortcutRow" data-fdn-prop-label="Split pane" data-fdn-prop-note="row · column" data-fdn-prop-keyGroups="⌘D · ⌘⇧D"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Split pane</span><span data-fdn-style="row-note">row · column</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘D</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧D</span></span></span></div></fdn-use>
-                <fdn-use component="ShortcutRow" data-fdn-prop-label="Close pane" data-fdn-prop-keyGroups="⌘W"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Close pane</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘W</span></span></span></div></fdn-use>
-                <fdn-use component="ShortcutRow" data-fdn-prop-label="Focus pane in direction" data-fdn-prop-keyGroups="⌥←↑↓→" data-fdn-prop-dim="true"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;opacity:.5;"><span data-fdn-style="row-label">Focus pane in direction</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌥←↑↓→</span></span></span></div></fdn-use>
+                <span data-fdn-id="n52" style="color:var(--color-text-faint);flex:none;font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400">
+                  86 bindings · 10 surfaces
+                </span>
               </div>
-
-              <div style="flex:none;width:132px;border-left:1px solid var(--color-border-hairline);padding:16px 16px 0 14px">
-                <fdn-use component="AnchorLink" data-fdn-prop-label="This pane" data-fdn-prop-weight="active"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-primary);font-weight:600">This pane</span></fdn-use>
-                <fdn-use component="AnchorLink" data-fdn-prop-label="Global" data-fdn-prop-weight="dim"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-tertiary);font-weight:400">Global</span></fdn-use>
-                <fdn-use component="AnchorLink" data-fdn-prop-label="Panes &amp; tabs"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-faint);font-weight:400">Panes &amp; tabs</span></fdn-use>
-                <fdn-use component="AnchorLink" data-fdn-prop-label="Lists"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-faint);font-weight:400">Lists</span></fdn-use>
-                <fdn-use component="AnchorLink" data-fdn-prop-label="Composer"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-faint);font-weight:400">Composer</span></fdn-use>
-                <fdn-use component="AnchorLink" data-fdn-prop-label="Fleet"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-faint);font-weight:400">Fleet</span></fdn-use>
-                <fdn-use component="AnchorLink" data-fdn-prop-label="Changes"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-faint);font-weight:400">Changes</span></fdn-use>
-                <fdn-use component="AnchorLink" data-fdn-prop-label="Editor"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-faint);font-weight:400">Editor</span></fdn-use>
-                <fdn-use component="AnchorLink" data-fdn-prop-label="Search"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-faint);font-weight:400">Search</span></fdn-use>
-                <fdn-use component="AnchorLink" data-fdn-prop-label="Sidebar &amp; pickers"><span style="display:block;padding:3px 0;font:400 11.5px var(--font-sans);color:var(--color-text-faint);font-weight:400">Sidebar &amp; pickers</span></fdn-use>
+              <div data-fdn-id="n53" style="display:flex;flex:1;min-height:0">
+                <div data-fdn-id="n54" style="flex:1;min-width:0;overflow:hidden;padding-bottom:0;padding-left:12px;padding-right:10px;padding-top:2px">
+                  <div data-fdn-id="n55" when="param.entryContext == 'agent-run'">
+                    <fdn-use data-fdn-id="n56" component="SectionHead" data-fdn-prop-emphasis="active" data-fdn-prop-text="THIS PANE · AGENT RUN" data-fdn-prop-trailing="· opened from drone-07"></fdn-use>
+                    <div data-fdn-id="n57" style="border:1px solid var(--color-border-subtle);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);margin-bottom:2px;margin-left:8px;margin-right:8px;margin-top:0;padding-bottom:4px;padding-left:2px;padding-right:2px;padding-top:4px">
+                      <fdn-use data-fdn-id="n58" component="ShortcutRow" data-fdn-prop-keygroups="{{ s.keys }}" data-fdn-prop-label="{{ s.label }}" data-fdn-prop-note="{{ s.note }}" each="s in data.thisPaneShortcuts"></fdn-use>
+                    </div>
+                  </div>
+                  <fdn-use data-fdn-id="n59" component="SectionHead" data-fdn-prop-text="GLOBAL"></fdn-use>
+                  <fdn-use data-fdn-id="n60" component="ShortcutRow" data-fdn-prop-keygroups="{{ s.keys }}" data-fdn-prop-label="{{ s.label }}" data-fdn-prop-note="{{ s.note }}" each="s in data.globalShortcuts"></fdn-use>
+                  <fdn-use data-fdn-id="n61" component="SectionHead" data-fdn-prop-text="PANES &amp; TABS"></fdn-use>
+                  <fdn-use data-fdn-id="n62" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘D&quot;, &quot;⌘⇧D&quot;]" data-fdn-prop-label="Split pane" data-fdn-prop-note="row · column"></fdn-use>
+                  <fdn-use data-fdn-id="n63" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘W&quot;]" data-fdn-prop-label="Close pane"></fdn-use>
+                  <fdn-use data-fdn-id="n64" component="ShortcutRow" data-fdn-prop-dim="true" data-fdn-prop-keygroups="[&quot;⌥←↑↓→&quot;]" data-fdn-prop-label="Focus pane in direction"></fdn-use>
+                </div>
+                <div data-fdn-id="n65" style="border-left:1px solid var(--color-border-hairline);flex:none;padding-bottom:0;padding-left:14px;padding-right:16px;padding-top:16px;width:132px">
+                  <fdn-use data-fdn-id="n66" component="AnchorLink" data-fdn-prop-label="This pane" data-fdn-prop-weight="active"></fdn-use>
+                  <fdn-use data-fdn-id="n67" component="AnchorLink" data-fdn-prop-label="Global" data-fdn-prop-weight="dim"></fdn-use>
+                  <fdn-use data-fdn-id="n68" component="AnchorLink" data-fdn-prop-label="Panes &amp; tabs"></fdn-use>
+                  <fdn-use data-fdn-id="n69" component="AnchorLink" data-fdn-prop-label="Lists"></fdn-use>
+                  <fdn-use data-fdn-id="n70" component="AnchorLink" data-fdn-prop-label="Composer"></fdn-use>
+                  <fdn-use data-fdn-id="n71" component="AnchorLink" data-fdn-prop-label="Fleet"></fdn-use>
+                  <fdn-use data-fdn-id="n72" component="AnchorLink" data-fdn-prop-label="Changes"></fdn-use>
+                  <fdn-use data-fdn-id="n73" component="AnchorLink" data-fdn-prop-label="Editor"></fdn-use>
+                  <fdn-use data-fdn-id="n74" component="AnchorLink" data-fdn-prop-label="Search"></fdn-use>
+                  <fdn-use data-fdn-id="n75" component="AnchorLink" data-fdn-prop-label="Sidebar &amp; pickers"></fdn-use>
+                </div>
+              </div>
+              <div data-fdn-id="n76" style="align-items:center;border-top:1px solid var(--color-border-subtle);color:var(--color-text-faint);column-gap:14px;display:flex;flex:none;font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400;height:34px;padding-bottom:0;padding-left:20px;padding-right:20px;padding-top:0;row-gap:14px">
+                <span data-fdn-id="n77">
+                  type to search
+                </span>
+                <span data-fdn-id="n78" style="color:#DAD5CC">
+                  ·
+                </span>
+                <span data-fdn-id="n79">
+                  ↑↓ move
+                </span>
+                <span data-fdn-id="n80" style="color:#DAD5CC">
+                  ·
+                </span>
+                <span data-fdn-id="n81">
+                  ↵ run command
+                </span>
+                <span data-fdn-id="n82" style="color:#DAD5CC">
+                  ·
+                </span>
+                <span data-fdn-id="n83">
+                  click keys to rebind
+                </span>
+                <span data-fdn-id="n84" style="color:#DAD5CC">
+                  ·
+                </span>
+                <span data-fdn-id="n85">
+                  esc close
+                </span>
+                <span data-fdn-id="n86" style="margin-left:auto">
+                  live from the command registry
+                </span>
               </div>
             </div>
-
-            <div style="flex:none;display:flex;align-items:center;gap:14px;height:34px;padding:0 20px;border-top:1px solid var(--color-border-subtle);font:400 10.5px var(--font-mono);color:var(--color-text-faint)">
-              <span>type to search</span><span style="color:#DAD5CC">·</span><span>↑↓ move</span><span style="color:#DAD5CC">·</span><span>↵ run command</span><span style="color:#DAD5CC">·</span><span>click keys to rebind</span><span style="color:#DAD5CC">·</span><span>esc close</span>
-              <span style="margin-left:auto">live from the command registry</span>
+          </div>
+        </fdn-overlay>
+      </div>
+      <div data-fdn-id="n87" data-fdn-style="caption" style="margin-left:210px;margin-top:10px;width:1060px">
+        <b data-fdn-id="n88" style="color:var(--color-accent);font-weight:600">
+          As implemented:
+        </b>
+        <span data-fdn-id="n89">
+          the focused pane's section is NOT pinned — it stays in its natural catalog slot and the dialog
+        </span>
+        <b data-fdn-id="n90" style="color:var(--color-text-tertiary);font-weight:600">
+          auto-scrolls to it on open
+        </b>
+        <span data-fdn-id="n91">
+          , marking the header with a neutral "this pane" tag. Search is focused on open · rows are live from
+        </span>
+        <span data-fdn-id="n92" style="font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400">
+          keysFor()
+        </span>
+        <span data-fdn-id="n93">
+          (override &gt; default) · ↵ dispatches the focused row. Zero honey per the §2 accent budget.
+        </span>
+      </div>
+    </section>
+    <section data-fdn-id="n94" style="column-gap:30px;display:flex;flex-wrap:wrap;row-gap:30px">
+      <div data-fdn-id="n95" data-fdn-state="dialog-changes" style="width:460px">
+        <div data-fdn-id="n96" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px">
+          2a · context = Changes pane
+        </div>
+        <div data-fdn-id="n97" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-xl);border-bottom-right-radius:var(--radius-xl);border-top-left-radius:var(--radius-xl);border-top-right-radius:var(--radius-xl);box-shadow:var(--shadow-card);height:308px;overflow:hidden;padding-bottom:0;padding-left:14px;padding-right:14px;padding-top:12px;width:460px">
+          <div data-fdn-id="n98" style="align-items:center;border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);column-gap:9px;display:flex;height:30px;margin-bottom:2px;padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:9px">
+            <span data-fdn-id="n99" style="color:var(--color-text-placeholder);font-family:var(--font-sans);font-size:12.5px;font-style:normal;font-variant:normal;font-weight:400">
+              Search shortcuts…
+            </span>
+          </div>
+          <fdn-use data-fdn-id="n100" component="SectionHead" data-fdn-prop-emphasis="active" data-fdn-prop-text="THIS PANE · CHANGES" data-fdn-prop-trailing="· apiary · working copy"></fdn-use>
+          <div data-fdn-id="n101" style="border:1px solid var(--color-border-subtle);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);padding-bottom:3px;padding-left:2px;padding-right:2px;padding-top:3px">
+            <fdn-use data-fdn-id="n102" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;j&quot;, &quot;k&quot;]" data-fdn-prop-label="Next · prev hunk — across files"></fdn-use>
+            <fdn-use data-fdn-id="n103" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;v&quot;]" data-fdn-prop-label="Mark file viewed · advance"></fdn-use>
+            <fdn-use data-fdn-id="n104" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;c&quot;]" data-fdn-prop-label="Comment → steer this hunk"></fdn-use>
+            <fdn-use data-fdn-id="n105" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⇧⌘P&quot;, &quot;⇧⌘L&quot;, &quot;⇧⌘R&quot;]" data-fdn-prop-label="Scope — product · checkout · range"></fdn-use>
+          </div>
+          <fdn-use data-fdn-id="n106" component="SectionHead" data-fdn-prop-text="GLOBAL"></fdn-use>
+          <fdn-use data-fdn-id="n107" component="ShortcutRow" data-fdn-prop-dim="true" data-fdn-prop-keygroups="[&quot;⌘K&quot;]" data-fdn-prop-label="Command palette"></fdn-use>
+        </div>
+        <div data-fdn-id="n108" data-fdn-style="caption" style="margin-top:9px">
+          <fdn-use data-fdn-id="n109" component="KbdCap" data-fdn-prop-height="15" data-fdn-prop-keys="?"></fdn-use>
+          <span data-fdn-id="n110">
+            in a Changes pane — the dialog opens scrolled to the diff atlas section (tagged "this pane"); its rows come from the pane's local registration, not the app registry.
+          </span>
+        </div>
+      </div>
+      <div data-fdn-id="n111" data-fdn-state="dialog-fleet" style="width:460px">
+        <div data-fdn-id="n112" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px">
+          2b · context = Fleet (Agents) pane
+        </div>
+        <div data-fdn-id="n113" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-xl);border-bottom-right-radius:var(--radius-xl);border-top-left-radius:var(--radius-xl);border-top-right-radius:var(--radius-xl);box-shadow:var(--shadow-card);height:308px;overflow:hidden;padding-bottom:0;padding-left:14px;padding-right:14px;padding-top:12px;width:460px">
+          <div data-fdn-id="n114" style="align-items:center;border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);column-gap:9px;display:flex;height:30px;margin-bottom:2px;padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:9px">
+            <span data-fdn-id="n115" style="color:var(--color-text-placeholder);font-family:var(--font-sans);font-size:12.5px;font-style:normal;font-variant:normal;font-weight:400">
+              Search shortcuts…
+            </span>
+          </div>
+          <fdn-use data-fdn-id="n116" component="SectionHead" data-fdn-prop-emphasis="active" data-fdn-prop-text="THIS PANE · AGENTS" data-fdn-prop-trailing="· fleet list · 24 shown"></fdn-use>
+          <div data-fdn-id="n117" style="border:1px solid var(--color-border-subtle);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);padding-bottom:3px;padding-left:2px;padding-right:2px;padding-top:3px">
+            <fdn-use data-fdn-id="n118" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;j&quot;, &quot;k&quot;, &quot;↑↓&quot;]" data-fdn-prop-label="Move selection"></fdn-use>
+            <fdn-use data-fdn-id="n119" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⇥&quot;, &quot;↵&quot;]" data-fdn-prop-label="Preview beside · open"></fdn-use>
+            <fdn-use data-fdn-id="n120" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;n&quot;]" data-fdn-prop-label="New agent here"></fdn-use>
+            <fdn-use data-fdn-id="n121" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;1 … 9&quot;]" data-fdn-prop-label="View tabs — list · tree · dense"></fdn-use>
+          </div>
+          <fdn-use data-fdn-id="n122" component="SectionHead" data-fdn-prop-text="GLOBAL"></fdn-use>
+          <fdn-use data-fdn-id="n123" component="ShortcutRow" data-fdn-prop-dim="true" data-fdn-prop-keygroups="[&quot;⌘K&quot;]" data-fdn-prop-label="Command palette"></fdn-use>
+        </div>
+        <div data-fdn-id="n124" data-fdn-style="caption" style="margin-top:9px">
+          <fdn-use data-fdn-id="n125" component="KbdCap" data-fdn-prop-height="15" data-fdn-prop-keys="?"></fdn-use>
+          <span data-fdn-id="n126">
+            in the Agents pane — lands on the Fleet section: the ADR 0002 list spine + the pane's own keys, in their normal catalog slot.
+          </span>
+        </div>
+      </div>
+      <div data-fdn-id="n127" data-fdn-state="dialog-none" style="width:460px">
+        <div data-fdn-id="n128" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px">
+          2c · no pane context
+        </div>
+        <div data-fdn-id="n129" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-xl);border-bottom-right-radius:var(--radius-xl);border-top-left-radius:var(--radius-xl);border-top-right-radius:var(--radius-xl);box-shadow:var(--shadow-card);height:308px;overflow:hidden;padding-bottom:0;padding-left:14px;padding-right:14px;padding-top:12px;width:460px">
+          <div data-fdn-id="n130" style="align-items:center;border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);column-gap:9px;display:flex;height:30px;margin-bottom:2px;padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:9px">
+            <span data-fdn-id="n131" style="color:var(--color-text-placeholder);font-family:var(--font-sans);font-size:12.5px;font-style:normal;font-variant:normal;font-weight:400">
+              Search shortcuts…
+            </span>
+          </div>
+          <fdn-use data-fdn-id="n132" component="SectionHead" data-fdn-prop-text="GLOBAL"></fdn-use>
+          <fdn-use data-fdn-id="n133" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘K&quot;]" data-fdn-prop-label="Command palette"></fdn-use>
+          <fdn-use data-fdn-id="n134" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘⇧N&quot;]" data-fdn-prop-label="New agent — quick compose"></fdn-use>
+          <fdn-use data-fdn-id="n135" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘S&quot;]" data-fdn-prop-label="Jump to pane — picker"></fdn-use>
+          <fdn-use data-fdn-id="n136" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘⇧S&quot;, &quot;⌘J&quot;]" data-fdn-prop-label="Jump to most important"></fdn-use>
+          <fdn-use data-fdn-id="n137" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;g j&quot;]" data-fdn-prop-label="Needs me — triage"></fdn-use>
+          <fdn-use data-fdn-id="n138" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;/&quot;]" data-fdn-prop-label="Search everything"></fdn-use>
+          <fdn-use data-fdn-id="n139" component="ShortcutRow" data-fdn-prop-dim="true" data-fdn-prop-keygroups="[&quot;⌘B&quot;]" data-fdn-prop-label="Toggle sidebar"></fdn-use>
+        </div>
+        <div data-fdn-id="n140" data-fdn-style="caption" style="margin-top:9px">
+          <fdn-use data-fdn-id="n141" component="KbdCap" data-fdn-prop-height="15" data-fdn-prop-keys="?"></fdn-use>
+          <span data-fdn-id="n142">
+            with no pane focus (launcher, empty slot) — no scroll target, no tag; the catalog simply starts at GLOBAL. Same document, same order.
+          </span>
+        </div>
+      </div>
+    </section>
+    <section data-fdn-id="n143" data-fdn-state="dialog-search">
+      <div data-fdn-id="n144" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px">
+        3 · search — one flat ranked list, surface tags keep the origin · ↵ runs the focused row
+      </div>
+      <div data-fdn-id="n145" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-2xl);border-bottom-right-radius:var(--radius-2xl);border-top-left-radius:var(--radius-2xl);border-top-right-radius:var(--radius-2xl);box-shadow:var(--shadow-card-lg);display:flex;flex-direction:column;height:560px;overflow:hidden;width:900px">
+        <div data-fdn-id="n146" style="align-items:center;column-gap:12px;display:flex;flex:none;padding-bottom:10px;padding-left:20px;padding-right:20px;padding-top:14px;row-gap:12px">
+          <div data-fdn-id="n147" style="align-items:center;border:1px solid #DAD5CC;border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);column-gap:9px;display:flex;flex:1;height:34px;padding-bottom:0;padding-left:12px;padding-right:12px;padding-top:0;row-gap:9px">
+            <span data-fdn-id="n148" data-fdn-bind="param.searchQuery" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:13.5px;font-style:normal;font-variant:normal;font-weight:400">
+              <span data-fdn-id="n149">
+                split
+              </span>
+              <span data-fdn-id="n150" style="background:var(--color-caret);display:inline-block;height:16px;margin-left:1px;vertical-align:-3px;width:2px"></span>
+            </span>
+            <span data-fdn-id="n151" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400;margin-left:auto">
+              6 matches
+            </span>
+            <span data-fdn-id="n152" style="align-items:center;border-bottom-left-radius:4px;border-bottom-right-radius:4px;border-top-left-radius:4px;border-top-right-radius:4px;color:var(--color-text-faint);display:inline-flex;font-size:11px;height:18px;justify-content:center;width:18px">
+              ✕
+            </span>
+          </div>
+        </div>
+        <div data-fdn-id="n153" style="flex:1;min-height:0;padding-bottom:0;padding-left:12px;padding-right:12px;padding-top:2px">
+          <fdn-use data-fdn-id="n154" component="ShortcutRow" data-fdn-prop-highlighted="true" data-fdn-prop-keygroups="[&quot;⌘D&quot;, &quot;⌘⇧D&quot;]" data-fdn-prop-label="Split pane" data-fdn-prop-leadingtag="Panes &amp; tabs" data-fdn-prop-note="row · column"></fdn-use>
+          <fdn-use data-fdn-id="n155" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘⌥O&quot;, &quot;⌘⌥⇧O&quot;]" data-fdn-prop-label="Open files in a split" data-fdn-prop-leadingtag="Panes &amp; tabs" data-fdn-prop-note="vertical · horizontal"></fdn-use>
+          <fdn-use data-fdn-id="n156" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⇥&quot;]" data-fdn-prop-label="Preview beside — split stays" data-fdn-prop-leadingtag="Lists"></fdn-use>
+          <fdn-use data-fdn-id="n157" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;i&quot;]" data-fdn-prop-label="Inline ⇄ split diff" data-fdn-prop-leadingtag="Changes" data-fdn-prop-note="auto by pane width"></fdn-use>
+          <fdn-use data-fdn-id="n158" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘⌥⇧←↑↓→&quot;]" data-fdn-prop-label="Move pane in direction — splits off at an edge" data-fdn-prop-leadingtag="Panes &amp; tabs"></fdn-use>
+          <fdn-use data-fdn-id="n159" component="ShortcutRow" data-fdn-prop-dim="true" data-fdn-prop-keygroups="[&quot;⌘⇧T&quot;]" data-fdn-prop-label="Add pane to group — unsplit a tab" data-fdn-prop-leadingtag="Panes &amp; tabs" data-fdn-prop-note="not available in this pane"></fdn-use>
+          <div data-fdn-id="n160" style="border-top:1px solid var(--color-border-hairline);color:var(--color-text-faint);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:400;margin-bottom:0;margin-left:10px;margin-right:10px;margin-top:16px;padding-top:12px">
+            <span data-fdn-id="n161">
+              no match in GUIDE topics ·
+            </span>
+            <span data-fdn-id="n162" style="color:var(--color-text-tertiary)">
+              search "split" in Search everything /
+            </span>
+          </div>
+        </div>
+        <div data-fdn-id="n163" style="align-items:center;border-top:1px solid var(--color-border-subtle);color:var(--color-text-faint);column-gap:14px;display:flex;flex:none;font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400;height:34px;padding-bottom:0;padding-left:20px;padding-right:20px;padding-top:0;row-gap:14px">
+          <span data-fdn-id="n164">
+            ↑↓ move
+          </span>
+          <span data-fdn-id="n165" style="color:#DAD5CC">
+            ·
+          </span>
+          <span data-fdn-id="n166">
+            ↵ run Split pane
+          </span>
+          <span data-fdn-id="n167" style="color:#DAD5CC">
+            ·
+          </span>
+          <span data-fdn-id="n168">
+            esc clear, then close
+          </span>
+        </div>
+      </div>
+      <div data-fdn-id="n169" data-fdn-style="caption" style="margin-top:10px;width:900px">
+        <span data-fdn-id="n170">
+          Typing anywhere lands in the field (focused on open). Matching is the house fuzzy scorer over
+        </span>
+        <b data-fdn-id="n171" style="color:var(--color-text-tertiary);font-weight:600">
+          title + key spec + surface name
+        </b>
+        <span data-fdn-id="n172">
+          ; sections dissolve into one ranked list with a quiet surface tag before the keys. Rows whose when-clause fails in the current context stay listed but dim ("not available in this pane") — discovery beats hiding.
+        </span>
+      </div>
+    </section>
+    <section data-fdn-id="n173" data-fdn-state="row-grammar" style="width:520px">
+      <div data-fdn-id="n174" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px">
+        4 · row grammar — every state a binding can be in · remap inline (APIA-14)
+      </div>
+      <div data-fdn-id="n175" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-2xl);border-bottom-right-radius:var(--radius-2xl);border-top-left-radius:var(--radius-2xl);border-top-right-radius:var(--radius-2xl);box-shadow:var(--shadow-card);padding-bottom:16px;padding-left:12px;padding-right:12px;padding-top:14px;width:520px">
+        <div data-fdn-id="n176" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10px;font-style:normal;font-variant:normal;font-weight:400;margin-bottom:3px;margin-left:10px;margin-right:10px;margin-top:2px">
+          default — straight from defaultKeys
+        </div>
+        <fdn-use data-fdn-id="n177" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘W&quot;]" data-fdn-prop-label="Close pane"></fdn-use>
+        <div data-fdn-id="n178" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10px;font-style:normal;font-variant:normal;font-weight:400;margin-bottom:3px;margin-left:10px;margin-right:10px;margin-top:12px">
+          multiple bindings · chords render as separate caps
+        </div>
+        <fdn-use data-fdn-id="n179" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘⇧S&quot;, &quot;⌘J&quot;]" data-fdn-prop-label="Jump to most important"></fdn-use>
+        <fdn-use data-fdn-id="n180" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;o y&quot;]" data-fdn-prop-label="Switch yard"></fdn-use>
+        <div data-fdn-id="n181" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10px;font-style:normal;font-variant:normal;font-weight:400;margin-bottom:3px;margin-left:10px;margin-right:10px;margin-top:12px">
+          user override — dot marks it custom · ↺ resets to default
+        </div>
+        <div data-fdn-id="n182" style="align-items:center;border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:10px;display:flex;min-height:30px;padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:10px">
+          <span data-fdn-id="n183" data-fdn-style="row-label">
+            Split pane
+          </span>
+          <span data-fdn-id="n184" style="align-items:center;column-gap:3px;display:inline-flex;margin-left:auto;row-gap:3px">
+            <span data-fdn-id="n185" style="background:var(--color-text-muted);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;height:5px;margin-right:2px;width:5px"></span>
+            <fdn-use data-fdn-id="n186" component="KbdCap" data-fdn-prop-keys="⌃\"></fdn-use>
+            <span data-fdn-id="n187" data-fdn-style="row-note" style="margin-left:6px">
+              ↺
+            </span>
+          </span>
+        </div>
+        <div data-fdn-id="n188" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10px;font-style:normal;font-variant:normal;font-weight:400;margin-bottom:3px;margin-left:10px;margin-right:10px;margin-top:12px">
+          disabled — override [] · command stays reachable via ⌘K
+        </div>
+        <div data-fdn-id="n189" style="align-items:center;border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:10px;display:flex;min-height:30px;opacity:.6;padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:10px">
+          <span data-fdn-id="n190" data-fdn-style="row-label">
+            Ask agent to self-seal
+          </span>
+          <span data-fdn-id="n191" style="align-items:center;column-gap:6px;display:inline-flex;margin-left:auto;row-gap:6px">
+            <span data-fdn-id="n192" data-fdn-style="row-note">
+              off
+            </span>
+            <span data-fdn-id="n193" data-fdn-style="row-note">
+              ↺
+            </span>
+          </span>
+        </div>
+        <div data-fdn-id="n194" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10px;font-style:normal;font-variant:normal;font-weight:400;margin-bottom:3px;margin-left:10px;margin-right:10px;margin-top:12px">
+          recording — click the keys (or ↵ on a focused row, then r)
+        </div>
+        <div data-fdn-id="n195" style="align-items:center;background:var(--color-selected-bg);border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:10px;display:flex;min-height:30px;padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:10px">
+          <span data-fdn-id="n196" data-fdn-style="row-label">
+            Split pane
+          </span>
+          <span data-fdn-id="n197" style="align-items:center;column-gap:6px;display:inline-flex;margin-left:auto;row-gap:6px">
+            <span data-fdn-id="n198" style="align-items:center;border:1px dashed #C5BEB3;border-bottom-left-radius:4px;border-bottom-right-radius:4px;border-top-left-radius:4px;border-top-right-radius:4px;color:var(--color-text-tertiary);display:inline-flex;font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400;height:20px;padding-bottom:0;padding-left:8px;padding-right:8px;padding-top:0">
+              press keys…
+            </span>
+            <span data-fdn-id="n199" data-fdn-style="row-note">
+              ↵ set · esc keep
+            </span>
+          </span>
+        </div>
+        <div data-fdn-id="n200" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10px;font-style:normal;font-variant:normal;font-weight:400;margin-bottom:3px;margin-left:10px;margin-right:10px;margin-top:12px">
+          conflict — the holder is named · taking it clears the loser
+        </div>
+        <div data-fdn-id="n201" style="border:1px solid var(--color-border-subtle);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);margin-bottom:0;margin-left:8px;margin-right:8px;margin-top:0;padding-bottom:8px;padding-left:10px;padding-right:10px;padding-top:8px">
+          <div data-fdn-id="n202" style="align-items:center;column-gap:8px;display:flex;row-gap:8px">
+            <fdn-use data-fdn-id="n203" component="KbdCap" data-fdn-prop-keys="⌘T"></fdn-use>
+            <span data-fdn-id="n204" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:400">
+              <span data-fdn-id="n205">
+                is held by
+              </span>
+              <b data-fdn-id="n206" style="color:var(--color-text-primary);font-weight:600">
+                New window tab
+              </b>
+            </span>
+          </div>
+          <div data-fdn-id="n207" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400;margin-top:7px">
+            ↵ take it — New window tab goes unbound · esc keep mine
+          </div>
+        </div>
+      </div>
+      <div data-fdn-id="n208" data-fdn-style="caption" style="margin-top:10px;width:520px">
+        <span data-fdn-id="n209">
+          Remapping writes
+        </span>
+        <span data-fdn-id="n210" style="font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400">
+          settings.keybindings
+        </span>
+        <span data-fdn-id="n211">
+          in the workspace doc (override &gt; default;
+        </span>
+        <span data-fdn-id="n212" style="font-family:var(--font-mono);font-size:10.5px;font-style:normal;font-variant:normal;font-weight:400">
+          []
+        </span>
+        <span data-fdn-id="n213">
+          disables). Paired bindings (⌘D/⌘⇧D) rebind as a pair. Conflicts are stated and resolved explicitly, never silently.
+        </span>
+      </div>
+    </section>
+    <section data-fdn-id="n214">
+      <div data-fdn-id="n215" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px">
+        5 · any other topic — the same shell carries prose · article grammar: breadcrumb · title · body with inline caps · one callout · related shortcuts
+      </div>
+      <div data-fdn-id="n216" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-2xl);border-bottom-right-radius:var(--radius-2xl);border-top-left-radius:var(--radius-2xl);border-top-right-radius:var(--radius-2xl);box-shadow:var(--shadow-card-lg);display:flex;height:640px;overflow:hidden;width:1060px">
+        <fdn-use data-fdn-id="n217" component="GuideNav" data-fdn-prop-activetopicid="message-delivery"></fdn-use>
+        <div data-fdn-id="n218" style="flex:1;min-width:0;overflow:hidden;padding-bottom:0;padding-left:40px;padding-right:40px;padding-top:26px">
+          <div data-fdn-id="n219" style="max-width:600px">
+            <div data-fdn-id="n220" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:10px;font-style:normal;font-variant:normal;font-weight:600;letter-spacing:.16em">
+              REFERENCE
+            </div>
+            <div data-fdn-id="n221" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:22px;font-style:normal;font-variant:normal;font-weight:600;letter-spacing:-.01em;margin-top:8px">
+              Message delivery
+            </div>
+            <p data-fdn-id="n222" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:14px;font-style:normal;font-variant:normal;font-weight:400;line-height:1.65;margin-bottom:0;margin-left:0;margin-right:0;margin-top:14px">
+              <span data-fdn-id="n223">
+                While a bee is running,
+              </span>
+              <fdn-use data-fdn-id="n224" component="KbdCap" data-fdn-prop-keys="↵"></fdn-use>
+              <span data-fdn-id="n225">
+                never interrupts it. Your message joins the bee's
+              </span>
+              <b data-fdn-id="n226" style="font-weight:600">
+                queue
+              </b>
+              <span data-fdn-id="n227">
+                and is delivered the moment the current turn ends — the row sits under the composer with a quiet
+              </span>
+              <i data-fdn-id="n228">
+                queued
+              </i>
+              <span data-fdn-id="n229">
+                tag until then.
+              </span>
+            </p>
+            <p data-fdn-id="n230" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:14px;font-style:normal;font-variant:normal;font-weight:400;line-height:1.65;margin-bottom:0;margin-left:0;margin-right:0;margin-top:12px">
+              <fdn-use data-fdn-id="n231" component="KbdCap" data-fdn-prop-keys="⌘↵"></fdn-use>
+              <span data-fdn-id="n232">
+                is the impatient path: it interrupts the live turn and delivers your message immediately. The queue is untouched — everything already waiting keeps waiting.
+              </span>
+            </p>
+            <p data-fdn-id="n233" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:14px;font-style:normal;font-variant:normal;font-weight:400;line-height:1.65;margin-bottom:0;margin-left:0;margin-right:0;margin-top:12px">
+              <span data-fdn-id="n234">
+                Each queued row carries two affordances:
+              </span>
+              <b data-fdn-id="n235" style="font-weight:600">
+                send now
+              </b>
+              <span data-fdn-id="n236">
+                (interrupt and deliver that row only) and
+              </span>
+              <b data-fdn-id="n237" style="font-weight:600">
+                ✕
+              </b>
+              <span data-fdn-id="n238">
+                (cancel before delivery). Rows are editable until they leave the queue.
+              </span>
+            </p>
+            <div data-fdn-id="n239" style="background:var(--color-surface-alt);border:1px solid var(--color-border-subtle);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:12.5px;font-style:normal;font-variant:normal;font-weight:400;line-height:1.6;margin-top:18px;padding-bottom:12px;padding-left:16px;padding-right:16px;padding-top:12px">
+              <span data-fdn-id="n240">
+                Bees on an HSR substrate also accept
+              </span>
+              <b data-fdn-id="n241" style="color:var(--color-text-secondary);font-weight:600">
+                next-tool
+              </b>
+              <span data-fdn-id="n242">
+                delivery — the message interjects at the live turn's next tool boundary instead of waiting for the turn to end. Where the substrate can't hold that, Apiary downgrades it to a plain queue append.
+              </span>
+            </div>
+            <fdn-use data-fdn-id="n243" component="SectionHead" data-fdn-prop-text="SHORTCUTS FOR THIS"></fdn-use>
+            <fdn-use data-fdn-id="n244" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;↵&quot;]" data-fdn-prop-label="Reply — queue for turn end"></fdn-use>
+            <fdn-use data-fdn-id="n245" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⌘↵&quot;]" data-fdn-prop-label="Interrupt &amp; send now"></fdn-use>
+            <fdn-use data-fdn-id="n246" component="ShortcutRow" data-fdn-prop-keygroups="[&quot;⇧↵&quot;]" data-fdn-prop-label="Newline in the composer"></fdn-use>
+            <div data-fdn-id="n247" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:500;margin-top:10px">
+              all agent-run shortcuts →
             </div>
           </div>
         </div>
-      </fdn-overlay>
-    </div>
-    <div data-fdn-style="caption" style="margin-top:10px;width:1060px;margin-left:210px"><b style="font-weight:600;color:var(--color-accent)">As implemented:</b> the focused pane's section is NOT pinned — it stays in its natural catalog slot and the dialog <b style="font-weight:600;color:var(--color-text-tertiary)">auto-scrolls to it on open</b>, marking the header with a neutral "this pane" tag. Search is focused on open · rows are live from <span style="font:400 10.5px var(--font-mono)">keysFor()</span> (override &gt; default) · ↵ dispatches the focused row. Zero honey per the §2 accent budget.</div>
-  </section>
-
-  <!-- ============================================================
-       BOARD 2 · CONTEXT AWARENESS — three crops, same dialog content
-       column, different pinned/scrolled "THIS PANE" section, driven by
-       the same param.entryContext used above. Demonstrates when= doing
-       real work: three renders of ONE component with three param values.
-       ============================================================ -->
-  <section style="display:flex;gap:30px;flex-wrap:wrap">
-    <div data-fdn-state="dialog-changes" style="width:460px">
-      <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px">2a · context = Changes pane</div>
-      <div style="width:460px;height:308px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);box-shadow:var(--shadow-card);overflow:hidden;padding:12px 14px 0">
-        <div style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border:1px solid var(--color-border);border-radius:var(--radius-lg);margin-bottom:2px">
-          <span style="font:400 12.5px var(--font-sans);color:var(--color-text-placeholder)">Search shortcuts…</span>
+      </div>
+    </section>
+    <section data-fdn-id="n248">
+      <div data-fdn-id="n249" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px">
+        6 · contracts — entry points · the dialog's own keys · data contract · budgets &amp; nots
+      </div>
+      <div data-fdn-id="n250" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-2xl);border-bottom-right-radius:var(--radius-2xl);border-top-left-radius:var(--radius-2xl);border-top-right-radius:var(--radius-2xl);column-gap:34px;display:flex;padding-bottom:24px;padding-left:26px;padding-right:26px;padding-top:22px;row-gap:34px;width:1480px">
+        <div data-fdn-id="n251" style="flex:1;min-width:0">
+          <div data-fdn-id="n252" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:10px;font-style:normal;font-variant:normal;font-weight:600;letter-spacing:.16em;margin-bottom:10px">
+            OPEN &amp; ENTRY
+          </div>
+          <div data-fdn-id="n253" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:400;line-height:1.9">
+            <fdn-use data-fdn-id="n254" component="KbdCap" data-fdn-prop-keys="?"></fdn-use>
+            <span data-fdn-id="n255">
+              opens it — matched on the
+            </span>
+            <b data-fdn-id="n256" style="font-weight:600">
+              produced character
+            </b>
+            <span data-fdn-id="n257">
+              (event.key === '?'), never the physical ⇧/ — so it works on Nordic and every other layout, and never collides with
+            </span>
+            <fdn-use data-fdn-id="n258" component="KbdCap" data-fdn-prop-keys="/"></fdn-use>
+            <span data-fdn-id="n259">
+              search. Outside editable targets only; a textarea keeps its question marks.
+            </span>
+            <br data-fdn-id="n260">
+            <span data-fdn-id="n261">
+              Other doors: a "Keyboard shortcuts ?" row in ⌘K · the palette footer hint · pane ⋯ menu · Help in the app menu. Repeat
+            </span>
+            <fdn-use data-fdn-id="n262" component="KbdCap" data-fdn-prop-keys="?"></fdn-use>
+            <span data-fdn-id="n263">
+              while open → jumps to the shortcuts entry re-scoped to the pane under the dialog; if already there, closes.
+            </span>
+          </div>
         </div>
-        <fdn-use component="SectionHead" data-fdn-prop-text="THIS PANE · CHANGES" data-fdn-prop-trailing="· apiary · working copy" data-fdn-prop-emphasis="active"><div data-fdn-style="section-head" style="color:var(--color-text-tertiary)">THIS PANE · CHANGES<span style="font:400 10px var(--font-mono);letter-spacing:0;color:var(--color-text-faint);text-transform:none">· apiary · working copy</span></div></fdn-use>
-        <div style="border:1px solid var(--color-border-subtle);border-radius:var(--radius-lg);padding:3px 2px">
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="Next · prev hunk — across files" data-fdn-prop-keyGroups="j · k"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Next · prev hunk — across files</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">j</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">k</span></span></span></div></fdn-use>
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="Mark file viewed · advance" data-fdn-prop-keyGroups="v"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Mark file viewed · advance</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">v</span></span></span></div></fdn-use>
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="Comment → steer this hunk" data-fdn-prop-keyGroups="c"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Comment → steer this hunk</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">c</span></span></span></div></fdn-use>
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="Scope — product · checkout · range" data-fdn-prop-keyGroups="⇧⌘P · ⇧⌘L · ⇧⌘R"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Scope — product · checkout · range</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⇧⌘P</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⇧⌘L</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⇧⌘R</span></span></span></div></fdn-use>
+        <div data-fdn-id="n264" style="border-left:1px solid var(--color-border-hairline);flex:1;min-width:0;padding-left:34px">
+          <div data-fdn-id="n265" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:10px;font-style:normal;font-variant:normal;font-weight:600;letter-spacing:.16em;margin-bottom:10px">
+            INSIDE THE DIALOG
+          </div>
+          <div data-fdn-id="n266" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:400;line-height:1.9">
+            <span data-fdn-id="n267">
+              search is focused on open ·
+            </span>
+            <b data-fdn-id="n268" style="font-weight:600">
+              type
+            </b>
+            <span data-fdn-id="n269">
+              = filter ·
+            </span>
+            <fdn-use data-fdn-id="n270" component="KbdCap" data-fdn-prop-keys="↑↓"></fdn-use>
+            <span data-fdn-id="n271">
+              move rows ·
+            </span>
+            <fdn-use data-fdn-id="n272" component="KbdCap" data-fdn-prop-keys="↵"></fdn-use>
+            <span data-fdn-id="n273">
+              run the command (closing the dialog) or open the topic ·
+            </span>
+            <fdn-use data-fdn-id="n274" component="KbdCap" data-fdn-prop-keys="⇥"></fdn-use>
+            <span data-fdn-id="n275">
+              hop rail ⇄ content ·
+            </span>
+            <fdn-use data-fdn-id="n276" component="KbdCap" data-fdn-prop-keys="⌥↑↓"></fdn-use>
+            <span data-fdn-id="n277">
+              previous · next section ·
+            </span>
+            <fdn-use data-fdn-id="n278" component="KbdCap" data-fdn-prop-keys="esc"></fdn-use>
+            <span data-fdn-id="n279">
+              clears the query first, closes second · click keys → record a rebinding.
+            </span>
+            <br data-fdn-id="n280">
+            <span data-fdn-id="n281">
+              No j/k inside the dialog — the field owns the keys (same rule as every popover, brief §11.5).
+            </span>
+          </div>
         </div>
-        <fdn-use component="SectionHead" data-fdn-prop-text="GLOBAL"><div data-fdn-style="section-head" style="color:var(--color-text-faint)">GLOBAL</div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Command palette" data-fdn-prop-keyGroups="⌘K" data-fdn-prop-dim="true"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;opacity:.5;"><span data-fdn-style="row-label">Command palette</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘K</span></span></span></div></fdn-use>
-      </div>
-      <div data-fdn-style="caption" style="margin-top:9px"><fdn-use component="KbdCap" data-fdn-prop-keys="?" data-fdn-prop-height="15"><span data-fdn-style="kbd-cap" style="height:15px">?</span></fdn-use> in a Changes pane — the dialog opens scrolled to the diff atlas section (tagged "this pane"); its rows come from the pane's local registration, not the app registry.</div>
-    </div>
-
-    <div data-fdn-state="dialog-fleet" style="width:460px">
-      <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px">2b · context = Fleet (Agents) pane</div>
-      <div style="width:460px;height:308px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);box-shadow:var(--shadow-card);overflow:hidden;padding:12px 14px 0">
-        <div style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border:1px solid var(--color-border);border-radius:var(--radius-lg);margin-bottom:2px">
-          <span style="font:400 12.5px var(--font-sans);color:var(--color-text-placeholder)">Search shortcuts…</span>
+        <div data-fdn-id="n282" style="border-left:1px solid var(--color-border-hairline);flex:1;min-width:0;padding-left:34px">
+          <div data-fdn-id="n283" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:10px;font-style:normal;font-variant:normal;font-weight:600;letter-spacing:.16em;margin-bottom:10px">
+            DATA CONTRACT
+          </div>
+          <div data-fdn-id="n284" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:400;line-height:1.9">
+            <span data-fdn-id="n285">
+              One source of truth: app commands come from the
+            </span>
+            <b data-fdn-id="n286" style="font-weight:600">
+              CommandRegistry
+            </b>
+            <span data-fdn-id="n287">
+              (title · category · when · keysFor overrides); pane vocabularies (list spine, diff atlas, composer mnemonics) are contributed by their surface as static atlas blocks. Nothing here is hand-maintained prose — add a command, it appears; remap a key, it updates live.
+            </span>
+            <br data-fdn-id="n288">
+            <span data-fdn-id="n289">
+              Context = focusedPaneId → pane kind → section map. Unknown pane kinds simply pin nothing.
+            </span>
+          </div>
         </div>
-        <fdn-use component="SectionHead" data-fdn-prop-text="THIS PANE · AGENTS" data-fdn-prop-trailing="· fleet list · 24 shown" data-fdn-prop-emphasis="active"><div data-fdn-style="section-head" style="color:var(--color-text-tertiary)">THIS PANE · AGENTS<span style="font:400 10px var(--font-mono);letter-spacing:0;color:var(--color-text-faint);text-transform:none">· fleet list · 24 shown</span></div></fdn-use>
-        <div style="border:1px solid var(--color-border-subtle);border-radius:var(--radius-lg);padding:3px 2px">
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="Move selection" data-fdn-prop-keyGroups="j · k · ↑↓"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Move selection</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">j</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">k</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">↑↓</span></span></span></div></fdn-use>
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="Preview beside · open" data-fdn-prop-keyGroups="⇥ · ↵"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Preview beside · open</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⇥</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">↵</span></span></span></div></fdn-use>
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="New agent here" data-fdn-prop-keyGroups="n"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">New agent here</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">n</span></span></span></div></fdn-use>
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="View tabs — list · tree · dense" data-fdn-prop-keyGroups="1 … 9"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">View tabs — list · tree · dense</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">1 … 9</span></span></span></div></fdn-use>
-        </div>
-        <fdn-use component="SectionHead" data-fdn-prop-text="GLOBAL"><div data-fdn-style="section-head" style="color:var(--color-text-faint)">GLOBAL</div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Command palette" data-fdn-prop-keyGroups="⌘K" data-fdn-prop-dim="true"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;opacity:.5;"><span data-fdn-style="row-label">Command palette</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘K</span></span></span></div></fdn-use>
-      </div>
-      <div data-fdn-style="caption" style="margin-top:9px"><fdn-use component="KbdCap" data-fdn-prop-keys="?" data-fdn-prop-height="15"><span data-fdn-style="kbd-cap" style="height:15px">?</span></fdn-use> in the Agents pane — lands on the Fleet section: the ADR 0002 list spine + the pane's own keys, in their normal catalog slot.</div>
-    </div>
-
-    <div data-fdn-state="dialog-none" style="width:460px">
-      <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px">2c · no pane context</div>
-      <div style="width:460px;height:308px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);box-shadow:var(--shadow-card);overflow:hidden;padding:12px 14px 0">
-        <div style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border:1px solid var(--color-border);border-radius:var(--radius-lg);margin-bottom:2px">
-          <span style="font:400 12.5px var(--font-sans);color:var(--color-text-placeholder)">Search shortcuts…</span>
-        </div>
-        <fdn-use component="SectionHead" data-fdn-prop-text="GLOBAL"><div data-fdn-style="section-head" style="color:var(--color-text-faint)">GLOBAL</div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Command palette" data-fdn-prop-keyGroups="⌘K"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Command palette</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘K</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="New agent — quick compose" data-fdn-prop-keyGroups="⌘⇧N"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">New agent — quick compose</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧N</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Jump to pane — picker" data-fdn-prop-keyGroups="⌘S"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Jump to pane — picker</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘S</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Jump to most important" data-fdn-prop-keyGroups="⌘⇧S · ⌘J"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Jump to most important</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧S</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘J</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Needs me — triage" data-fdn-prop-keyGroups="g j"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Needs me — triage</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">g j</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Search everything" data-fdn-prop-keyGroups="/"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Search everything</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">/</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Toggle sidebar" data-fdn-prop-keyGroups="⌘B" data-fdn-prop-dim="true"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;opacity:.5;"><span data-fdn-style="row-label">Toggle sidebar</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘B</span></span></span></div></fdn-use>
-      </div>
-      <div data-fdn-style="caption" style="margin-top:9px"><fdn-use component="KbdCap" data-fdn-prop-keys="?" data-fdn-prop-height="15"><span data-fdn-style="kbd-cap" style="height:15px">?</span></fdn-use> with no pane focus (launcher, empty slot) — no scroll target, no tag; the catalog simply starts at GLOBAL. Same document, same order.</div>
-    </div>
-  </section>
-
-  <!-- ============================================================
-       BOARD 3 · SEARCH — flat ranked list, driven by param.searchQuery.
-       ============================================================ -->
-  <section data-fdn-state="dialog-search">
-    <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px">3 · search — one flat ranked list, surface tags keep the origin · ↵ runs the focused row</div>
-    <div style="width:900px;height:560px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-2xl);box-shadow:var(--shadow-card-lg);overflow:hidden;display:flex;flex-direction:column">
-      <div style="flex:none;display:flex;align-items:center;gap:12px;padding:14px 20px 10px">
-        <div style="flex:1;display:flex;align-items:center;gap:9px;height:34px;padding:0 12px;border:1px solid #DAD5CC;border-radius:var(--radius-lg)">
-          <span style="font:400 13.5px var(--font-sans);color:var(--color-text-primary)" data-fdn-bind="param.searchQuery">split<span style="display:inline-block;width:2px;height:16px;background:var(--color-caret);vertical-align:-3px;margin-left:1px"></span></span>
-          <span style="margin-left:auto;font:400 10.5px var(--font-mono);color:var(--color-text-faint)">6 matches</span>
-          <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--color-text-faint);font-size:11px">✕</span>
-        </div>
-      </div>
-      <div style="flex:1;min-height:0;padding:2px 12px 0">
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Split pane" data-fdn-prop-note="row · column" data-fdn-prop-leadingTag="Panes &amp; tabs" data-fdn-prop-keyGroups="⌘D · ⌘⇧D" data-fdn-prop-highlighted="true"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:var(--color-selected-bg);"><span data-fdn-style="row-label">Split pane</span><span data-fdn-style="row-note">row · column</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span data-fdn-style="row-note" style="margin-right:8px">Panes &amp; tabs</span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘D</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧D</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Open files in a split" data-fdn-prop-note="vertical · horizontal" data-fdn-prop-leadingTag="Panes &amp; tabs" data-fdn-prop-keyGroups="⌘⌥O · ⌘⌥⇧O"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Open files in a split</span><span data-fdn-style="row-note">vertical · horizontal</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span data-fdn-style="row-note" style="margin-right:8px">Panes &amp; tabs</span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⌥O</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⌥⇧O</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Preview beside — split stays" data-fdn-prop-leadingTag="Lists" data-fdn-prop-keyGroups="⇥"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Preview beside — split stays</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span data-fdn-style="row-note" style="margin-right:8px">Lists</span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⇥</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Inline ⇄ split diff" data-fdn-prop-note="auto by pane width" data-fdn-prop-leadingTag="Changes" data-fdn-prop-keyGroups="i"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Inline ⇄ split diff</span><span data-fdn-style="row-note">auto by pane width</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span data-fdn-style="row-note" style="margin-right:8px">Changes</span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">i</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Move pane in direction — splits off at an edge" data-fdn-prop-leadingTag="Panes &amp; tabs" data-fdn-prop-keyGroups="⌘⌥⇧←↑↓→"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Move pane in direction — splits off at an edge</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span data-fdn-style="row-note" style="margin-right:8px">Panes &amp; tabs</span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⌥⇧←↑↓→</span></span></span></div></fdn-use>
-        <fdn-use component="ShortcutRow" data-fdn-prop-label="Add pane to group — unsplit a tab" data-fdn-prop-note="not available in this pane" data-fdn-prop-leadingTag="Panes &amp; tabs" data-fdn-prop-keyGroups="⌘⇧T" data-fdn-prop-dim="true"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;opacity:.5;"><span data-fdn-style="row-label">Add pane to group — unsplit a tab</span><span data-fdn-style="row-note">not available in this pane</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span data-fdn-style="row-note" style="margin-right:8px">Panes &amp; tabs</span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧T</span></span></span></div></fdn-use>
-        <div style="margin:16px 10px 0;padding-top:12px;border-top:1px solid var(--color-border-hairline);font:400 11px var(--font-mono);color:var(--color-text-faint)">no match in GUIDE topics · <span style="color:var(--color-text-tertiary)">search "split" in Search everything /</span></div>
-      </div>
-      <div style="flex:none;display:flex;align-items:center;gap:14px;height:34px;padding:0 20px;border-top:1px solid var(--color-border-subtle);font:400 10.5px var(--font-mono);color:var(--color-text-faint)">
-        <span>↑↓ move</span><span style="color:#DAD5CC">·</span><span>↵ run Split pane</span><span style="color:#DAD5CC">·</span><span>esc clear, then close</span>
-      </div>
-    </div>
-    <div data-fdn-style="caption" style="margin-top:10px;width:900px">Typing anywhere lands in the field (focused on open). Matching is the house fuzzy scorer over <b style="font-weight:600;color:var(--color-text-tertiary)">title + key spec + surface name</b>; sections dissolve into one ranked list with a quiet surface tag before the keys. Rows whose when-clause fails in the current context stay listed but dim ("not available in this pane") — discovery beats hiding.</div>
-  </section>
-
-  <!-- ============================================================
-       BOARD 4 · ROW GRAMMAR & REMAP — every lifecycle state a single
-       binding can be in. Rendered as six ShortcutRow-shaped variants;
-       "recording" and "conflict" need micro-states ShortcutRow's props
-       don't cover, so they're hand-written subset markup instead — see
-       findings (b) for what that gap actually is.
-       ============================================================ -->
-  <section data-fdn-state="row-grammar" style="width:520px">
-    <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px">4 · row grammar — every state a binding can be in · remap inline (APIA-14)</div>
-    <div style="width:520px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-2xl);box-shadow:var(--shadow-card);padding:14px 12px 16px">
-
-      <div style="font:400 10px var(--font-mono);color:var(--color-text-faint);margin:2px 10px 3px">default — straight from defaultKeys</div>
-      <fdn-use component="ShortcutRow" data-fdn-prop-label="Close pane" data-fdn-prop-keyGroups="⌘W"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Close pane</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘W</span></span></span></div></fdn-use>
-
-      <div style="font:400 10px var(--font-mono);color:var(--color-text-faint);margin:12px 10px 3px">multiple bindings · chords render as separate caps</div>
-      <fdn-use component="ShortcutRow" data-fdn-prop-label="Jump to most important" data-fdn-prop-keyGroups="⌘⇧S · ⌘J"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Jump to most important</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘⇧S</span></span><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘J</span></span></span></div></fdn-use>
-      <fdn-use component="ShortcutRow" data-fdn-prop-label="Switch yard" data-fdn-prop-keyGroups="o y"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Switch yard</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">o y</span></span></span></div></fdn-use>
-
-      <div style="font:400 10px var(--font-mono);color:var(--color-text-faint);margin:12px 10px 3px">user override — dot marks it custom · ↺ resets to default</div>
-      <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md)">
-        <span data-fdn-style="row-label">Split pane</span>
-        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px">
-          <span style="width:5px;height:5px;border-radius:50%;background:var(--color-text-muted);margin-right:2px"></span>
-          <fdn-use component="KbdCap" data-fdn-prop-keys="⌃\"><span data-fdn-style="kbd-cap" style="height:18px">⌃\</span></fdn-use>
-          <span data-fdn-style="row-note" style="margin-left:6px">↺</span>
-        </span>
-      </div>
-
-      <div style="font:400 10px var(--font-mono);color:var(--color-text-faint);margin:12px 10px 3px">disabled — override [] · command stays reachable via ⌘K</div>
-      <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);opacity:.6">
-        <span data-fdn-style="row-label">Ask agent to self-seal</span>
-        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">
-          <span data-fdn-style="row-note">off</span><span data-fdn-style="row-note">↺</span>
-        </span>
-      </div>
-
-      <div style="font:400 10px var(--font-mono);color:var(--color-text-faint);margin:12px 10px 3px">recording — click the keys (or ↵ on a focused row, then r)</div>
-      <div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:var(--color-selected-bg)">
-        <span data-fdn-style="row-label">Split pane</span>
-        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">
-          <span style="display:inline-flex;align-items:center;height:20px;padding:0 8px;border:1px dashed #C5BEB3;border-radius:4px;font:400 10.5px var(--font-mono);color:var(--color-text-tertiary)">press keys…</span>
-          <span data-fdn-style="row-note">↵ set · esc keep</span>
-        </span>
-      </div>
-
-      <div style="font:400 10px var(--font-mono);color:var(--color-text-faint);margin:12px 10px 3px">conflict — the holder is named · taking it clears the loser</div>
-      <div style="margin:0 8px;border:1px solid var(--color-border-subtle);border-radius:var(--radius-lg);padding:8px 10px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <fdn-use component="KbdCap" data-fdn-prop-keys="⌘T"><span data-fdn-style="kbd-cap" style="height:18px">⌘T</span></fdn-use>
-          <span style="font:400 12px var(--font-sans);color:var(--color-text-tertiary)">is held by <b style="font-weight:600;color:var(--color-text-primary)">New window tab</b></span>
-        </div>
-        <div style="margin-top:7px;font:400 10.5px var(--font-mono);color:var(--color-text-faint)">↵ take it — New window tab goes unbound · esc keep mine</div>
-      </div>
-    </div>
-    <div data-fdn-style="caption" style="margin-top:10px;width:520px">Remapping writes <span style="font:400 10.5px var(--font-mono)">settings.keybindings</span> in the workspace doc (override &gt; default; <span style="font:400 10.5px var(--font-mono)">[]</span> disables). Paired bindings (⌘D/⌘⇧D) rebind as a pair. Conflicts are stated and resolved explicitly, never silently.</div>
-  </section>
-
-  <!-- ============================================================
-       BOARD 5 · A GUIDE TOPIC — the generic article shell.
-       ============================================================ -->
-  <section>
-    <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px">5 · any other topic — the same shell carries prose · article grammar: breadcrumb · title · body with inline caps · one callout · related shortcuts</div>
-    <div style="width:1060px;height:640px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-2xl);box-shadow:var(--shadow-card-lg);display:flex;overflow:hidden">
-      <fdn-use component="GuideNav" data-fdn-prop-activeTopicId="message-delivery">    <div style="flex:none;width:232px;display:flex;flex-direction:column;background:var(--color-surface-alt);border-right:1px solid var(--color-border-subtle);padding:14px 10px 12px">
-      <div style="display:flex;align-items:center;gap:8px;padding:0 10px 12px">
-        <span style="font:600 14px var(--font-sans);color:var(--color-text-primary)">Help</span>
-        <span style="margin-left:auto"><span data-fdn-style="kbd-cap" style="height:18px">esc</span></span>
-      </div>
-      <div data-fdn-style="section-head" style="color:var(--color-text-faint)">GUIDE</div>
-        <fdn-use component="NavRow" data-fdn-prop-label="Getting started" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Getting started</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Bees &amp; the fleet" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Bees &amp; the fleet</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Yards &amp; quests" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Yards &amp; quests</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Reviewing changes" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Reviewing changes</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Loops" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Loops</span></fdn-use>
-      <div data-fdn-style="section-head" style="color:var(--color-text-faint)">REFERENCE</div>
-        <fdn-use component="NavRow" data-fdn-prop-label="Keyboard shortcuts" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Keyboard shortcuts</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Command palette" data-fdn-prop-active="false"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">Command palette</span></fdn-use>
-        <fdn-use component="NavRow" data-fdn-prop-label="Message delivery" data-fdn-prop-active="true"><span style="display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:var(--radius-md);font:600 13px var(--font-sans);color:var(--color-text-primary);background:var(--color-selected-bg)">Message delivery</span></fdn-use>
-      <span style="flex:1"></span>
-      <fdn-use component="NavRow" data-fdn-prop-label="What's new" data-fdn-prop-badge="0.4.2" data-fdn-prop-height="26"><span style="display:flex;align-items:center;gap:9px;height:26px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-tertiary);background:transparent">What's new<span style="margin-left:auto;font:400 10.5px var(--font-mono);color:var(--color-text-faint)">0.4.2</span></span></fdn-use>
-      <fdn-use component="NavRow" data-fdn-prop-label="About Apiary" data-fdn-prop-height="26" data-fdn-prop-muted="true"><span style="display:flex;align-items:center;gap:9px;height:26px;padding:0 10px;border-radius:var(--radius-md);font:500 13px var(--font-sans);color:var(--color-text-faint);background:transparent">About Apiary</span></fdn-use>
-    </div></fdn-use>
-      <div style="flex:1;min-width:0;overflow:hidden;padding:26px 40px 0">
-        <div style="max-width:600px">
-          <div style="font:600 10px var(--font-sans);letter-spacing:.16em;color:var(--color-text-faint)">REFERENCE</div>
-          <div style="font:600 22px var(--font-sans);color:var(--color-text-primary);margin-top:8px;letter-spacing:-.01em">Message delivery</div>
-          <p style="font:400 14px/1.65 var(--font-sans);color:var(--color-text-secondary);margin:14px 0 0">While a bee is running, <fdn-use component="KbdCap" data-fdn-prop-keys="↵"><span data-fdn-style="kbd-cap" style="height:18px">↵</span></fdn-use> never interrupts it. Your message joins the bee's <b style="font-weight:600">queue</b> and is delivered the moment the current turn ends — the row sits under the composer with a quiet <i>queued</i> tag until then.</p>
-          <p style="font:400 14px/1.65 var(--font-sans);color:var(--color-text-secondary);margin:12px 0 0"><fdn-use component="KbdCap" data-fdn-prop-keys="⌘↵"><span data-fdn-style="kbd-cap" style="height:18px">⌘↵</span></fdn-use> is the impatient path: it interrupts the live turn and delivers your message immediately. The queue is untouched — everything already waiting keeps waiting.</p>
-          <p style="font:400 14px/1.65 var(--font-sans);color:var(--color-text-secondary);margin:12px 0 0">Each queued row carries two affordances: <b style="font-weight:600">send now</b> (interrupt and deliver that row only) and <b style="font-weight:600">✕</b> (cancel before delivery). Rows are editable until they leave the queue.</p>
-          <div style="margin-top:18px;border:1px solid var(--color-border-subtle);border-radius:var(--radius-lg);background:var(--color-surface-alt);padding:12px 16px;font:400 12.5px/1.6 var(--font-sans);color:var(--color-text-tertiary)">Bees on an HSR substrate also accept <b style="font-weight:600;color:var(--color-text-secondary)">next-tool</b> delivery — the message interjects at the live turn's next tool boundary instead of waiting for the turn to end. Where the substrate can't hold that, Apiary downgrades it to a plain queue append.</div>
-          <fdn-use component="SectionHead" data-fdn-prop-text="SHORTCUTS FOR THIS"><div data-fdn-style="section-head" style="color:var(--color-text-faint)">SHORTCUTS FOR THIS</div></fdn-use>
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="Reply — queue for turn end" data-fdn-prop-keyGroups="↵"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Reply — queue for turn end</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">↵</span></span></span></div></fdn-use>
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="Interrupt &amp; send now" data-fdn-prop-keyGroups="⌘↵"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Interrupt &amp; send now</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⌘↵</span></span></span></div></fdn-use>
-          <fdn-use component="ShortcutRow" data-fdn-prop-label="Newline in the composer" data-fdn-prop-keyGroups="⇧↵"><div style="display:flex;align-items:center;gap:10px;min-height:30px;padding:0 10px;border-radius:var(--radius-md);background:transparent;"><span data-fdn-style="row-label">Newline in the composer</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;flex:none"><span style="display:inline-flex;align-items:center;gap:3px"><span data-fdn-style="kbd-cap" style="height:18px">⇧↵</span></span></span></div></fdn-use>
-          <div style="margin-top:10px;font:500 12px var(--font-sans);color:var(--color-text-tertiary)">all agent-run shortcuts →</div>
+        <div data-fdn-id="n290" style="border-left:1px solid var(--color-border-hairline);flex:1;min-width:0;padding-left:34px">
+          <div data-fdn-id="n291" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:10px;font-style:normal;font-variant:normal;font-weight:600;letter-spacing:.16em;margin-bottom:10px">
+            BUDGETS &amp; NOTS
+          </div>
+          <div data-fdn-id="n292" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:400;line-height:1.9">
+            <span data-fdn-id="n293">
+              Honey count:
+            </span>
+            <b data-fdn-id="n294" style="font-weight:600">
+              zero
+            </b>
+            <span data-fdn-id="n295">
+              . Selection, pinned card, recording state — all neutral gray. Status palette: unused. Serif: unused —
+            </span>
+            <span data-fdn-id="n296" style="color:var(--color-text-faint)">
+              <span data-fdn-id="n297">
+                a design-system audit finding, not this document's opinion:
+              </span>
+              <code data-fdn-id="n298">
+                --font-serif
+              </code>
+              <span data-fdn-id="n299">
+                is declared/imported and never referenced by a single node, see GRAMMAR-FINDINGS.md (d).
+              </span>
+            </span>
+            <br data-fdn-id="n300">
+            <span data-fdn-id="n301">
+              NOT a settings pane · NOT a docs site · NOT inline hint chrome (locked). No sidebar key hints, ever.
+            </span>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- ============================================================
-       BOARD 6 · CONTRACTS + DIALOG ATLAS — four columns of prose. No
-       componentization: each column is a one-off block of body text,
-       exactly the case D1 says stays plain HTML. Named style used for
-       the recurring column-head caption typography only.
-       ============================================================ -->
-  <section>
-    <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px">6 · contracts — entry points · the dialog's own keys · data contract · budgets &amp; nots</div>
-    <div style="width:1480px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-2xl);padding:22px 26px 24px;display:flex;gap:34px">
-      <div style="flex:1;min-width:0">
-        <div style="font:600 10px var(--font-sans);letter-spacing:.16em;color:var(--color-text-faint);margin-bottom:10px">OPEN &amp; ENTRY</div>
-        <div style="font:400 12px/1.9 var(--font-sans);color:var(--color-text-secondary)">
-          <fdn-use component="KbdCap" data-fdn-prop-keys="?"><span data-fdn-style="kbd-cap" style="height:18px">?</span></fdn-use> opens it — matched on the <b style="font-weight:600">produced character</b> (event.key === '?'), never the physical ⇧/ — so it works on Nordic and every other layout, and never collides with <fdn-use component="KbdCap" data-fdn-prop-keys="/"><span data-fdn-style="kbd-cap" style="height:18px">/</span></fdn-use> search. Outside editable targets only; a textarea keeps its question marks.<br>
-          Other doors: a "Keyboard shortcuts ?" row in ⌘K · the palette footer hint · pane ⋯ menu · Help in the app menu. Repeat <fdn-use component="KbdCap" data-fdn-prop-keys="?"><span data-fdn-style="kbd-cap" style="height:18px">?</span></fdn-use> while open → jumps to the shortcuts entry re-scoped to the pane under the dialog; if already there, closes.
-        </div>
-      </div>
-      <div style="flex:1;min-width:0;border-left:1px solid var(--color-border-hairline);padding-left:34px">
-        <div style="font:600 10px var(--font-sans);letter-spacing:.16em;color:var(--color-text-faint);margin-bottom:10px">INSIDE THE DIALOG</div>
-        <div style="font:400 12px/1.9 var(--font-sans);color:var(--color-text-secondary)">
-          search is focused on open · <b style="font-weight:600">type</b> = filter · <fdn-use component="KbdCap" data-fdn-prop-keys="↑↓"><span data-fdn-style="kbd-cap" style="height:18px">↑↓</span></fdn-use> move rows · <fdn-use component="KbdCap" data-fdn-prop-keys="↵"><span data-fdn-style="kbd-cap" style="height:18px">↵</span></fdn-use> run the command (closing the dialog) or open the topic · <fdn-use component="KbdCap" data-fdn-prop-keys="⇥"><span data-fdn-style="kbd-cap" style="height:18px">⇥</span></fdn-use> hop rail ⇄ content · <fdn-use component="KbdCap" data-fdn-prop-keys="⌥↑↓"><span data-fdn-style="kbd-cap" style="height:18px">⌥↑↓</span></fdn-use> previous · next section · <fdn-use component="KbdCap" data-fdn-prop-keys="esc"><span data-fdn-style="kbd-cap" style="height:18px">esc</span></fdn-use> clears the query first, closes second · click keys → record a rebinding.<br>
-          No j/k inside the dialog — the field owns the keys (same rule as every popover, brief §11.5).
-        </div>
-      </div>
-      <div style="flex:1;min-width:0;border-left:1px solid var(--color-border-hairline);padding-left:34px">
-        <div style="font:600 10px var(--font-sans);letter-spacing:.16em;color:var(--color-text-faint);margin-bottom:10px">DATA CONTRACT</div>
-        <div style="font:400 12px/1.9 var(--font-sans);color:var(--color-text-secondary)">
-          One source of truth: app commands come from the <b style="font-weight:600">CommandRegistry</b> (title · category · when · keysFor overrides); pane vocabularies (list spine, diff atlas, composer mnemonics) are contributed by their surface as static atlas blocks. Nothing here is hand-maintained prose — add a command, it appears; remap a key, it updates live.<br>
-          Context = focusedPaneId → pane kind → section map. Unknown pane kinds simply pin nothing.
-        </div>
-      </div>
-      <div style="flex:1;min-width:0;border-left:1px solid var(--color-border-hairline);padding-left:34px">
-        <div style="font:600 10px var(--font-sans);letter-spacing:.16em;color:var(--color-text-faint);margin-bottom:10px">BUDGETS &amp; NOTS</div>
-        <div style="font:400 12px/1.9 var(--font-sans);color:var(--color-text-secondary)">
-          Honey count: <b style="font-weight:600">zero</b>. Selection, pinned card, recording state — all neutral gray. Status palette: unused. Serif: unused — <span style="color:var(--color-text-faint)">a design-system audit finding, not this document's opinion: <code>--font-serif</code> is declared/imported and never referenced by a single node, see GRAMMAR-FINDINGS.md (d).</span><br>
-          NOT a settings pane · NOT a docs site · NOT inline hint chrome (locked). No sidebar key hints, ever.
-        </div>
-      </div>
-    </div>
-  </section>
-
-</main>
-
+    </section>
+  </main>
 </body>
 </html>

@@ -143,25 +143,56 @@ function toBindable(item: unknown): Record<string, unknown> {
   return { value: item }
 }
 
+// `data.<name>` is the sanctioned each-source shape (matches validate's
+// checkEachSource and every board) — dispatched first, ahead of the generic
+// dotted-ref fallback, since 'data' is not a binding prefix resolveRef knows
+// about and would otherwise always fail as unknown-ref (the zero-items bug).
+const DATA_EACH_SOURCE = /^data\.([A-Za-z_][A-Za-z0-9_]*)$/
+
 function resolveEachSource(source: string, node: FdnNode, ctx: BakeCtx): unknown[] | undefined {
-  if (source.includes('.')) {
-    const path = source.split('.')
+  const trimmed = source.trim()
+
+  const dataMatch = DATA_EACH_SOURCE.exec(trimmed)
+  if (dataMatch) {
+    const setName = dataMatch[1] as string
+    const ds = ctx.doc.data.find((d) => d.name === setName)
+    if (!ds) {
+      pushReport(ctx, { code: 'unknown-ref', severity: 'warning', message: `each source "${trimmed}" is not a declared data set`, nodeId: node.id })
+      return undefined
+    }
+    return ds.items
+  }
+
+  // Dotted, non-`data.` sources: prop./param. list-typed refs, or a ref into
+  // a bound each-alias (nested each, e.g. "member in group.members").
+  if (trimmed.includes('.')) {
+    const path = trimmed.split('.')
     const r = resolveRef(path, ctx)
     if (!r.ok) {
-      pushReport(ctx, { code: 'unknown-ref', severity: 'warning', message: `each source "${source}" not found`, nodeId: node.id })
+      pushReport(ctx, { code: 'unknown-ref', severity: 'warning', message: `each source "${trimmed}" not found`, nodeId: node.id })
       return undefined
     }
     if (!Array.isArray(r.value)) {
-      pushReport(ctx, { code: 'each-source-not-list', severity: 'error', message: `each source "${source}" did not resolve to a list`, nodeId: node.id })
+      pushReport(ctx, { code: 'each-source-not-list', severity: 'error', message: `each source "${trimmed}" did not resolve to a list`, nodeId: node.id })
       return undefined
     }
     return r.value
   }
-  const ds = ctx.doc.data.find((d) => d.name === source)
+
+  // Bare data-set name: deprecated back-compat form. `validate` requires the
+  // dotted `data.<name>` shape, so this always trips a report line even on
+  // success — the deprecation is the point, not an error.
+  const ds = ctx.doc.data.find((d) => d.name === trimmed)
   if (!ds) {
-    pushReport(ctx, { code: 'unknown-ref', severity: 'warning', message: `each source "${source}" is not a declared data set`, nodeId: node.id })
+    pushReport(ctx, { code: 'unknown-ref', severity: 'warning', message: `each source "${trimmed}" is not a declared data set`, nodeId: node.id })
     return undefined
   }
+  pushReport(ctx, {
+    code: 'each-bare-data-source',
+    severity: 'warning',
+    message: `each source "${trimmed}" uses the deprecated bare data-set name; write "data.${trimmed}" instead (the shape validate requires)`,
+    nodeId: node.id,
+  })
   return ds.items
 }
 

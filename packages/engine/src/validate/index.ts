@@ -235,6 +235,24 @@ function checkEachSource(ctx: ValidateCtx, source: string, scope: Scope, nodeId:
 }
 
 // ——————————————————————————————————————————————————————————————————————————
+// identifier casing (prop/param names must survive HTML's attribute-name
+// lowercasing — a parser upstream of the engine, e.g. parse5, lowercases
+// `data-fdn-prop-activeTopicId` to `data-fdn-prop-activetopicid` before any
+// engine code sees it, so a camelCase declaration silently never binds: the
+// instance attribute lookup is exact-string against the declared name)
+// ——————————————————————————————————————————————————————————————————————————
+
+function checkLowercaseName(ctx: ValidateCtx, kind: 'param' | 'prop', name: string, componentName: string | undefined): void {
+  if (name === name.toLowerCase()) return
+  push(ctx, {
+    code: 'prop-name-not-lowercase',
+    severity: 'error',
+    message: `${kind} "${name}"${componentName ? ` on component "${componentName}"` : ''} is not all-lowercase — HTML lowercases attribute names, so a camelCase ${kind} silently never binds; rename it to lowercase (e.g. "${name.toLowerCase()}")`,
+    detail: { kind, name, component: componentName },
+  })
+}
+
+// ——————————————————————————————————————————————————————————————————————————
 // node walk
 // ——————————————————————————————————————————————————————————————————————————
 
@@ -365,6 +383,7 @@ function walkNode(ctx: ValidateCtx, node: FdnNode, scope: Scope, inOverlay: bool
 }
 
 function walkComponent(ctx: ValidateCtx, component: FdnComponent): void {
+  for (const prop of component.props) checkLowercaseName(ctx, 'prop', prop.name, component.name)
   const scope: Scope = { props: new Set(component.props.map((p) => p.name)), aliases: new Set() }
   for (const node of component.body) walkNode(ctx, node, scope, false)
 }
@@ -392,6 +411,8 @@ export function validateDocument(doc: FdnDocument): ValidationResult {
     stateNames: new Set(doc.states.map((s) => s.name)),
     viewportNames: new Set(doc.viewports.map((v) => v.name)),
   }
+
+  for (const param of doc.params) checkLowercaseName(ctx, 'param', param.name, undefined)
 
   for (const state of doc.states) {
     for (const key of Object.keys(state.assignments)) {

@@ -64,4 +64,15 @@ describe('CLI against boards/system-help-center.fdn.html', () => {
     expect(code).toBe(0)
     expect(io.err.some((l) => l.includes('unknown-state'))).toBe(true)
   })
+
+  it('bake prints warning- and info-severity report lines too, not just errors', async () => {
+    // Regression: bake.ts used to only forward severity === 'error' lines to
+    // stderr, so a whole class of silent failures (e.g. an each source that
+    // resolves to nothing, reported at 'warning') never reached the user —
+    // see GRAMMAR-FINDINGS.md (g) finding 3.
+    const io = captureIo()
+    const code = await runBake([BOARD], io)
+    expect(code).toBe(0)
+    expect(io.err.some((l) => l.startsWith('warning ') || l.startsWith('info '))).toBe(true)
+  })
 })

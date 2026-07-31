@@ -30,7 +30,7 @@ export async function runBake(args: string[], io: CliIO): Promise<number> {
   const baked = bakeDocument(doc, state !== undefined ? { state } : undefined)
 
   for (const line of baked.report.lines) {
-    if (line.severity === 'error') io.stderr(`${line.severity} ${line.code}: ${line.message}`)
+    io.stderr(`${line.severity} ${line.code}: ${line.message}`)
   }
 
   if (out) {

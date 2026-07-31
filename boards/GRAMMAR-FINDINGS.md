@@ -545,3 +545,212 @@ and assume the tooltip is covered:
    menu-with-sections), not a required shape every `<fdn-overlay>` must carry — this board's tooltip is
    the existence proof that the minimal legal `<fdn-overlay>` is just the wrapper plus content, no
    substructure at all.
+
+---
+
+## (g) Toolchain dogfood — bringing all three boards to zero `validate` errors
+
+**Method:** ran `foundation validate` on each board, fixed the reported errors at the source (never
+suppressed), re-ran `validate` to convergence, then `foundation ingest` to canonicalize. Visual fidelity
+was checked by baking (`foundation bake`) each board before my first edit and after my last, screenshotting
+both with Playwright at 1480×1100 full-page, and inspecting the PNGs directly — per the task brief, the
+*baked* output is the real rendering; the raw `.fdn.html` file (with its dual-carried literal fallback
+content inside every `<fdn-use>`) was only ever a degraded plain-browser preview, and `ingest` deletes that
+fallback content outright (`resolved-instance-collapsed`), so bake fidelity is the only fidelity that
+survives past this pass.
+
+### Per-board error counts and fixes
+
+**`system-help-center.fdn.html`: 27 errors → 0.**
+- **22 × `text-children-conflict`.** Every case was the same shape: a block of prose with one or more
+  inline elements stitched into the middle (`<b>`, `<fdn-use>` icon chips, `<code>`) — e.g. `<div>APIARY
+  · SYSTEM — HELP CENTER · <fdn-use component="KbdCap" .../> opens a context-aware help dialog...</div>`.
+  Fix: wrapped every *non-whitespace* direct text run in its own `<span>`, leaving pure word-separating
+  whitespace between spans/elements untouched as bare text (so the parent's own `.text` collapses to
+  empty and the conflict disappears) — this is byte-identical visually, since `<span>` is unstyled/inline
+  by default and no characters moved or were re-collapsed differently than the original single-string
+  join already did.
+- **2 × `expression-not-in-subset` / `undeclared-ref-root`** on `each="group in prop.keyGroups.split('
+  · ')"` (`ShortcutRow`'s multi-chord keycap row, GRAMMAR-FINDINGS §b.4's own predicted violation).
+  Fix: made `keyGroups` a real `type="list"` prop (per `types.ts`'s list convention — primitive items
+  addressed as `<binding>.value`), changed the each to `each="group in prop.keyGroups"` and the
+  downstream ref to `{{ group.value }}`, and re-encoded every call site's chord string as a JSON array
+  literal (`data-fdn-prop-keyGroups='["⌘D","⌘⇧D"]'` — the same encoding `bake/index.ts`'s
+  `coercePropValue` already uses for `list`/`record` props, confirmed against
+  `packages/engine/test/bake-component.test.ts`). The underlying `fdn-item keys="⌥D · ⌥B · ⌥T · ⌥S"`
+  sample-data attributes became `keys='["⌥D","⌥B","⌥T","⌥S"]'` for the same reason — real lists, not a
+  middot-delimited string operated on at use-time.
+- **3 × `position-outside-overlay`** on the "ghost app behind the dialog" background chrome (three
+  `position:absolute;left:...;top:...` siblings simulating a 3-pane app window) — exactly the board's own
+  caption right above them: *"ghost app behind the overlay: ordinary flex chrome, NOT part of the
+  overlay context."* Fix: converted to a flex row (`display:flex;gap:12px`) with the two card children
+  carrying `margin:12px 0` / `margin:12px 12px 12px 0` in place of their `top`/`bottom`/`right` offsets —
+  arithmetically identical geometry, confirmed by re-deriving each pixel value from the original
+  `left`/`top`/`bottom`/`right` numbers rather than eyeballing it.
+
+**`inbox-unified.fdn.html`: 24 errors → 0.**
+- **23 × `text-children-conflict`**, same fix as above. 20 of 23 were caught by an automated pass; 3
+  (`PR #214` and `drone-12` badges, and the `packet f-2183<br>bee drone-12 ↗<br>...` lineage block) were
+  missed by that pass on the first try and fixed by hand — see the UX-review note below on why (a
+  self-closing-`<fdn-use/>` parse subtlety the automation didn't replicate).
+- **1 × `position-outside-overlay`** on a "notched legend" label (`CHANGED · CART MERGE`) straddling the
+  top border of a dashed review-diff box — `position:absolute;top:-8px;left:12px`, a classic
+  legend-over-fieldset-border trick, not overlay content. Fix: restructured as an ordinary flex column
+  with the label as a sibling *above* the box, `align-self:flex-start` + `margin-left:12px` for horizontal
+  position, `margin-bottom:-8px` on the label pulling the box up underneath it — same straddle, no
+  absolute positioning. Confirmed visually (cropped screenshot) that the notch still reads correctly.
+
+**`overlay-evidence.fdn.html`: 10 errors → 0.**
+- **5 × `text-children-conflict`**, same fix as above (board captions and per-instance explanatory prose
+  under each of the four overlay demos).
+- **5 × `position-outside-overlay`**: two more instances of the same "ghost app chrome" canvas-idiom
+  pattern (menu-board and dialog-board), fixed with the same flex-row conversion as system-help-center.
+  The menu board additionally had a "docked fleet pane" floating at a fixed offset *inside* the ghost
+  content area (`position:absolute;left:1084px;top:64px;width:360px` — real content, not decoration, but
+  still not overlay content); converted by making the ghost content card `display:flex;justify-content:
+  flex-end` with `padding:52px 24px 0 0`, re-deriving the padding numbers from the original absolute
+  offsets minus the card's own new flex margin, so the fleet pane lands in the same pixel position.
+
+**Also fixed, beyond `validate`'s own ask (see UX finding below for why this was necessary for bake
+fidelity):** renamed the component prop identifiers `activeTopicId`, `keyGroups`, `leadingTag`
+(system-help-center), `selectedItemId`, `detailMode` (inbox-unified, scoped to `InboxChrome`'s own props),
+and `triggerActive` (overlay-evidence) to all-lowercase (`activetopicid`, `keygroups`, `leadingtag`,
+`selecteditemid`, `detailmode`, `triggeractive`) — see finding 4 below.
+
+**Not touched:** the top-level `<fdn-param>`/`<fdn-state>` camelCase names in `inbox-unified.fdn.html`
+(`selectedItemId`, `detailMode`, `narrowScope`, `whatToTestExpanded`, …) and `system-help-center.fdn.html`
+(`entryContext`, `rowBindingState`, `dialogOpen`, `searchQuery`) suffer the identical case-folding bug
+(their `<fdn-state name="..." xxxYyy="value">` assignment attributes never bind), but nothing in either
+board's `<main>` body actually reads `{{ param.xxxYyy }}` for these — the rendered content hardcodes
+literal values at each `<fdn-use>` call site instead — so the state-assignment declarations are already
+vestigial independent of the case bug. Renaming ~15 param names plus every `<fdn-state>` tag that assigns
+them felt out of scope for a `validate`-driven pass with no visible payoff in the default bake; flagged in
+finding 4 instead of silently fixed.
+
+**Result:** `pnpm exec tsx packages/cli/src/main.ts validate <board>` reports zero issues (not just zero
+errors — zero warnings too) for all three boards. `foundation ingest` was run on each afterward; its only
+output was expected, benign normalization info (`shorthand-expanded` for `font`/`padding`/`border-radius`/
+`gap`/`inset`, `text-whitespace-normalized`, `resolved-instance-collapsed` for every `<fdn-use>`'s dropped
+dual-carried fallback content) — nothing surprising, nothing silently lossy beyond what D1 already commits
+to. `pnpm test` remains green (352 tests; the fixpoint/determinism suites are shape-agnostic and the CLI
+fixture test already tolerated either validity outcome).
+
+**Visual fidelity:** I inspected the before/after PNGs for all three boards directly (not diffed
+mechanically — pixelmatch was available but a mechanical diff would have flagged the *intended* content
+increase described below as noise). Layout, alignment, and every hand-verified geometry conversion
+(the two flex-row ghost-chrome rewrites, the docked-fleet-pane reposition, and the notched-legend
+restructure) read as visually identical to the pre-edit bake. The overlay-evidence board in particular is
+close to pixel-identical before/after, since none of its content is `each`-over-`data`-driven — it's the
+cleanest apples-to-apples comparison of the three. The other two boards' *after* bakes render substantially
+**more complete** than *before* — full paragraph prose, keyboard-shortcut chip rows, and active-state nav
+highlighting all now appear where they were silently blank pre-fix. This is not a fidelity regression to
+flag; it's the direct, intended effect of fixing `text-children-conflict` (which was silently discarding
+the prose text at bake time even before any grammar work — see `buildRegularNode` in `bake/index.ts`:
+`if (node.children.length === 0 && node.text !== undefined)`, i.e. text is dropped outright whenever
+children are present) and the prop-name-casing bug (finding 4). The *before* bake was already a broken
+rendering relative to the boards' own design intent (visible via the dual-carried fallback markup, which
+is what a plain-browser "raw open" was actually showing); the *after* bake now matches that intent far
+more closely. One content gap remains identical before and after and is **not** fixed by this pass: every
+`each="<alias> in data.<name>>"` loop (queue rail, guide-nav topic lists, keyboard-shortcut catalogs)
+still renders zero items in bake, for the reason in finding 2 below — a pre-existing engine bug outside
+`boards/`'s power to fix, present identically before and after my edits.
+
+### UX review: the `validate` → fix → `ingest` loop as an editing companion
+
+**Best of the loop:**
+- `position-outside-overlay`'s message is the model to hold every other corrective error to: it names
+  the violation *and* both sanctioned alternatives in one sentence ("position:absolute is only legal
+  inside `<fdn-overlay>` — wrap this content in fdn-overlay, or use flex/grid layout instead"). I used it
+  almost verbatim as my fix decision tree (wrap vs. convert), and the board's own explanatory comments
+  ("ghost app... NOT part of the overlay context") independently confirmed "convert to flex" was the
+  right branch every time — message and board intent agreed with no ambiguity.
+- `expression-not-in-subset`'s message for the `.split()` case ("iterate a declared data set
+  (data.<name>) or a list-typed prop (prop.<name>) directly, no operations") pointed straight at the
+  actual fix (make it a real list-typed prop) rather than just saying "method calls aren't allowed" —
+  genuinely taught me the sanctioned shape, not just the violation.
+- `text-children-conflict`'s message correctly predicts bake's actual behavior ("children win at bake
+  time; remove one") — I confirmed this by reading `bake/index.ts`'s `buildRegularNode`, and it matches
+  exactly: text is silently ignored whenever `children.length > 0`. No surprises, no gap between what the
+  message promises and what the engine does.
+- `ingest`'s normalization report is transparent and matched GRAMMAR-FINDINGS (d)'s own predictions
+  (`font`/`padding`/`border-radius`/`gap`/`inset` shorthand expansion, self-closing-tag rewriting,
+  text-whitespace collapsing) — every line was legible and none were surprising once fired.
+
+**Worst of the loop / confusing:**
+- **Node ids are not stable across edits until you `ingest`, and nothing tells you this.** `data-fdn-id`
+  is minted fresh, in document order, on every parse of a file that doesn't already carry the attribute —
+  so the moment you fix the *first* reported error, every subsequent nodeId in that validate run's output
+  refers to a *different* physical element than it will on the next run. I had to build my own tooling
+  (a parse5 walk replicating `parse/index.ts`'s exact mint order) to map nodeIds back to source text
+  reliably and to plan a whole batch of fixes from one validate run rather than fixing-and-rechecking
+  one at a time. A one-line hint on first use — "run `ingest` first to mint stable ids before iterating"
+  — or better, `validate` auto-suggesting it when the input has no `data-fdn-id` attributes at all, would
+  have saved real time.
+- **`text-children-conflict`'s `ReportLine` carries no `detail`.** The type has a `detail?: unknown` field
+  precisely for this (other codes populate it — `excluded-style-property` includes `{property, value,
+  on}`), but this code passes nothing beyond the bare nodeId. For a conflict on a 250-node document, the
+  message tells you *that* something's wrong at `n81` but not *what* the text or child tags are — exactly
+  the information I had to reconstruct with custom tooling to fix 50 instances across three boards
+  efficiently. Populating `detail: { text, childTags }` would turn this from "go find it yourself" into
+  "here's exactly what to split."
+
+**Validator/bake mismatches found (bugs to file, not board mistakes — none of these are board authoring
+errors, and I did not work around any of them by guessing which side of the mismatch to trust):**
+
+1. **No confirmed `validate` false positives.** Every error `validate` raised across all three boards
+   corresponded to a real problem per the documented grammar (genuine text/children ambiguity, a genuine
+   method call, genuine canvas-idiom absolute positioning) — I did not find a case where `validate`
+   rejected something that should have been legal.
+2. **`each="<alias> in data.<name>>"` — the exact shape `validate` requires — is not the shape `bake`
+   executes, and this is the single most consequential finding of this pass.** `validate/index.ts`'s own
+   code comment calls `data.<name>` "the sanctioned each-source shape in practice" and its regex
+   (`/^data\.([A-Za-z_][A-Za-z0-9_]*)$/`) accepts *only* that shape, rejecting a bare data-set name as an
+   `undeclared-ref-root` error. But `bake/index.ts`'s `resolveEachSource` does the opposite: `if
+   (source.includes('.'))` routes the source through `resolveRef` against the `prop`/`param` binding bags
+   only (no `data` key ever exists there, so `data.guideTopics` always fails to resolve); only a **bare**
+   name with no dot at all reaches the branch that actually looks up `ctx.doc.data`. The practical effect,
+   reproduced on all three boards: `foundation validate boards/system-help-center.fdn.html` reports zero
+   issues, and `foundation bake boards/system-help-center.fdn.html` silently renders the guide-nav topic
+   list, both keyboard-shortcut catalogs, and (in `inbox-unified.fdn.html`) the entire queue rail and
+   "what to test" checklist as **empty** — every `each="X in data.Y"` loop in every board produces zero
+   items. There is no source spelling that satisfies both `validate`'s requirement and `bake`'s
+   implementation at once, so this cannot be fixed from `boards/`; I left it reproducible and undisguised
+   rather than rewriting the `each` sources to the shape `bake` happens to accept (which would then fail
+   `validate` again). To reproduce: bake any board with no `--state` flag and grep the output for content
+   that should come from a `data.*` each loop.
+3. **That failure is invisible through the CLI.** `bake.ts`'s CLI command only writes `severity ===
+   'error'` report lines to stderr; the each-source failure above is reported at `warning` severity
+   (`unknown-ref`, "each source ... not found"), so `foundation bake` exits 0 with no diagnostic at all
+   while quietly dropping entire sections. I only found finding 2 by noticing large blank regions in the
+   before/after screenshots and bisecting by hand — a `foundation bake --verbose` (or just "surface
+   warnings too") would have surfaced it directly.
+4. **Validator false *negative*: camelCase prop/param identifiers silently fail to bind, with no check
+   anywhere.** HTML parses attribute *names* case-insensitively — parse5 lowercases `data-fdn-prop-
+   activeTopicId="x"` to `data-fdn-prop-activetopicid` before any engine code sees it (confirmed
+   empirically), so `instantiateComponent`'s exact-string lookup against the declared prop name
+   (`activeTopicId`, case preserved from `<fdn-prop name="activeTopicId">`) never matches, and the prop
+   silently falls back to its default (or `''` — again via a `warning`-severity report line the CLI never
+   prints). This is systemic, not a one-off: every board in this repo uses idiomatic camelCase for
+   multi-word identifiers (`activeTopicId`, `keyGroups`, `leadingTag`, `triggerActive`, `selectedItemId`,
+   `detailMode`, `entryContext`, `rowBindingState`, …), and nothing in the documented expression grammar
+   (`types.ts`'s ref EBNF permits `[A-Za-z_][A-Za-z0-9_]*`, mixed case included) suggests this is illegal
+   — it is a pure HTML-hosting-format hazard the grammar/validator is silent about. `validate` should
+   flag any declared prop/param name that isn't already all-lowercase (or fold case itself consistently
+   throughout the pipeline) — as shipped, the identifier is spec-legal and silently non-functional.
+5. **Numeric ternary branches are used pervasively and are not in bake's grammar, and `validate` doesn't
+   catch it either.** `{{ prop.dim ? .5 : 1 }}`, `{{ prop.weight == 'active' ? 600 : 400 }}` — every human
+   reading of "ternary: cond ? value : value" admits a bare number, but `bake/expr.ts`'s `parseValue()`
+   only accepts `ref | lookupref | quoted-string-literal`, so these fail at bake time
+   (`expr-parse-error`, `"expected a value (ref, lookup[ref], or quoted string)"`). `validate`'s
+   `findDisallowedConstructs` only pattern-matches for method calls, so it never flags this. Net effect:
+   every `opacity`/`font-weight`/`border-radius` value driven by a numeric ternary bakes to an empty
+   declaration (`opacity:;`) across all three boards. This predates my pass, isn't a `validate` error, and
+   I left it alone per the task's scope — flagging it here because it's the same *class* of bug as finding
+   2 (validate's grammar and bake's grammar have quietly diverged) and because it affects the same visual
+   properties (dimmed/disabled row opacity, active-nav-item font-weight) my fixes were trying to restore.
+
+**Missing report codes, concretely:** a `prop-name-not-lowercase` (or equivalent) check at `fdn-prop`/
+`fdn-param` declaration time (finding 4); a contract-level check or test that `validate`'s accepted
+`each` source grammar and `bake`'s executed `each` source grammar are the same grammar (finding 2 — this
+feels like it belongs as an engine-level fixture test, not just a board-level validate rule); and
+`text-children-conflict` populating its `detail` field (UX finding above).

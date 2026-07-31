@@ -64,6 +64,14 @@ function tokenize(src: string): Tok[] {
       i++
       continue
     }
+    if (c === '.' && DIGIT.test(src[i + 1] ?? '')) {
+      // leading-dot decimal, e.g. ".5" — a number-literal, not a dot token.
+      let j = i + 1
+      while (j < n && DIGIT.test(src[j] as string)) j++
+      toks.push({ t: 'num', v: src.slice(i, j) })
+      i = j
+      continue
+    }
     if (c === '.') {
       toks.push({ t: 'dot' })
       i++
@@ -159,7 +167,7 @@ function tokenize(src: string): Tok[] {
 // ——— AST ———
 
 type ValueNode =
-  | { kind: 'lit'; value: string }
+  | { kind: 'lit'; value: string | number }
   | { kind: 'ref'; path: string[] }
   | { kind: 'lookup'; name: string; ref: string[] }
 
@@ -210,12 +218,16 @@ class Parser {
     return path
   }
 
-  /** value := ref | lookupref | quoted-string-literal */
+  /** value := ref | lookupref | quoted-string-literal | number-literal */
   parseValue(): ValueNode {
     const t = this.peek()
     if (t.t === 'str') {
       this.next()
       return { kind: 'lit', value: t.v }
+    }
+    if (t.t === 'num') {
+      this.next()
+      return { kind: 'lit', value: Number(t.v) }
     }
     if (t.t === 'ident') {
       const name = t.v
@@ -263,7 +275,7 @@ class Parser {
   /** {{ … }} top level: ternary | value */
   parseInterpTop(): InterpTop {
     const t = this.peek()
-    if (t.t === 'str') {
+    if (t.t === 'str' || t.t === 'num') {
       const v = this.parseValue()
       this.expectEof()
       return { kind: 'value', node: v }

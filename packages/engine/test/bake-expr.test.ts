@@ -67,6 +67,37 @@ describe('expr: string literals', () => {
   })
 })
 
+describe('expr: number literals (types.ts grammar: value := ref | lookupref | quoted-string-literal | number-literal)', () => {
+  it('evaluates a bare integer literal', () => {
+    expect(evaluateInterpolation('12', ctx()).value).toBe('12')
+  })
+
+  it('evaluates a bare leading-zero decimal literal', () => {
+    expect(evaluateInterpolation('0.5', ctx()).value).toBe('0.5')
+  })
+
+  it('evaluates a bare leading-dot decimal literal', () => {
+    expect(evaluateInterpolation('.5', ctx()).value).toBe('0.5')
+  })
+
+  it('a number literal is legal as a ternary branch value (the reported bug: opacity/font-weight ternaries)', () => {
+    expect(evaluateInterpolation('prop.selected ? .5 : 1', ctx()).value).toBe('0.5')
+    expect(evaluateInterpolation('param.flag ? 0.5 : 1', ctx()).value).toBe('1')
+    expect(evaluateInterpolation('param.flag ? 600 : 400', ctx()).value).toBe('400')
+    expect(evaluateInterpolation("item.state == 'failed' ? 600 : 400", ctx()).value).toBe('600')
+  })
+
+  it('a number literal may be mixed with a ref branch on the other side of the ternary', () => {
+    const r = evaluateInterpolation("item.state == 'failed' ? prop.count : 0", ctx())
+    expect(r.value).toBe('3')
+  })
+
+  it('reports no errors for a numeric ternary', () => {
+    const r = evaluateInterpolation('prop.selected ? .5 : 1', ctx())
+    expect(r.reports).toEqual([])
+  })
+})
+
 describe('expr: ternary', () => {
   it('bare-ref truthy ternary picks the then-branch', () => {
     const r = evaluateInterpolation("prop.selected ? 'yes' : 'no'", ctx())

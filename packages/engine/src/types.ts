@@ -117,7 +117,7 @@ export interface FdnDocument {
 //                 // inside that each subtree; `item` is the default binding.
 //   ternary    := <cond> '?' <value> ':' <value>
 //   lookupref  := ident '[' ref ']'          // ident names an FdnLookup
-//   value      := ref | lookupref | quoted-string-literal
+//   value      := ref | lookupref | quoted-string-literal | number-literal
 //   cond       := ref | ref ('==' | '!=') (quoted-string-literal | number | boolean)
 // `when` attributes accept <cond> plus '&&' / '||' / '!' composition
 // (precedence: '!' > '&&' > '||').

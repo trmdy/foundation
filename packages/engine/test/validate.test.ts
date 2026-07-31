@@ -159,8 +159,8 @@ describe('validateDocument: undeclared references', () => {
 
   it('accepts param.X against a declared param', () => {
     const d = doc({
-      params: [{ name: 'entryContext', type: 'string' }],
-      body: [node({ id: 'n1', tag: 'div', text: '{{ param.entryContext }}' })],
+      params: [{ name: 'entrycontext', type: 'string' }],
+      body: [node({ id: 'n1', tag: 'div', text: '{{ param.entrycontext }}' })],
     })
     const result = validateDocument(d)
     expect(result.valid).toBe(true)
@@ -272,8 +272,8 @@ describe('validateDocument: undeclared references', () => {
 
   it('accepts a state assignment to a declared param', () => {
     const d = doc({
-      params: [{ name: 'dialogOpen', type: 'boolean' }],
-      states: [{ name: 's1', assignments: { dialogOpen: 'true' } }],
+      params: [{ name: 'dialogopen', type: 'boolean' }],
+      states: [{ name: 's1', assignments: { dialogopen: 'true' } }],
     })
     const result = validateDocument(d)
     expect(result.valid).toBe(true)
@@ -294,5 +294,39 @@ describe('validateDocument: undeclared references', () => {
     })
     const result = validateDocument(d)
     expect(result.valid).toBe(true)
+  })
+})
+
+describe('validateDocument: prop-name-not-lowercase', () => {
+  it('flags a camelCase component prop name, naming the binding hazard', () => {
+    const d = doc({
+      components: [{ name: 'Row', props: [{ name: 'activeTopicId', type: 'string' }], slots: [], body: [] }],
+    })
+    const result = validateDocument(d)
+    expect(result.valid).toBe(false)
+    const line = result.issues.find((i) => i.code === 'prop-name-not-lowercase')
+    expect(line).toBeDefined()
+    expect(line?.severity).toBe('error')
+    expect(line?.message).toContain('HTML lowercases attribute names')
+    expect(line?.message).toContain('activeTopicId')
+    expect(line?.detail).toEqual({ kind: 'prop', name: 'activeTopicId', component: 'Row' })
+  })
+
+  it('flags a camelCase top-level param name', () => {
+    const d = doc({ params: [{ name: 'selectedItemId', type: 'string' }] })
+    const result = validateDocument(d)
+    const line = result.issues.find((i) => i.code === 'prop-name-not-lowercase')
+    expect(line).toBeDefined()
+    expect(line?.message).toContain('selectedItemId')
+    expect(line?.detail).toEqual({ kind: 'param', name: 'selectedItemId', component: undefined })
+  })
+
+  it('accepts all-lowercase prop and param names', () => {
+    const d = doc({
+      params: [{ name: 'selecteditemid', type: 'string' }],
+      components: [{ name: 'Row', props: [{ name: 'active_topic_id', type: 'string' }], slots: [], body: [] }],
+    })
+    const result = validateDocument(d)
+    expect(result.issues.some((i) => i.code === 'prop-name-not-lowercase')).toBe(false)
   })
 })

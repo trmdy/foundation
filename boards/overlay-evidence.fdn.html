@@ -1,422 +1,452 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Apiary &middot; Overlay evidence round 2 — Foundation grammar re-draw</title>
-
-<!-- ONLY :root tokens live here, per D1 (see inbox-unified.fdn.html header
-     comment for the full rationale). Token set matches the two existing
-     boards; status palette is the Apiary design-brief's canonical six-state
-     palette (design-brief.md &sect;2) rather than inbox-unified's local
-     failed/review/waiting/login set, because this board's subject (the
-     fleet pane) is the palette's actual home surface. -->
+  <meta charset="utf-8">
+  <title>Overlay evidence round 2 — menu, tooltip, popover, dialog</title>
 <style>
-:root {
-  --color-bg: #F5F4F1;
-  --color-surface: #FFFFFF;
-  --color-surface-alt: #FAFAF8;
-  --color-border: #E7E5E0;
-  --color-border-subtle: #ECEAE5;
-  --color-card-border: #E7E5E0;
-  --color-selected-bg: #EEEDE9;
-  --color-text-primary: #2E2B27;
-  --color-text-secondary: #4A463F;
-  --color-text-tertiary: #6F6B63;
-  --color-text-muted: #8A877F;
-  --color-text-faint: #A8A59E;
-  --color-text-placeholder: #B4AEA4;
-  --color-accent: #9C6A1C;
-  --color-honey: #B8842E;
-
-  --color-status-running: #2F8738;
-  --color-status-waiting: #D4A72C;
-  --color-status-blocked: #B0512E;
-  --color-status-review:  #BD6B3C;
-  --color-status-done:    #9B978F;
-  --color-status-merged:  #8B7BB8;
-
-  --font-sans: 'Hanken Grotesk', sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
-
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
-  --radius-2xl: 12px;
-
-  --shadow-panel:   0 24px 64px rgba(40,35,30,.30);
-  --shadow-menu:    0 16px 40px rgba(40,35,30,.15);
-  --shadow-tooltip: 0 4px 10px rgba(40,35,30,.22);
-  --shadow-card:    0 4px 12px rgba(40,35,30,.08);
-}
-
-*        { box-sizing: border-box; }
-html,body{ margin: 0; }
-body     { background: var(--color-bg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  :root {
+    --color-accent: #9C6A1C;
+    --color-bg: #F5F4F1;
+    --color-border: #E7E5E0;
+    --color-border-subtle: #ECEAE5;
+    --color-card-border: #E7E5E0;
+    --color-honey: #B8842E;
+    --color-selected-bg: #EEEDE9;
+    --color-status-blocked: #B0512E;
+    --color-status-done: #9B978F;
+    --color-status-merged: #8B7BB8;
+    --color-status-review: #BD6B3C;
+    --color-status-running: #2F8738;
+    --color-status-waiting: #D4A72C;
+    --color-surface: #FFFFFF;
+    --color-surface-alt: #FAFAF8;
+    --color-text-faint: #A8A59E;
+    --color-text-muted: #8A877F;
+    --color-text-placeholder: #B4AEA4;
+    --color-text-primary: #2E2B27;
+    --color-text-secondary: #4A463F;
+    --color-text-tertiary: #6F6B63;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-sans: 'Hanken Grotesk', sans-serif;
+    --radius-2xl: 12px;
+    --radius-lg: 8px;
+    --radius-md: 6px;
+    --radius-sm: 4px;
+    --radius-xl: 10px;
+    --shadow-card: 0 4px 12px rgba(40,35,30,.08);
+    --shadow-menu: 0 16px 40px rgba(40,35,30,.15);
+    --shadow-panel: 0 24px 64px rgba(40,35,30,.30);
+    --shadow-tooltip: 0 4px 10px rgba(40,35,30,.22);
+  }
 </style>
 </head>
 <body>
-
-<!-- ==========================================================================
-     fdn-doc — header block. Four params, one boolean per overlay shape, each
-     drawn permanently "open" (matching both prior boards' convention: a
-     projection is a static document, so "open" states are baked states, not
-     live toggles — see SPEC open question 10, resolved).
-     ========================================================================== -->
-<fdn-doc hidden style="display:none" data-fdn-spec-version="0.0.1-draft" data-fdn-title="Overlay evidence round 2 — menu, tooltip, popover, dialog">
-
-  <fdn-params>
-    <fdn-param name="contextMenuOpen" type="boolean" default="true"
-      description="board 1: a context menu drawn open, anchored to a fleet row's trigger, positioned so both axes must flip to stay inside the frame"/>
-    <fdn-param name="tooltipVisible" type="boolean" default="true"
-      description="board 2: a tooltip drawn visible, as if mid-hover over a truncated title — see findings (f) for why this param alone cannot express the trigger"/>
-    <fdn-param name="popoverOpen" type="boolean" default="true"
-      description="board 3: a select/dropdown popover drawn open below its trigger button"/>
-    <fdn-param name="selectedRepoId" type="enum"
-      values="apiary,hive,pollinate,foundation,valhall-tools,honeycomb,drone-runtime,nectar,kontrol-site,scratch"
-      default="foundation" description="board 3: which row in the scrollable list carries the selected check"/>
-    <fdn-param name="confirmDialogOpen" type="boolean" default="true"
-      description="board 4: a small confirm dialog, the contrast case reusing board 1's dialog+scrim pattern from system-help-center.fdn.html"/>
-  </fdn-params>
-
-  <fdn-data name="fleetRows">
-    <fdn-item id="pay-webhooks" title="pay-webhooks" state="running" meta="4m &middot; local"/>
-    <fdn-item id="checkout-guest-cart" title="checkout-guest-cart" state="review" meta="22m &middot; wt-04"/>
-    <fdn-item id="forum-adapter" title="forum-adapter" state="waiting" meta="6m &middot; local"/>
-    <fdn-item id="docs-sweep" title="docs-sweep" state="done" meta="1h12 &middot; local"/>
-    <fdn-item id="hem-approve" title="hem-approve" state="merged" meta="3h &middot; wt-02"/>
-    <fdn-item id="grok-fleet-3" title="grok-fleet-3" state="blocked" meta="12m &middot; remote:build-04"/>
-  </fdn-data>
-
-  <fdn-data name="contextMenuItems">
-    <fdn-item id="open" label="Open" keys="&#8629;" destructive="false" submenu="false"/>
-    <fdn-item id="preview" label="Preview beside" keys="&#8677;" destructive="false" submenu="false"/>
-    <fdn-item id="copy-id" label="Copy bee id" keys="&#8984;&#8679;C" destructive="false" submenu="false"/>
-    <fdn-item id="important" label="Toggle important" keys="&#8984;&#8997;J" destructive="false" submenu="false"/>
-    <fdn-item id="surface" label="Surface a card" keys="" destructive="false" submenu="true"/>
-    <fdn-item id="self-seal" label="Ask agent to self-seal" keys="&#8984;&#8997;&#8679;L" destructive="false" submenu="false"/>
-    <fdn-item id="archive" label="Archive agent" keys="e" destructive="false" submenu="false"/>
-    <fdn-item id="delete" label="Delete agent&hellip;" keys="&#8984;&#8679;&#9003;" destructive="true" submenu="false"/>
-  </fdn-data>
-
-  <fdn-data name="repoPickerItems">
-    <fdn-item id="apiary" label="apiary" meta="main"/>
-    <fdn-item id="hive" label="hive" meta="main"/>
-    <fdn-item id="pollinate" label="pollinate" meta="main"/>
-    <fdn-item id="foundation" label="foundation" meta="main" selected="true"/>
-    <fdn-item id="valhall-tools" label="valhall-tools" meta="main"/>
-    <fdn-item id="honeycomb" label="honeycomb" meta="main"/>
-    <fdn-item id="drone-runtime" label="drone-runtime" meta="main"/>
-    <fdn-item id="nectar" label="nectar" meta="main"/>
-    <fdn-item id="kontrol-site" label="kontrol-site" meta="main"/>
-    <fdn-item id="scratch" label="scratch" meta="wip-notes"/>
-  </fdn-data>
-
-  <fdn-states>
-    <fdn-state name="menu-open" contextMenuOpen="true"/>
-    <fdn-state name="tooltip-visible" tooltipVisible="true"/>
-    <fdn-state name="popover-open" popoverOpen="true" selectedRepoId="foundation"/>
-    <fdn-state name="confirm-open" confirmDialogOpen="true"/>
-  </fdn-states>
-
-  <fdn-matrix>
-    <fdn-viewport name="board" width="1480" height="1100"/>
-    <fdn-cell state="menu-open" viewport="board"/>
-    <fdn-cell state="tooltip-visible" viewport="board"/>
-    <fdn-cell state="popover-open" viewport="board"/>
-    <fdn-cell state="confirm-open" viewport="board"/>
-  </fdn-matrix>
-
-</fdn-doc>
-
-<!-- ==========================================================================
-     fdn-styles — named styles reused across the four overlay shapes.
-     ========================================================================== -->
-<fdn-styles hidden style="display:none">
-  <fdn-style name="fleet-row"    display="flex" align-items="center" gap="8px" height="34px" padding="0 8px 0 10px" border-radius="var(--radius-sm)"/>
-  <fdn-style name="menu-row"     display="flex" align-items="center" gap="10px" height="30px" padding="0 10px" border-radius="var(--radius-md)"/>
-  <fdn-style name="menu-divider" height="1px" margin="5px 8px" background="var(--color-border-subtle)"/>
-  <fdn-style name="popover-row"  display="flex" align-items="center" gap="8px" height="30px" padding="0 10px" border-radius="var(--radius-lg)"/>
-  <fdn-style name="tooltip-pill" display="inline-flex" align-items="center" padding="5px 9px" border-radius="var(--radius-md)" background="var(--color-text-primary)" color="#FFFFFF" font-family="var(--font-sans)" font-weight="500" font-size="11px" white-space="nowrap" box-shadow="var(--shadow-tooltip)"/>
-  <fdn-style name="kbd-cap"      display="inline-flex" align-items="center" height="16px" padding="0 5px" border="1px solid var(--color-border)" border-radius="4px" background="var(--color-surface-alt)" font-family="var(--font-mono)" font-weight="500" font-size="10px" color="#5A564E" white-space="nowrap"/>
-  <fdn-style name="caption"      font-family="var(--font-sans)" font-weight="400" font-size="11.5px" line-height="1.6" color="var(--color-text-muted)"/>
-</fdn-styles>
-
-<!-- ==========================================================================
-     fdn-component definitions
-     ========================================================================== -->
-
-<fdn-component name="Icon" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="name" type="enum" values="agent,kebab,chevron-right,chevron-down,check,search" required="true"/>
-    <fdn-prop name="size" type="number" default="14"/>
-    <fdn-prop name="color" type="token" default="var(--color-text-muted)"/>
-  </fdn-props>
-  <svg width="{{ prop.size }}" height="{{ prop.size }}" viewBox="0 0 16 16" fill="none" style="color:{{ prop.color }};flex:none">
-    <path when="prop.name == 'agent'" d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
-    <g when="prop.name == 'kebab'"><circle cx="4" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12" cy="8" r="1.3" fill="currentColor"/></g>
-    <path when="prop.name == 'chevron-right'" d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <path when="prop.name == 'chevron-down'" d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <path when="prop.name == 'check'" d="M3 8.5l3.2 3 6.8-7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <g when="prop.name == 'search'"><circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"/><path d="m10.6 10.6 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></g>
-  </svg>
-</fdn-component>
-
-<fdn-component name="StatusDot" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="state" type="enum" values="running,waiting,blocked,review,done,merged" required="true"/>
-  </fdn-props>
-  <span when="prop.state == 'running'" style="width:6px;height:6px;border-radius:50%;background:var(--color-status-running);flex:none"></span>
-  <span when="prop.state == 'waiting'" style="width:6px;height:6px;border-radius:50%;background:var(--color-status-waiting);flex:none"></span>
-  <span when="prop.state == 'blocked'" style="width:6px;height:6px;border-radius:50%;background:var(--color-status-blocked);flex:none"></span>
-  <span when="prop.state == 'review'"  style="width:6px;height:6px;border-radius:50%;background:var(--color-status-review);flex:none"></span>
-  <span when="prop.state == 'done'"    style="width:6px;height:6px;border-radius:50%;background:var(--color-status-done);flex:none"></span>
-  <span when="prop.state == 'merged'"  style="width:6px;height:6px;border-radius:50%;background:var(--color-status-merged);flex:none"></span>
-</fdn-component>
-
-<!-- KbdCap — reused verbatim from system-help-center.fdn.html. -->
-<fdn-component name="KbdCap" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="keys" type="string" required="true"/>
-  </fdn-props>
-  <span data-fdn-style="kbd-cap" style="height:16px">{{ prop.keys }}</span>
-</fdn-component>
-
-<!-- FleetRow — a fleet-pane-style agent row (design-brief &sect;4 "Sidebar row" /
-     &sect;10 "Agent pane" vocabulary): leading status dot, title, trailing meta,
-     trailing kebab TRIGGER. The trigger carries data-fdn-role="trigger" and a
-     stable id — new vocabulary this board needed: a.4 previously only named
-     scrim/panel substructure roles; anchoring a menu needs the anchor SOURCE
-     to be identifiable too. See GRAMMAR-FINDINGS.md &sect;(f). -->
-<fdn-component name="FleetRow" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="id" type="string" required="true"/>
-    <fdn-prop name="title" type="string" required="true"/>
-    <fdn-prop name="state" type="enum" values="running,waiting,blocked,review,done,merged" required="true"/>
-    <fdn-prop name="meta" type="string" required="true"/>
-    <fdn-prop name="triggerActive" type="boolean" default="false"
-      description="true only for the row whose trigger currently anchors an open menu"/>
-  </fdn-props>
-  <div data-fdn-style="fleet-row" style-hover="background:var(--color-selected-bg)">
-    <fdn-use component="StatusDot" data-fdn-prop-state="{{ prop.state }}"/>
-    <span style="flex:1;min-width:0;font:500 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ prop.title }}</span>
-    <span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint)">{{ prop.meta }}</span>
-    <span id="kebab-{{ prop.id }}" data-fdn-role="trigger" style-hover="background:var(--color-selected-bg)" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--radius-sm);background:{{ prop.triggerActive ? 'var(--color-selected-bg)' : 'transparent' }}">
-      <fdn-use component="Icon" data-fdn-prop-name="kebab" data-fdn-prop-size="14" data-fdn-prop-color="var(--color-text-muted)"/>
+  <fdn-doc hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="Overlay evidence round 2 — menu, tooltip, popover, dialog">
+    <fdn-params>
+      <fdn-param name="contextMenuOpen" type="boolean" default="true" description="board 1: a context menu drawn open, anchored to a fleet row's trigger, positioned so both axes must flip to stay inside the frame"></fdn-param>
+      <fdn-param name="tooltipVisible" type="boolean" default="true" description="board 2: a tooltip drawn visible, as if mid-hover over a truncated title — see findings (f) for why this param alone cannot express the trigger"></fdn-param>
+      <fdn-param name="popoverOpen" type="boolean" default="true" description="board 3: a select/dropdown popover drawn open below its trigger button"></fdn-param>
+      <fdn-param name="selectedRepoId" type="enum" values="apiary,hive,pollinate,foundation,valhall-tools,honeycomb,drone-runtime,nectar,kontrol-site,scratch" default="foundation" description="board 3: which row in the scrollable list carries the selected check"></fdn-param>
+      <fdn-param name="confirmDialogOpen" type="boolean" default="true" description="board 4: a small confirm dialog, the contrast case reusing board 1's dialog+scrim pattern from system-help-center.fdn.html"></fdn-param>
+    </fdn-params>
+    <fdn-data name="fleetRows">
+      <fdn-item id="pay-webhooks" meta="4m · local" state="running" title="pay-webhooks"></fdn-item>
+      <fdn-item id="checkout-guest-cart" meta="22m · wt-04" state="review" title="checkout-guest-cart"></fdn-item>
+      <fdn-item id="forum-adapter" meta="6m · local" state="waiting" title="forum-adapter"></fdn-item>
+      <fdn-item id="docs-sweep" meta="1h12 · local" state="done" title="docs-sweep"></fdn-item>
+      <fdn-item id="hem-approve" meta="3h · wt-02" state="merged" title="hem-approve"></fdn-item>
+      <fdn-item id="grok-fleet-3" meta="12m · remote:build-04" state="blocked" title="grok-fleet-3"></fdn-item>
+    </fdn-data>
+    <fdn-data name="contextMenuItems">
+      <fdn-item id="open" destructive="false" keys="↵" label="Open" submenu="false"></fdn-item>
+      <fdn-item id="preview" destructive="false" keys="⇥" label="Preview beside" submenu="false"></fdn-item>
+      <fdn-item id="copy-id" destructive="false" keys="⌘⇧C" label="Copy bee id" submenu="false"></fdn-item>
+      <fdn-item id="important" destructive="false" keys="⌘⌥J" label="Toggle important" submenu="false"></fdn-item>
+      <fdn-item id="surface" destructive="false" keys="" label="Surface a card" submenu="true"></fdn-item>
+      <fdn-item id="self-seal" destructive="false" keys="⌘⌥⇧L" label="Ask agent to self-seal" submenu="false"></fdn-item>
+      <fdn-item id="archive" destructive="false" keys="e" label="Archive agent" submenu="false"></fdn-item>
+      <fdn-item id="delete" destructive="true" keys="⌘⇧⌫" label="Delete agent…" submenu="false"></fdn-item>
+    </fdn-data>
+    <fdn-data name="repoPickerItems">
+      <fdn-item id="apiary" label="apiary" meta="main"></fdn-item>
+      <fdn-item id="hive" label="hive" meta="main"></fdn-item>
+      <fdn-item id="pollinate" label="pollinate" meta="main"></fdn-item>
+      <fdn-item id="foundation" label="foundation" meta="main" selected="true"></fdn-item>
+      <fdn-item id="valhall-tools" label="valhall-tools" meta="main"></fdn-item>
+      <fdn-item id="honeycomb" label="honeycomb" meta="main"></fdn-item>
+      <fdn-item id="drone-runtime" label="drone-runtime" meta="main"></fdn-item>
+      <fdn-item id="nectar" label="nectar" meta="main"></fdn-item>
+      <fdn-item id="kontrol-site" label="kontrol-site" meta="main"></fdn-item>
+      <fdn-item id="scratch" label="scratch" meta="wip-notes"></fdn-item>
+    </fdn-data>
+    <fdn-states>
+      <fdn-state name="menu-open"></fdn-state>
+      <fdn-state name="tooltip-visible"></fdn-state>
+      <fdn-state name="popover-open"></fdn-state>
+      <fdn-state name="confirm-open"></fdn-state>
+    </fdn-states>
+    <fdn-matrix>
+      <fdn-viewport name="board" width="1480" height="1100"></fdn-viewport>
+      <fdn-cell state="menu-open" viewport="board"></fdn-cell>
+      <fdn-cell state="tooltip-visible" viewport="board"></fdn-cell>
+      <fdn-cell state="popover-open" viewport="board"></fdn-cell>
+      <fdn-cell state="confirm-open" viewport="board"></fdn-cell>
+    </fdn-matrix>
+  </fdn-doc>
+  <fdn-styles hidden>
+    <fdn-style name="fleet-row" align-items="center" border-bottom-left-radius="var(--radius-sm)" border-bottom-right-radius="var(--radius-sm)" border-top-left-radius="var(--radius-sm)" border-top-right-radius="var(--radius-sm)" column-gap="8px" display="flex" height="34px" padding-bottom="0" padding-left="10px" padding-right="8px" padding-top="0" row-gap="8px"></fdn-style>
+    <fdn-style name="menu-row" align-items="center" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" column-gap="10px" display="flex" height="30px" padding-bottom="0" padding-left="10px" padding-right="10px" padding-top="0" row-gap="10px"></fdn-style>
+    <fdn-style name="menu-divider" background="var(--color-border-subtle)" height="1px" margin-bottom="5px" margin-left="8px" margin-right="8px" margin-top="5px"></fdn-style>
+    <fdn-style name="popover-row" align-items="center" border-bottom-left-radius="var(--radius-lg)" border-bottom-right-radius="var(--radius-lg)" border-top-left-radius="var(--radius-lg)" border-top-right-radius="var(--radius-lg)" column-gap="8px" display="flex" height="30px" padding-bottom="0" padding-left="10px" padding-right="10px" padding-top="0" row-gap="8px"></fdn-style>
+    <fdn-style name="tooltip-pill" align-items="center" background="var(--color-text-primary)" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" box-shadow="var(--shadow-tooltip)" color="#FFFFFF" display="inline-flex" font-family="var(--font-sans)" font-size="11px" font-weight="500" padding-bottom="5px" padding-left="9px" padding-right="9px" padding-top="5px" white-space="nowrap"></fdn-style>
+    <fdn-style name="kbd-cap" align-items="center" background="var(--color-surface-alt)" border="1px solid var(--color-border)" border-bottom-left-radius="4px" border-bottom-right-radius="4px" border-top-left-radius="4px" border-top-right-radius="4px" color="#5A564E" display="inline-flex" font-family="var(--font-mono)" font-size="10px" font-weight="500" height="16px" padding-bottom="0" padding-left="5px" padding-right="5px" padding-top="0" white-space="nowrap"></fdn-style>
+    <fdn-style name="caption" color="var(--color-text-muted)" font-family="var(--font-sans)" font-size="11.5px" font-weight="400" line-height="1.6"></fdn-style>
+  </fdn-styles>
+  <fdn-component name="FleetRow" hidden>
+    <fdn-props>
+      <fdn-prop name="id" type="string" required="true"></fdn-prop>
+      <fdn-prop name="title" type="string" required="true"></fdn-prop>
+      <fdn-prop name="state" type="enum" required="true"></fdn-prop>
+      <fdn-prop name="meta" type="string" required="true"></fdn-prop>
+      <fdn-prop name="triggeractive" type="boolean" default="false"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n20" data-fdn-style="fleet-row" style-hover="background:var(--color-selected-bg)">
+      <fdn-use data-fdn-id="n21" component="StatusDot" data-fdn-prop-state="{{ prop.state }}"></fdn-use>
+      <span data-fdn-id="n22" style="color:var(--color-text-primary);flex:1;font-family:var(--font-sans);font-size:13px;font-style:normal;font-variant:normal;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ prop.title }}
+      </span>
+      <span data-fdn-id="n23" style="color:var(--color-text-faint);flex:none;font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:400">
+        {{ prop.meta }}
+      </span>
+      <span data-fdn-id="n24" data-fdn-role="trigger" id="kebab-{{ prop.id }}" style="align-items:center;background:{{ prop.triggeractive ? 'var(--color-selected-bg)' : 'transparent' }};border-bottom-left-radius:var(--radius-sm);border-bottom-right-radius:var(--radius-sm);border-top-left-radius:var(--radius-sm);border-top-right-radius:var(--radius-sm);display:inline-flex;flex:none;height:22px;justify-content:center;width:22px" style-hover="background:var(--color-selected-bg)">
+        <fdn-use data-fdn-id="n25" component="Icon" data-fdn-prop-color="var(--color-text-muted)" data-fdn-prop-name="kebab" data-fdn-prop-size="14"></fdn-use>
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="Icon" hidden>
+    <fdn-props>
+      <fdn-prop name="name" type="enum" required="true"></fdn-prop>
+      <fdn-prop name="size" type="number" default="14"></fdn-prop>
+      <fdn-prop name="color" type="token" default="var(--color-text-muted)"></fdn-prop>
+    </fdn-props>
+    <svg data-fdn-id="n1" fill="none" height="{{ prop.size }}" viewBox="0 0 16 16" width="{{ prop.size }}" style="color:{{ prop.color }};flex:none">
+      <path data-fdn-id="n2" d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.3" when="prop.name == 'agent'"></path>
+      <g data-fdn-id="n3" when="prop.name == 'kebab'">
+        <circle data-fdn-id="n4" cx="4" cy="8" fill="currentColor" r="1.3"></circle>
+        <circle data-fdn-id="n5" cx="8" cy="8" fill="currentColor" r="1.3"></circle>
+        <circle data-fdn-id="n6" cx="12" cy="8" fill="currentColor" r="1.3"></circle>
+      </g>
+      <path data-fdn-id="n7" d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4" when="prop.name == 'chevron-right'"></path>
+      <path data-fdn-id="n8" d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4" when="prop.name == 'chevron-down'"></path>
+      <path data-fdn-id="n9" d="M3 8.5l3.2 3 6.8-7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" when="prop.name == 'check'"></path>
+      <g data-fdn-id="n10" when="prop.name == 'search'">
+        <circle data-fdn-id="n11" cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"></circle>
+        <path data-fdn-id="n12" d="m10.6 10.6 3 3" stroke="currentColor" stroke-linecap="round" stroke-width="1.4"></path>
+      </g>
+    </svg>
+  </fdn-component>
+  <fdn-component name="KbdCap" hidden>
+    <fdn-props>
+      <fdn-prop name="keys" type="string" required="true"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n19" data-fdn-style="kbd-cap" style="height:16px">
+      {{ prop.keys }}
     </span>
-  </div>
-</fdn-component>
-
-<!-- MenuItem — one context-menu row. style-hover is the resolved Q11
-     mechanism (per-node hover styling); note this is NOT the mechanism that
-     shows/hides board 2's tooltip — see findings (f). -->
-<fdn-component name="MenuItem" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="label" type="string" required="true"/>
-    <fdn-prop name="keys" type="string" description="mono shortcut hint, right-aligned; blank for a submenu parent with no direct chord"/>
-    <fdn-prop name="destructive" type="boolean" default="false"/>
-    <fdn-prop name="submenu" type="boolean" default="false"/>
-  </fdn-props>
-  <div data-fdn-style="menu-row" style-hover="background:var(--color-selected-bg)" style="color:{{ prop.destructive ? 'var(--color-status-blocked)' : 'var(--color-text-primary)' }}">
-    <span style="flex:1;min-width:0;font:400 13px var(--font-sans)">{{ prop.label }}</span>
-    <span when="prop.keys" style="flex:none;font:400 11px var(--font-mono);color:{{ prop.destructive ? 'var(--color-status-blocked)' : 'var(--color-text-faint)' }};opacity:{{ prop.destructive ? 1 : .85 }}">{{ prop.keys }}</span>
-    <fdn-use when="prop.submenu" component="Icon" data-fdn-prop-name="chevron-right" data-fdn-prop-size="12" data-fdn-prop-color="var(--color-text-faint)"/>
-  </div>
-</fdn-component>
-
-<!-- PopoverRow — one row in the scrollable select/dropdown list. -->
-<fdn-component name="PopoverRow" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="label" type="string" required="true"/>
-    <fdn-prop name="meta" type="string"/>
-    <fdn-prop name="selected" type="boolean" default="false"/>
-  </fdn-props>
-  <div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="background:{{ prop.selected ? 'var(--color-selected-bg)' : 'transparent' }}">
-    <span style="flex:1;min-width:0;font:{{ prop.selected ? '600' : '400' }} 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ prop.label }}</span>
-    <span when="prop.meta" style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:{{ prop.selected ? 6 : 0 }}px">{{ prop.meta }}</span>
-    <fdn-use when="prop.selected" component="Icon" data-fdn-prop-name="check" data-fdn-prop-size="13" data-fdn-prop-color="var(--color-text-primary)"/>
-  </div>
-</fdn-component>
-
-<!-- TooltipPill — the tooltip's only visible content. -->
-<fdn-component name="TooltipPill" hidden style="display:none">
-  <fdn-props>
-    <fdn-prop name="text" type="string" required="true"/>
-  </fdn-props>
-  <div data-fdn-style="tooltip-pill">{{ prop.text }}</div>
-</fdn-component>
-
-<!-- ==========================================================================
-     document body
-     ========================================================================== -->
-<main style="padding:26px 0 80px;display:flex;flex-direction:column;gap:56px;width:1480px">
-
-  <header style="display:flex;flex-direction:column;gap:4px;padding:0 16px">
-    <div style="font:500 13px var(--font-mono);color:var(--color-text-faint);letter-spacing:.04em">APIARY &middot; OVERLAY EVIDENCE ROUND 2 &middot; four overlay shapes drawn fully open against SPEC open question 2</div>
-    <div style="font:400 12px var(--font-sans);color:var(--color-text-placeholder)">Draws the two shapes GRAMMAR-FINDINGS.md &sect;(c) flagged as never-drawn-open (menu, tooltip) plus a dropdown/select popover, each through <code style="font-family:var(--font-mono)">&lt;fdn-overlay&gt;</code> with role/anchor/dismiss metadata &mdash; and one small confirm dialog, reusing the established dialog+scrim pattern, for contrast.</div>
-  </header>
-
-  <!-- ============================================================
-       BOARD 1 &middot; CONTEXT MENU on a fleet-pane-style agent row.
-       Anchored to the row's trigger; positioned deliberately near the
-       bordered frame's right+bottom edge (the frame plays "viewport"
-       for this demonstration, same convention as the dialog boards) so
-       BOTH axes must flip to keep the panel fully inside it.
-       ============================================================ -->
-  <section>
-    <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px;padding:0 16px">1 &middot; context menu &mdash; anchored to a fleet row's &ctdot; trigger &middot; 8 items, one destructive, one submenu &middot; no scrim &middot; dismissed on outside-click or item-select &middot; flips on both axes to stay in frame</div>
-    <div style="position:relative;width:1480px;height:640px;border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:visible;background:var(--color-bg)">
-      <!-- ghost app chrome behind the overlay, not part of the overlay context -->
-      <div style="position:absolute;left:0;top:0;bottom:0;width:200px;border-right:1px solid var(--color-border-subtle);background:var(--color-bg)"></div>
-      <div style="position:absolute;left:212px;top:12px;bottom:12px;right:12px;background:var(--color-surface);border-radius:var(--radius-lg)"></div>
-
-      <!-- the fleet pane the menu belongs to (docked, boxless per design-brief &sect;3) -->
-      <div style="position:absolute;left:1084px;top:64px;width:360px;display:flex;flex-direction:column">
-        <div style="display:flex;align-items:center;gap:8px;height:40px;padding:0 4px 0 10px;border-bottom:1px solid var(--color-border-subtle)">
-          <span style="font:600 13px var(--font-sans);color:var(--color-text-primary)">Fleet</span>
-          <span style="font:400 11px var(--font-mono);color:var(--color-text-faint)">6 agents</span>
-        </div>
-        <div style="padding-top:8px">
-          <fdn-use component="FleetRow" data-fdn-prop-id="pay-webhooks" data-fdn-prop-title="pay-webhooks" data-fdn-prop-state="running" data-fdn-prop-meta="4m &middot; local"><div data-fdn-style="fleet-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:34px;padding:0 8px 0 10px;border-radius:var(--radius-sm)"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-status-running);flex:none"></span><span style="flex:1;min-width:0;font:500 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">pay-webhooks</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint)">4m &middot; local</span><span id="kebab-pay-webhooks" data-fdn-role="trigger" style-hover="background:var(--color-selected-bg)" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--radius-sm);background:transparent"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><circle cx="4" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12" cy="8" r="1.3" fill="currentColor"/></svg></span></div></fdn-use>
-          <fdn-use component="FleetRow" data-fdn-prop-id="checkout-guest-cart" data-fdn-prop-title="checkout-guest-cart" data-fdn-prop-state="review" data-fdn-prop-meta="22m &middot; wt-04"><div data-fdn-style="fleet-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:34px;padding:0 8px 0 10px;border-radius:var(--radius-sm)"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-status-review);flex:none"></span><span style="flex:1;min-width:0;font:500 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">checkout-guest-cart</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint)">22m &middot; wt-04</span><span id="kebab-checkout-guest-cart" data-fdn-role="trigger" style-hover="background:var(--color-selected-bg)" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--radius-sm);background:transparent"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><circle cx="4" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12" cy="8" r="1.3" fill="currentColor"/></svg></span></div></fdn-use>
-          <fdn-use component="FleetRow" data-fdn-prop-id="forum-adapter" data-fdn-prop-title="forum-adapter" data-fdn-prop-state="waiting" data-fdn-prop-meta="6m &middot; local"><div data-fdn-style="fleet-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:34px;padding:0 8px 0 10px;border-radius:var(--radius-sm)"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-status-waiting);flex:none"></span><span style="flex:1;min-width:0;font:500 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">forum-adapter</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint)">6m &middot; local</span><span id="kebab-forum-adapter" data-fdn-role="trigger" style-hover="background:var(--color-selected-bg)" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--radius-sm);background:transparent"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><circle cx="4" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12" cy="8" r="1.3" fill="currentColor"/></svg></span></div></fdn-use>
-          <fdn-use component="FleetRow" data-fdn-prop-id="docs-sweep" data-fdn-prop-title="docs-sweep" data-fdn-prop-state="done" data-fdn-prop-meta="1h12 &middot; local"><div data-fdn-style="fleet-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:34px;padding:0 8px 0 10px;border-radius:var(--radius-sm)"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-status-done);flex:none"></span><span style="flex:1;min-width:0;font:500 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">docs-sweep</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint)">1h12 &middot; local</span><span id="kebab-docs-sweep" data-fdn-role="trigger" style-hover="background:var(--color-selected-bg)" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--radius-sm);background:transparent"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><circle cx="4" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12" cy="8" r="1.3" fill="currentColor"/></svg></span></div></fdn-use>
-          <fdn-use component="FleetRow" data-fdn-prop-id="hem-approve" data-fdn-prop-title="hem-approve" data-fdn-prop-state="merged" data-fdn-prop-meta="3h &middot; wt-02"><div data-fdn-style="fleet-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:34px;padding:0 8px 0 10px;border-radius:var(--radius-sm)"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-status-merged);flex:none"></span><span style="flex:1;min-width:0;font:500 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">hem-approve</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint)">3h &middot; wt-02</span><span id="kebab-hem-approve" data-fdn-role="trigger" style-hover="background:var(--color-selected-bg)" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--radius-sm);background:transparent"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><circle cx="4" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12" cy="8" r="1.3" fill="currentColor"/></svg></span></div></fdn-use>
-          <fdn-use component="FleetRow" data-fdn-prop-id="grok-fleet-3" data-fdn-prop-title="grok-fleet-3" data-fdn-prop-state="blocked" data-fdn-prop-meta="12m &middot; remote:build-04" data-fdn-prop-triggerActive="true"><div data-fdn-style="fleet-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:34px;padding:0 8px 0 10px;border-radius:var(--radius-sm)"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-status-blocked);flex:none"></span><span style="flex:1;min-width:0;font:500 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">grok-fleet-3</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint)">12m &middot; remote:build-04</span><span id="kebab-grok-fleet-3" data-fdn-role="trigger" style-hover="background:var(--color-selected-bg)" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:var(--radius-sm);background:var(--color-selected-bg)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><circle cx="4" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="12" cy="8" r="1.3" fill="currentColor"/></svg></span></div></fdn-use>
-        </div>
-      </div>
-
-      <!-- fdn-overlay: role="menu" is new vocabulary this board needed (a.4
-           only defined role="dialog"/"scrim"/"panel"). data-fdn-anchor="trigger"
-           + data-fdn-anchor-ref point AT the trigger element above by id;
-           data-fdn-anchor-edge carries the RESOLVED (already-flipped) edge for
-           THIS baked instance; data-fdn-anchor-preferred-edge records the
-           author's un-flipped intent, so the two don't collapse into one
-           fact — see findings (f). -->
-      <fdn-overlay data-fdn-role="menu" data-fdn-anchor="trigger" data-fdn-anchor-ref="kebab-grok-fleet-3" data-fdn-anchor-preferred-edge="bottom-start" data-fdn-anchor-edge="top-end" data-fdn-anchor-flip="viewport" data-fdn-anchor-offset="4" data-fdn-dismiss="outside-click,item-select,esc" style="position:absolute;left:1232px;top:214px;width:230px">
-        <div data-fdn-role="panel" style="background:var(--color-surface);border:1px solid var(--color-card-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-menu);padding:6px 0">
-          <fdn-use component="MenuItem" data-fdn-prop-label="Open" data-fdn-prop-keys="&#8629;"><div data-fdn-style="menu-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:var(--radius-md);color:var(--color-text-primary)"><span style="flex:1;min-width:0;font:400 13px var(--font-sans)">Open</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);opacity:.85">&#8629;</span></div></fdn-use>
-            <fdn-use component="MenuItem" data-fdn-prop-label="Preview beside" data-fdn-prop-keys="&#8677;"><div data-fdn-style="menu-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:var(--radius-md);color:var(--color-text-primary)"><span style="flex:1;min-width:0;font:400 13px var(--font-sans)">Preview beside</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);opacity:.85">&#8677;</span></div></fdn-use>
-            <fdn-use component="MenuItem" data-fdn-prop-label="Copy bee id" data-fdn-prop-keys="&#8984;&#8679;C"><div data-fdn-style="menu-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:var(--radius-md);color:var(--color-text-primary)"><span style="flex:1;min-width:0;font:400 13px var(--font-sans)">Copy bee id</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);opacity:.85">&#8984;&#8679;C</span></div></fdn-use>
-            <fdn-use component="MenuItem" data-fdn-prop-label="Toggle important" data-fdn-prop-keys="&#8984;&#8997;J"><div data-fdn-style="menu-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:var(--radius-md);color:var(--color-text-primary)"><span style="flex:1;min-width:0;font:400 13px var(--font-sans)">Toggle important</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);opacity:.85">&#8984;&#8997;J</span></div></fdn-use>
-            <fdn-use component="MenuItem" data-fdn-prop-label="Surface a card" data-fdn-prop-submenu="true"><div data-fdn-style="menu-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:var(--radius-md);color:var(--color-text-primary)"><span style="flex:1;min-width:0;font:400 13px var(--font-sans)">Surface a card</span><svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-faint);flex:none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></fdn-use>
-            <fdn-use component="MenuItem" data-fdn-prop-label="Ask agent to self-seal" data-fdn-prop-keys="&#8984;&#8997;&#8679;L"><div data-fdn-style="menu-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:var(--radius-md);color:var(--color-text-primary)"><span style="flex:1;min-width:0;font:400 13px var(--font-sans)">Ask agent to self-seal</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);opacity:.85">&#8984;&#8997;&#8679;L</span></div></fdn-use>
-          <fdn-use component="MenuItem" data-fdn-prop-label="Archive agent" data-fdn-prop-keys="e"><div data-fdn-style="menu-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:var(--radius-md);color:var(--color-text-primary)"><span style="flex:1;min-width:0;font:400 13px var(--font-sans)">Archive agent</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);opacity:.85">e</span></div></fdn-use>
-          <div data-fdn-style="menu-divider" style="height:1px;margin:5px 8px;background:var(--color-border-subtle)"></div>
-          <fdn-use component="MenuItem" data-fdn-prop-label="Delete agent&hellip;" data-fdn-prop-keys="&#8984;&#8679;&#9003;" data-fdn-prop-destructive="true"><div data-fdn-style="menu-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:var(--radius-md);color:var(--color-status-blocked)"><span style="flex:1;min-width:0;font:400 13px var(--font-sans)">Delete agent&hellip;</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-status-blocked);opacity:1">&#8984;&#8679;&#9003;</span></div></fdn-use>
-        </div>
-      </fdn-overlay>
+  </fdn-component>
+  <fdn-component name="MenuItem" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="keys" type="string"></fdn-prop>
+      <fdn-prop name="destructive" type="boolean" default="false"></fdn-prop>
+      <fdn-prop name="submenu" type="boolean" default="false"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n26" data-fdn-style="menu-row" style="color:{{ prop.destructive ? 'var(--color-status-blocked)' : 'var(--color-text-primary)' }}" style-hover="background:var(--color-selected-bg)">
+      <span data-fdn-id="n27" style="flex:1;font-family:var(--font-sans);font-size:13px;font-style:normal;font-variant:normal;font-weight:400;min-width:0">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n28" when="prop.keys" style="color:{{ prop.destructive ? 'var(--color-status-blocked)' : 'var(--color-text-faint)' }};flex:none;font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:400;opacity:{{ prop.destructive ? 1 : .85 }}">
+        {{ prop.keys }}
+      </span>
+      <fdn-use data-fdn-id="n29" component="Icon" data-fdn-prop-color="var(--color-text-faint)" data-fdn-prop-name="chevron-right" data-fdn-prop-size="12" when="prop.submenu"></fdn-use>
     </div>
-    <div data-fdn-style="caption" style="margin-top:10px;width:100%;box-sizing:border-box;padding:0 16px"><b style="font-weight:600;color:var(--color-accent)">Anchor resolution shown baked-in:</b> the author's declared default is <code style="font-family:var(--font-mono)">bottom-start</code> (open below, left-aligned to the trigger) &mdash; opening there from this row's position would push the panel past both the frame's right edge and bottom edge, so this instance's <code style="font-family:var(--font-mono)">data-fdn-anchor-edge</code> is the flipped result, <code style="font-family:var(--font-mono)">top-end</code>. A projection with no live layout engine can only ever show one already-resolved edge per state; see findings (f) on whether that's sufficient.</div>
-  </section>
-
-  <!-- ============================================================
-       BOARD 2 &middot; TOOLTIP on a truncated title. Small dark pill,
-       anchored above the element, no dismiss affordance at all.
-       ============================================================ -->
-  <section>
-    <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px;padding:0 16px">2 &middot; tooltip &mdash; hover-triggered, anchored above a truncated title &middot; no dismiss affordance (it isn't dismissed, it just stops being hovered)</div>
-    <div style="position:relative;width:1480px;height:220px;border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:visible;background:var(--color-bg);display:flex;align-items:center;padding:0 40px">
-      <div style="width:240px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-card);padding:14px 16px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <fdn-use component="StatusDot" data-fdn-prop-state="blocked"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-status-blocked);flex:none"></span></fdn-use>
-          <span id="title-checkout-hotfix" data-fdn-role="trigger" style="flex:1;min-width:0;font:500 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px dotted var(--color-text-faint)">checkout-guest-cart-recovery-hotfix-attempt-3</span>
-        </div>
-        <div style="margin-top:4px;font:400 11px var(--font-mono);color:var(--color-text-faint);padding-left:14px">14m &middot; remote:build-02</div>
-      </div>
-
-      <!-- fdn-overlay role="tooltip": data-fdn-dismiss="none" is deliberate
-           and load-bearing, not an oversight — a tooltip has no user
-           dismiss action, only a hover-end. data-fdn-trigger is INVENTED
-           vocabulary this board needed and does not exist in (a.4): it
-           names the visibility trigger itself (here, hover on the ref
-           element), which is a distinct fact from anchor (WHERE) and
-           dismiss (how the user makes an already-open overlay go away).
-           See findings (f) for why style-hover cannot carry this. -->
-      <fdn-overlay data-fdn-role="tooltip" data-fdn-anchor="trigger" data-fdn-anchor-ref="title-checkout-hotfix" data-fdn-anchor-edge="top" data-fdn-anchor-offset="6" data-fdn-anchor-flip="viewport" data-fdn-trigger="hover:title-checkout-hotfix" data-fdn-dismiss="none" style="position:absolute;left:78px;top:44px">
-        <fdn-use component="TooltipPill" data-fdn-prop-text="checkout-guest-cart-recovery-hotfix-attempt-3">
-          <div data-fdn-style="tooltip-pill" style="display:inline-flex;align-items:center;padding:5px 9px;border-radius:var(--radius-md);background:var(--color-text-primary);color:#FFFFFF;font:500 11px var(--font-sans);white-space:nowrap;box-shadow:var(--shadow-tooltip)">checkout-guest-cart-recovery-hotfix-attempt-3</div>
-        </fdn-use>
-      </fdn-overlay>
+  </fdn-component>
+  <fdn-component name="PopoverRow" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="meta" type="string"></fdn-prop>
+      <fdn-prop name="selected" type="boolean" default="false"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n30" data-fdn-style="popover-row" style="background:{{ prop.selected ? 'var(--color-selected-bg)' : 'transparent' }}" style-hover="background:var(--color-selected-bg)">
+      <span data-fdn-id="n31" style="color:var(--color-text-primary);flex:1;font-family:var(--font-sans);font-size:13px;font-style:normal;font-variant:normal;font-weight:{{ prop.selected ? '600' : '400' }};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n32" when="prop.meta" style="color:var(--color-text-faint);flex:none;font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:400;margin-right:{{ prop.selected ? 6 : 0 }}px">
+        {{ prop.meta }}
+      </span>
+      <fdn-use data-fdn-id="n33" component="Icon" data-fdn-prop-color="var(--color-text-primary)" data-fdn-prop-name="check" data-fdn-prop-size="13" when="prop.selected"></fdn-use>
     </div>
-    <div data-fdn-style="caption" style="margin-top:10px;width:100%;box-sizing:border-box;padding:0 16px"><b style="font-weight:600;color:var(--color-accent)">As drawn:</b> the title is truncated with <code style="font-family:var(--font-mono)">text-overflow:ellipsis</code> in the row itself; the tooltip repeats the full string. The pill is anchored to the title element's top edge, offset 6px, no scrim, no panel chrome &mdash; the smallest possible <code style="font-family:var(--font-mono)">fdn-overlay</code> instance in this grammar.</div>
-  </section>
-
-  <!-- ============================================================
-       BOARD 3 &middot; DROPDOWN / SELECT POPOVER, anchored below a
-       trigger button, scrollable list, one item selected. Matches the
-       design-brief &sect;11.4 popover convention exactly (white card,
-       filter field, --selection fill + check, never honey).
-       ============================================================ -->
-  <section>
-    <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px;padding:0 16px">3 &middot; dropdown / select popover &mdash; anchored below a trigger button, scrollable list (10 rows, ~6 visible), one item selected</div>
-    <div style="position:relative;width:1480px;height:480px;border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:visible;background:var(--color-bg);padding:40px">
-      <div style="display:flex;align-items:center;gap:9px;height:28px;padding:0 12px;border-radius:var(--radius-md);border:1px solid var(--color-border);width:fit-content" id="repo-picker-trigger" data-fdn-role="trigger">
-        <span style="font:500 12px var(--font-sans);color:var(--color-text-primary)">foundation &middot; main</span>
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </fdn-component>
+  <fdn-component name="StatusDot" hidden>
+    <fdn-props>
+      <fdn-prop name="state" type="enum" required="true"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n13" when="prop.state == 'running'" style="background:var(--color-status-running);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:6px;width:6px"></span>
+    <span data-fdn-id="n14" when="prop.state == 'waiting'" style="background:var(--color-status-waiting);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:6px;width:6px"></span>
+    <span data-fdn-id="n15" when="prop.state == 'blocked'" style="background:var(--color-status-blocked);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:6px;width:6px"></span>
+    <span data-fdn-id="n16" when="prop.state == 'review'" style="background:var(--color-status-review);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:6px;width:6px"></span>
+    <span data-fdn-id="n17" when="prop.state == 'done'" style="background:var(--color-status-done);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:6px;width:6px"></span>
+    <span data-fdn-id="n18" when="prop.state == 'merged'" style="background:var(--color-status-merged);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:6px;width:6px"></span>
+  </fdn-component>
+  <fdn-component name="TooltipPill" hidden>
+    <fdn-props>
+      <fdn-prop name="text" type="string" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n34" data-fdn-style="tooltip-pill">
+      {{ prop.text }}
+    </div>
+  </fdn-component>
+  <main>
+    <header data-fdn-id="n35" style="column-gap:4px;display:flex;flex-direction:column;padding-bottom:0;padding-left:16px;padding-right:16px;padding-top:0;row-gap:4px">
+      <div data-fdn-id="n36" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:13px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em">
+        APIARY · OVERLAY EVIDENCE ROUND 2 · four overlay shapes drawn fully open against SPEC open question 2
       </div>
-
-      <!-- fdn-overlay role="popover": same structural shape as a menu (panel,
-           no scrim, trigger-anchored, outside-click/item-select/esc dismiss)
-           but role differs because behaviorally it's a single-select list,
-           not a command list — see findings (f) on whether "menu" and
-           "popover" actually need to be distinct role values or collapse
-           into one. -->
-      <fdn-overlay data-fdn-role="popover" data-fdn-anchor="trigger" data-fdn-anchor-ref="repo-picker-trigger" data-fdn-anchor-preferred-edge="bottom-start" data-fdn-anchor-edge="bottom-start" data-fdn-anchor-flip="viewport" data-fdn-anchor-offset="6" data-fdn-dismiss="outside-click,item-select,esc" style="position:absolute;left:40px;top:74px;width:280px">
-        <div data-fdn-role="panel" style="background:var(--color-surface);border:1px solid var(--color-card-border);border-radius:var(--radius-xl);box-shadow:var(--shadow-menu);padding:8px">
-          <div style="display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;border:1px solid #E2E0DB;border-radius:var(--radius-md);margin-bottom:6px">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-faint);flex:none"><circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"/><path d="m10.6 10.6 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-            <span style="font:400 12px var(--font-sans);color:var(--color-text-placeholder)">Filter repositories&hellip;</span>
-          </div>
-          <div style="font:600 10px var(--font-sans);letter-spacing:.14em;color:var(--color-text-faint);padding:2px 8px 4px">REPOSITORIES</div>
-          <div style="max-height:220px;overflow-y:auto;padding-bottom:2px">
-            <fdn-use component="PopoverRow" data-fdn-prop-label="apiary" data-fdn-prop-meta="main"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:transparent"><span style="flex:1;min-width:0;font:400 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">apiary</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:0px">main</span></div></fdn-use>
-            <fdn-use component="PopoverRow" data-fdn-prop-label="hive" data-fdn-prop-meta="main"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:transparent"><span style="flex:1;min-width:0;font:400 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">hive</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:0px">main</span></div></fdn-use>
-            <fdn-use component="PopoverRow" data-fdn-prop-label="pollinate" data-fdn-prop-meta="main"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:transparent"><span style="flex:1;min-width:0;font:400 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">pollinate</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:0px">main</span></div></fdn-use>
-            <fdn-use component="PopoverRow" data-fdn-prop-label="foundation" data-fdn-prop-meta="main" data-fdn-prop-selected="true"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:var(--color-selected-bg)"><span style="flex:1;min-width:0;font:600 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">foundation</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:6px">main</span><svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-primary);flex:none"><path d="M3 8.5l3.2 3 6.8-7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></fdn-use>
-            <fdn-use component="PopoverRow" data-fdn-prop-label="valhall-tools" data-fdn-prop-meta="main"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:transparent"><span style="flex:1;min-width:0;font:400 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">valhall-tools</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:0px">main</span></div></fdn-use>
-            <fdn-use component="PopoverRow" data-fdn-prop-label="honeycomb" data-fdn-prop-meta="main"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:transparent"><span style="flex:1;min-width:0;font:400 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">honeycomb</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:0px">main</span></div></fdn-use>
-            <fdn-use component="PopoverRow" data-fdn-prop-label="drone-runtime" data-fdn-prop-meta="main"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:transparent"><span style="flex:1;min-width:0;font:400 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">drone-runtime</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:0px">main</span></div></fdn-use>
-            <fdn-use component="PopoverRow" data-fdn-prop-label="nectar" data-fdn-prop-meta="main"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:transparent"><span style="flex:1;min-width:0;font:400 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">nectar</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:0px">main</span></div></fdn-use>
-            <fdn-use component="PopoverRow" data-fdn-prop-label="kontrol-site" data-fdn-prop-meta="main"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:transparent"><span style="flex:1;min-width:0;font:400 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">kontrol-site</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:0px">main</span></div></fdn-use>
-            <fdn-use component="PopoverRow" data-fdn-prop-label="scratch" data-fdn-prop-meta="wip-notes"><div data-fdn-style="popover-row" style-hover="background:var(--color-selected-bg)" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:transparent"><span style="flex:1;min-width:0;font:400 13px var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scratch</span><span style="flex:none;font:400 11px var(--font-mono);color:var(--color-text-faint);margin-right:0px">wip-notes</span></div></fdn-use>
+      <div data-fdn-id="n37" style="color:var(--color-text-placeholder);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:400">
+        <span data-fdn-id="n38">
+          Draws the two shapes GRAMMAR-FINDINGS.md §(c) flagged as never-drawn-open (menu, tooltip) plus a dropdown/select popover, each through
+        </span>
+        <code data-fdn-id="n39" style="font-family:var(--font-mono)">
+          &lt;fdn-overlay&gt;
+        </code>
+        <span data-fdn-id="n40">
+          with role/anchor/dismiss metadata — and one small confirm dialog, reusing the established dialog+scrim pattern, for contrast.
+        </span>
+      </div>
+    </header>
+    <section data-fdn-id="n41">
+      <div data-fdn-id="n42" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px;padding-bottom:0;padding-left:16px;padding-right:16px;padding-top:0">
+        1 · context menu — anchored to a fleet row's ⋯ trigger · 8 items, one destructive, one submenu · no scrim · dismissed on outside-click or item-select · flips on both axes to stay in frame
+      </div>
+      <div data-fdn-id="n43" style="background:var(--color-bg);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-xl);border-bottom-right-radius:var(--radius-xl);border-top-left-radius:var(--radius-xl);border-top-right-radius:var(--radius-xl);column-gap:12px;display:flex;height:640px;overflow:visible;position:relative;row-gap:12px;width:1480px">
+        <div data-fdn-id="n44" style="background:var(--color-bg);border-right:1px solid var(--color-border-subtle);flex:none;width:200px"></div>
+        <div data-fdn-id="n45" style="background:var(--color-surface);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);display:flex;flex:1;justify-content:flex-end;margin-bottom:12px;margin-left:0;margin-right:12px;margin-top:12px;padding-bottom:0;padding-left:0;padding-right:24px;padding-top:52px">
+          <div data-fdn-id="n46" style="display:flex;flex-direction:column;width:360px">
+            <div data-fdn-id="n47" style="align-items:center;border-bottom:1px solid var(--color-border-subtle);column-gap:8px;display:flex;height:40px;padding-bottom:0;padding-left:10px;padding-right:4px;padding-top:0;row-gap:8px">
+              <span data-fdn-id="n48" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:13px;font-style:normal;font-variant:normal;font-weight:600">
+                Fleet
+              </span>
+              <span data-fdn-id="n49" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:400">
+                6 agents
+              </span>
+            </div>
+            <div data-fdn-id="n50" style="padding-top:8px">
+              <fdn-use data-fdn-id="n51" component="FleetRow" data-fdn-prop-id="pay-webhooks" data-fdn-prop-meta="4m · local" data-fdn-prop-state="running" data-fdn-prop-title="pay-webhooks"></fdn-use>
+              <fdn-use data-fdn-id="n52" component="FleetRow" data-fdn-prop-id="checkout-guest-cart" data-fdn-prop-meta="22m · wt-04" data-fdn-prop-state="review" data-fdn-prop-title="checkout-guest-cart"></fdn-use>
+              <fdn-use data-fdn-id="n53" component="FleetRow" data-fdn-prop-id="forum-adapter" data-fdn-prop-meta="6m · local" data-fdn-prop-state="waiting" data-fdn-prop-title="forum-adapter"></fdn-use>
+              <fdn-use data-fdn-id="n54" component="FleetRow" data-fdn-prop-id="docs-sweep" data-fdn-prop-meta="1h12 · local" data-fdn-prop-state="done" data-fdn-prop-title="docs-sweep"></fdn-use>
+              <fdn-use data-fdn-id="n55" component="FleetRow" data-fdn-prop-id="hem-approve" data-fdn-prop-meta="3h · wt-02" data-fdn-prop-state="merged" data-fdn-prop-title="hem-approve"></fdn-use>
+              <fdn-use data-fdn-id="n56" component="FleetRow" data-fdn-prop-id="grok-fleet-3" data-fdn-prop-meta="12m · remote:build-04" data-fdn-prop-state="blocked" data-fdn-prop-title="grok-fleet-3" data-fdn-prop-triggeractive="true"></fdn-use>
+            </div>
           </div>
         </div>
-      </fdn-overlay>
-    </div>
-    <div data-fdn-style="caption" style="margin-top:10px;width:100%;box-sizing:border-box;padding:0 16px"><b style="font-weight:600;color:var(--color-accent)">As drawn:</b> the list panel caps at <code style="font-family:var(--font-mono)">max-height:220px</code> with <code style="font-family:var(--font-mono)">overflow-y:auto</code> so 10 declared rows clip to about 6 visible and the panel scrolls &mdash; a real scrollbar, not a decorative fade. <code style="font-family:var(--font-mono)">foundation</code> carries the selected fill + check per design-brief &sect;11.4 (never honey).</div>
-  </section>
-
-  <!-- ============================================================
-       BOARD 4 &middot; SMALL CONFIRM DIALOG, for contrast. Reuses
-       system-help-center.fdn.html board 1's exact pattern
-       (role="dialog", scrim, viewport-center, esc/backdrop-click) at a
-       much smaller panel size, following naturally from board 1's
-       destructive "Delete agent&hellip;" menu item.
-       ============================================================ -->
-  <section>
-    <div style="font:500 11px var(--font-mono);letter-spacing:.04em;color:var(--color-accent);margin-bottom:8px;padding:0 16px">4 &middot; confirm dialog &mdash; for contrast &middot; scrim + centered, the established pattern from system-help-center.fdn.html board 1, at dialog scale rather than app-window scale</div>
-    <div style="position:relative;width:1480px;height:420px;border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:hidden;background:var(--color-bg)">
-      <div style="position:absolute;left:0;top:0;bottom:0;width:200px;border-right:1px solid var(--color-border-subtle);background:var(--color-bg)"></div>
-      <div style="position:absolute;left:212px;top:12px;bottom:12px;right:12px;background:var(--color-surface);border-radius:var(--radius-lg)"></div>
-
-      <fdn-overlay data-fdn-role="dialog" data-fdn-anchor="viewport-center" data-fdn-anchor-flip="none" data-fdn-dismiss="esc,backdrop-click" style="position:absolute;inset:0">
-        <div data-fdn-role="scrim" style="position:absolute;inset:0;background:rgba(46,43,39,.32)"></div>
-        <div data-fdn-role="panel" style="position:absolute;left:560px;top:120px;width:360px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-2xl);box-shadow:var(--shadow-panel);padding:20px 22px 18px">
-          <div style="font:600 15px var(--font-sans);color:var(--color-text-primary)">Delete agent &mdash; grok-fleet-3?</div>
-          <div style="margin-top:8px;font:400 12.5px/1.6 var(--font-sans);color:var(--color-text-tertiary)">Stops the run and removes it from the fleet list. Conversation history and any produced changes stay in Runs. This can't be undone.</div>
-          <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
-            <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border:1px solid #E2E0DB;border-radius:var(--radius-md);font:500 12.5px var(--font-sans);color:var(--color-text-secondary)">Cancel</span>
-            <span style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:var(--radius-md);background:var(--color-status-blocked);font:500 12.5px var(--font-sans);color:#FFFFFF">Delete agent</span>
+        <fdn-overlay data-fdn-id="n57" data-fdn-anchor="trigger" data-fdn-anchor-edge="top-end" data-fdn-anchor-flip="viewport" data-fdn-anchor-offset="4" data-fdn-anchor-preferred-edge="bottom-start" data-fdn-anchor-ref="kebab-grok-fleet-3" data-fdn-dismiss="outside-click,item-select,esc" data-fdn-role="menu" style="left:1232px;position:absolute;top:214px;width:230px">
+          <div data-fdn-id="n58" data-fdn-role="panel" style="background:var(--color-surface);border:1px solid var(--color-card-border);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);box-shadow:var(--shadow-menu);padding-bottom:6px;padding-left:0;padding-right:0;padding-top:6px">
+            <fdn-use data-fdn-id="n59" component="MenuItem" data-fdn-prop-keys="↵" data-fdn-prop-label="Open"></fdn-use>
+            <fdn-use data-fdn-id="n60" component="MenuItem" data-fdn-prop-keys="⇥" data-fdn-prop-label="Preview beside"></fdn-use>
+            <fdn-use data-fdn-id="n61" component="MenuItem" data-fdn-prop-keys="⌘⇧C" data-fdn-prop-label="Copy bee id"></fdn-use>
+            <fdn-use data-fdn-id="n62" component="MenuItem" data-fdn-prop-keys="⌘⌥J" data-fdn-prop-label="Toggle important"></fdn-use>
+            <fdn-use data-fdn-id="n63" component="MenuItem" data-fdn-prop-label="Surface a card" data-fdn-prop-submenu="true"></fdn-use>
+            <fdn-use data-fdn-id="n64" component="MenuItem" data-fdn-prop-keys="⌘⌥⇧L" data-fdn-prop-label="Ask agent to self-seal"></fdn-use>
+            <fdn-use data-fdn-id="n65" component="MenuItem" data-fdn-prop-keys="e" data-fdn-prop-label="Archive agent"></fdn-use>
+            <div data-fdn-id="n66" data-fdn-style="menu-divider" style="background:var(--color-border-subtle);height:1px;margin-bottom:5px;margin-left:8px;margin-right:8px;margin-top:5px"></div>
+            <fdn-use data-fdn-id="n67" component="MenuItem" data-fdn-prop-destructive="true" data-fdn-prop-keys="⌘⇧⌫" data-fdn-prop-label="Delete agent…"></fdn-use>
+          </div>
+        </fdn-overlay>
+      </div>
+      <div data-fdn-id="n68" data-fdn-style="caption" style="box-sizing:border-box;margin-top:10px;padding-bottom:0;padding-left:16px;padding-right:16px;padding-top:0;width:100%">
+        <b data-fdn-id="n69" style="color:var(--color-accent);font-weight:600">
+          Anchor resolution shown baked-in:
+        </b>
+        <span data-fdn-id="n70">
+          the author's declared default is
+        </span>
+        <code data-fdn-id="n71" style="font-family:var(--font-mono)">
+          bottom-start
+        </code>
+        <span data-fdn-id="n72">
+          (open below, left-aligned to the trigger) — opening there from this row's position would push the panel past both the frame's right edge and bottom edge, so this instance's
+        </span>
+        <code data-fdn-id="n73" style="font-family:var(--font-mono)">
+          data-fdn-anchor-edge
+        </code>
+        <span data-fdn-id="n74">
+          is the flipped result,
+        </span>
+        <code data-fdn-id="n75" style="font-family:var(--font-mono)">
+          top-end
+        </code>
+        <span data-fdn-id="n76">
+          . A projection with no live layout engine can only ever show one already-resolved edge per state; see findings (f) on whether that's sufficient.
+        </span>
+      </div>
+    </section>
+    <section data-fdn-id="n77">
+      <div data-fdn-id="n78" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px;padding-bottom:0;padding-left:16px;padding-right:16px;padding-top:0">
+        2 · tooltip — hover-triggered, anchored above a truncated title · no dismiss affordance (it isn't dismissed, it just stops being hovered)
+      </div>
+      <div data-fdn-id="n79" style="align-items:center;background:var(--color-bg);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-xl);border-bottom-right-radius:var(--radius-xl);border-top-left-radius:var(--radius-xl);border-top-right-radius:var(--radius-xl);display:flex;height:220px;overflow:visible;padding-bottom:0;padding-left:40px;padding-right:40px;padding-top:0;position:relative;width:1480px">
+        <div data-fdn-id="n80" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);box-shadow:var(--shadow-card);padding-bottom:14px;padding-left:16px;padding-right:16px;padding-top:14px;width:240px">
+          <div data-fdn-id="n81" style="align-items:center;column-gap:8px;display:flex;row-gap:8px">
+            <fdn-use data-fdn-id="n82" component="StatusDot" data-fdn-prop-state="blocked"></fdn-use>
+            <span data-fdn-id="n83" data-fdn-role="trigger" id="title-checkout-hotfix" style="border-bottom:1px dotted var(--color-text-faint);color:var(--color-text-primary);flex:1;font-family:var(--font-sans);font-size:13px;font-style:normal;font-variant:normal;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              checkout-guest-cart-recovery-hotfix-attempt-3
+            </span>
+          </div>
+          <div data-fdn-id="n84" style="color:var(--color-text-faint);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:400;margin-top:4px;padding-left:14px">
+            14m · remote:build-02
           </div>
         </div>
-      </fdn-overlay>
-    </div>
-    <div data-fdn-style="caption" style="margin-top:10px;width:100%;box-sizing:border-box;padding:0 16px"><b style="font-weight:600;color:var(--color-accent)">Deliberately NOT honey:</b> the confirming action is filled with <code style="font-family:var(--font-mono)">--color-status-blocked</code>, not <code style="font-family:var(--font-mono)">--honey</code> &mdash; design-brief &sect;2's accent budget reserves honey for the one non-destructive primary CTA + the focus cue; a destructive confirm is neither.</div>
-  </section>
-
-</main>
-
+        <fdn-overlay data-fdn-id="n85" data-fdn-anchor="trigger" data-fdn-anchor-edge="top" data-fdn-anchor-flip="viewport" data-fdn-anchor-offset="6" data-fdn-anchor-ref="title-checkout-hotfix" data-fdn-dismiss="none" data-fdn-role="tooltip" data-fdn-trigger="hover:title-checkout-hotfix" style="left:78px;position:absolute;top:44px">
+          <fdn-use data-fdn-id="n86" component="TooltipPill" data-fdn-prop-text="checkout-guest-cart-recovery-hotfix-attempt-3"></fdn-use>
+        </fdn-overlay>
+      </div>
+      <div data-fdn-id="n87" data-fdn-style="caption" style="box-sizing:border-box;margin-top:10px;padding-bottom:0;padding-left:16px;padding-right:16px;padding-top:0;width:100%">
+        <b data-fdn-id="n88" style="color:var(--color-accent);font-weight:600">
+          As drawn:
+        </b>
+        <span data-fdn-id="n89">
+          the title is truncated with
+        </span>
+        <code data-fdn-id="n90" style="font-family:var(--font-mono)">
+          text-overflow:ellipsis
+        </code>
+        <span data-fdn-id="n91">
+          in the row itself; the tooltip repeats the full string. The pill is anchored to the title element's top edge, offset 6px, no scrim, no panel chrome — the smallest possible
+        </span>
+        <code data-fdn-id="n92" style="font-family:var(--font-mono)">
+          fdn-overlay
+        </code>
+        <span data-fdn-id="n93">
+          instance in this grammar.
+        </span>
+      </div>
+    </section>
+    <section data-fdn-id="n94">
+      <div data-fdn-id="n95" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px;padding-bottom:0;padding-left:16px;padding-right:16px;padding-top:0">
+        3 · dropdown / select popover — anchored below a trigger button, scrollable list (10 rows, ~6 visible), one item selected
+      </div>
+      <div data-fdn-id="n96" style="background:var(--color-bg);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-xl);border-bottom-right-radius:var(--radius-xl);border-top-left-radius:var(--radius-xl);border-top-right-radius:var(--radius-xl);height:480px;overflow:visible;padding-bottom:40px;padding-left:40px;padding-right:40px;padding-top:40px;position:relative;width:1480px">
+        <div data-fdn-id="n97" data-fdn-role="trigger" id="repo-picker-trigger" style="align-items:center;border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:9px;display:flex;height:28px;padding-bottom:0;padding-left:12px;padding-right:12px;padding-top:0;row-gap:9px;width:fit-content">
+          <span data-fdn-id="n98" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:500">
+            foundation · main
+          </span>
+          <svg data-fdn-id="n99" fill="none" height="12" viewBox="0 0 16 16" width="12" style="color:var(--color-text-muted);flex:none">
+            <path data-fdn-id="n100" d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4"></path>
+          </svg>
+        </div>
+        <fdn-overlay data-fdn-id="n101" data-fdn-anchor="trigger" data-fdn-anchor-edge="bottom-start" data-fdn-anchor-flip="viewport" data-fdn-anchor-offset="6" data-fdn-anchor-preferred-edge="bottom-start" data-fdn-anchor-ref="repo-picker-trigger" data-fdn-dismiss="outside-click,item-select,esc" data-fdn-role="popover" style="left:40px;position:absolute;top:74px;width:280px">
+          <div data-fdn-id="n102" data-fdn-role="panel" style="background:var(--color-surface);border:1px solid var(--color-card-border);border-bottom-left-radius:var(--radius-xl);border-bottom-right-radius:var(--radius-xl);border-top-left-radius:var(--radius-xl);border-top-right-radius:var(--radius-xl);box-shadow:var(--shadow-menu);padding-bottom:8px;padding-left:8px;padding-right:8px;padding-top:8px">
+            <div data-fdn-id="n103" style="align-items:center;border:1px solid #E2E0DB;border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:8px;display:flex;height:30px;margin-bottom:6px;padding-bottom:0;padding-left:8px;padding-right:8px;padding-top:0;row-gap:8px">
+              <svg data-fdn-id="n104" fill="none" height="12" viewBox="0 0 16 16" width="12" style="color:var(--color-text-faint);flex:none">
+                <circle data-fdn-id="n105" cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"></circle>
+                <path data-fdn-id="n106" d="m10.6 10.6 3 3" stroke="currentColor" stroke-linecap="round" stroke-width="1.4"></path>
+              </svg>
+              <span data-fdn-id="n107" style="color:var(--color-text-placeholder);font-family:var(--font-sans);font-size:12px;font-style:normal;font-variant:normal;font-weight:400">
+                Filter repositories…
+              </span>
+            </div>
+            <div data-fdn-id="n108" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:10px;font-style:normal;font-variant:normal;font-weight:600;letter-spacing:.14em;padding-bottom:4px;padding-left:8px;padding-right:8px;padding-top:2px">
+              REPOSITORIES
+            </div>
+            <div data-fdn-id="n109" style="max-height:220px;overflow-y:auto;padding-bottom:2px">
+              <fdn-use data-fdn-id="n110" component="PopoverRow" data-fdn-prop-label="apiary" data-fdn-prop-meta="main"></fdn-use>
+              <fdn-use data-fdn-id="n111" component="PopoverRow" data-fdn-prop-label="hive" data-fdn-prop-meta="main"></fdn-use>
+              <fdn-use data-fdn-id="n112" component="PopoverRow" data-fdn-prop-label="pollinate" data-fdn-prop-meta="main"></fdn-use>
+              <fdn-use data-fdn-id="n113" component="PopoverRow" data-fdn-prop-label="foundation" data-fdn-prop-meta="main" data-fdn-prop-selected="true"></fdn-use>
+              <fdn-use data-fdn-id="n114" component="PopoverRow" data-fdn-prop-label="valhall-tools" data-fdn-prop-meta="main"></fdn-use>
+              <fdn-use data-fdn-id="n115" component="PopoverRow" data-fdn-prop-label="honeycomb" data-fdn-prop-meta="main"></fdn-use>
+              <fdn-use data-fdn-id="n116" component="PopoverRow" data-fdn-prop-label="drone-runtime" data-fdn-prop-meta="main"></fdn-use>
+              <fdn-use data-fdn-id="n117" component="PopoverRow" data-fdn-prop-label="nectar" data-fdn-prop-meta="main"></fdn-use>
+              <fdn-use data-fdn-id="n118" component="PopoverRow" data-fdn-prop-label="kontrol-site" data-fdn-prop-meta="main"></fdn-use>
+              <fdn-use data-fdn-id="n119" component="PopoverRow" data-fdn-prop-label="scratch" data-fdn-prop-meta="wip-notes"></fdn-use>
+            </div>
+          </div>
+        </fdn-overlay>
+      </div>
+      <div data-fdn-id="n120" data-fdn-style="caption" style="box-sizing:border-box;margin-top:10px;padding-bottom:0;padding-left:16px;padding-right:16px;padding-top:0;width:100%">
+        <b data-fdn-id="n121" style="color:var(--color-accent);font-weight:600">
+          As drawn:
+        </b>
+        <span data-fdn-id="n122">
+          the list panel caps at
+        </span>
+        <code data-fdn-id="n123" style="font-family:var(--font-mono)">
+          max-height:220px
+        </code>
+        <span data-fdn-id="n124">
+          with
+        </span>
+        <code data-fdn-id="n125" style="font-family:var(--font-mono)">
+          overflow-y:auto
+        </code>
+        <span data-fdn-id="n126">
+          so 10 declared rows clip to about 6 visible and the panel scrolls — a real scrollbar, not a decorative fade.
+        </span>
+        <code data-fdn-id="n127" style="font-family:var(--font-mono)">
+          foundation
+        </code>
+        <span data-fdn-id="n128">
+          carries the selected fill + check per design-brief §11.4 (never honey).
+        </span>
+      </div>
+    </section>
+    <section data-fdn-id="n129">
+      <div data-fdn-id="n130" style="color:var(--color-accent);font-family:var(--font-mono);font-size:11px;font-style:normal;font-variant:normal;font-weight:500;letter-spacing:.04em;margin-bottom:8px;padding-bottom:0;padding-left:16px;padding-right:16px;padding-top:0">
+        4 · confirm dialog — for contrast · scrim + centered, the established pattern from system-help-center.fdn.html board 1, at dialog scale rather than app-window scale
+      </div>
+      <div data-fdn-id="n131" style="background:var(--color-bg);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-xl);border-bottom-right-radius:var(--radius-xl);border-top-left-radius:var(--radius-xl);border-top-right-radius:var(--radius-xl);column-gap:12px;display:flex;height:420px;overflow:hidden;position:relative;row-gap:12px;width:1480px">
+        <div data-fdn-id="n132" style="background:var(--color-bg);border-right:1px solid var(--color-border-subtle);flex:none;width:200px"></div>
+        <div data-fdn-id="n133" style="background:var(--color-surface);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);flex:1;margin-bottom:12px;margin-left:0;margin-right:12px;margin-top:12px"></div>
+        <fdn-overlay data-fdn-id="n134" data-fdn-anchor="viewport-center" data-fdn-anchor-flip="none" data-fdn-dismiss="esc,backdrop-click" data-fdn-role="dialog" style="bottom:0;left:0;position:absolute;right:0;top:0">
+          <div data-fdn-id="n135" data-fdn-role="scrim" style="background:rgba(46,43,39,.32);bottom:0;left:0;position:absolute;right:0;top:0"></div>
+          <div data-fdn-id="n136" data-fdn-role="panel" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-2xl);border-bottom-right-radius:var(--radius-2xl);border-top-left-radius:var(--radius-2xl);border-top-right-radius:var(--radius-2xl);box-shadow:var(--shadow-panel);left:560px;padding-bottom:18px;padding-left:22px;padding-right:22px;padding-top:20px;position:absolute;top:120px;width:360px">
+            <div data-fdn-id="n137" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:15px;font-style:normal;font-variant:normal;font-weight:600">
+              Delete agent — grok-fleet-3?
+            </div>
+            <div data-fdn-id="n138" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:12.5px;font-style:normal;font-variant:normal;font-weight:400;line-height:1.6;margin-top:8px">
+              Stops the run and removes it from the fleet list. Conversation history and any produced changes stay in Runs. This can't be undone.
+            </div>
+            <div data-fdn-id="n139" style="column-gap:8px;display:flex;justify-content:flex-end;margin-top:18px;row-gap:8px">
+              <span data-fdn-id="n140" style="align-items:center;border:1px solid #E2E0DB;border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);color:var(--color-text-secondary);display:inline-flex;font-family:var(--font-sans);font-size:12.5px;font-style:normal;font-variant:normal;font-weight:500;height:28px;padding-bottom:0;padding-left:12px;padding-right:12px;padding-top:0">
+                Cancel
+              </span>
+              <span data-fdn-id="n141" style="align-items:center;background:var(--color-status-blocked);border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);color:#FFFFFF;display:inline-flex;font-family:var(--font-sans);font-size:12.5px;font-style:normal;font-variant:normal;font-weight:500;height:28px;padding-bottom:0;padding-left:12px;padding-right:12px;padding-top:0">
+                Delete agent
+              </span>
+            </div>
+          </div>
+        </fdn-overlay>
+      </div>
+      <div data-fdn-id="n142" data-fdn-style="caption" style="box-sizing:border-box;margin-top:10px;padding-bottom:0;padding-left:16px;padding-right:16px;padding-top:0;width:100%">
+        <b data-fdn-id="n143" style="color:var(--color-accent);font-weight:600">
+          Deliberately NOT honey:
+        </b>
+        <span data-fdn-id="n144">
+          the confirming action is filled with
+        </span>
+        <code data-fdn-id="n145" style="font-family:var(--font-mono)">
+          --color-status-blocked
+        </code>
+        <span data-fdn-id="n146">
+          , not
+        </span>
+        <code data-fdn-id="n147" style="font-family:var(--font-mono)">
+          --honey
+        </code>
+        <span data-fdn-id="n148">
+          — design-brief §2's accent budget reserves honey for the one non-destructive primary CTA + the focus cue; a destructive confirm is neither.
+        </span>
+      </div>
+    </section>
+  </main>
 </body>
 </html>
