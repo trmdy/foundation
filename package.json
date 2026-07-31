@@ -1,0 +1,12 @@
+{
+  "name": "foundation",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "spike:chain": "tsx spikes/chain/src/run.ts",
+    "spike:render": "tsx spikes/render/run.ts"
+  }
+}
