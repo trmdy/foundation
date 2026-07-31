@@ -124,10 +124,50 @@ describe('expr: ternary', () => {
     expect(r.value).toBe('Hello')
   })
 
-  it('a bare comparison outside a ternary is a parse error', () => {
-    const r = evaluateInterpolation("item.state == 'failed'", ctx())
+  it('nested ternary via parens: cond ? value : (nestedCond ? value : value)', () => {
+    const truthy = evaluateInterpolation("item.state == 'failed' ? 'A' : (prop.selected ? 'B' : 'C')", ctx())
+    expect(truthy.value).toBe('A')
+    const nestedTrue = evaluateInterpolation("item.state == 'nope' ? 'A' : (prop.selected ? 'B' : 'C')", ctx())
+    expect(nestedTrue.value).toBe('B')
+    const nestedFalse = evaluateInterpolation("item.state == 'nope' ? 'A' : (param.flag ? 'B' : 'C')", ctx())
+    expect(nestedFalse.value).toBe('C')
+    expect(nestedFalse.reports).toEqual([])
+  })
+
+  it('a ternary condition must be a ref or a comparison, never a bare literal', () => {
+    const r = evaluateInterpolation("'literal' ? 'A' : 'B'", ctx())
     expect(r.value).toBe('')
     expect(r.reports[0]?.code).toBe('expr-parse-error')
+  })
+})
+
+describe('expr: bare comparison as a standalone boolean value (round 3)', () => {
+  it('a bare comparison outside a ternary evaluates to a stringified boolean, not a parse error', () => {
+    const truthy = evaluateInterpolation("item.state == 'failed'", ctx())
+    expect(truthy.value).toBe('true')
+    expect(truthy.reports).toEqual([])
+
+    const falsy = evaluateInterpolation("item.state == 'waiting'", ctx())
+    expect(falsy.value).toBe('false')
+  })
+
+  it('!= as a bare standalone value', () => {
+    expect(evaluateInterpolation("item.state != 'failed'", ctx()).value).toBe('false')
+  })
+
+  it('ref-vs-ref comparison (the selection idiom: item.id == prop.selecteditemid)', () => {
+    const c = ctx({ bindings: { item: { id: 'row-1' }, prop: { selecteditemid: 'row-1' }, param: {} } })
+    expect(evaluateInterpolation('item.id == prop.selecteditemid', c).value).toBe('true')
+
+    const notSelected = ctx({ bindings: { item: { id: 'row-2' }, prop: { selecteditemid: 'row-1' }, param: {} } })
+    expect(evaluateInterpolation('item.id == prop.selecteditemid', notSelected).value).toBe('false')
+  })
+
+  it('a bare comparison can bind a boolean prop via data-fdn-prop-* (stringifies to "true"/"false")', () => {
+    // simulates how instantiateComponent interpolates a data-fdn-prop-* attr
+    // whose source expression is a bare comparison, then coerces "true"/"false"
+    const r = evaluateInterpolation("item.id == prop.selecteditemid", ctx({ bindings: { item: { id: 'x' }, prop: { selecteditemid: 'x' }, param: {} } }))
+    expect(r.value === 'true' || r.value === 'false').toBe(true)
   })
 })
 
@@ -230,5 +270,39 @@ describe('expr: when — comparisons and boolean composition', () => {
     const r = evaluateWhen('bogus.field', ctx())
     expect(r.value).toBe(false)
     expect(r.reports[0]?.code).toBe('unknown-ref')
+  })
+
+  it('ref-vs-ref comparison in when (round 3)', () => {
+    const c = ctx({ bindings: { item: { id: 'a' }, prop: { selecteditemid: 'a' }, param: {} } })
+    expect(evaluateWhen('item.id == prop.selecteditemid', c).value).toBe(true)
+    const other = ctx({ bindings: { item: { id: 'b' }, prop: { selecteditemid: 'a' }, param: {} } })
+    expect(evaluateWhen('item.id == prop.selecteditemid', other).value).toBe(false)
+  })
+
+  it('parentheses group boolean composition (round 3)', () => {
+    // (flag || selected) && !flag  =>  (false || true) && true => true
+    expect(evaluateWhen('(param.flag || prop.selected) && !param.flag', ctx()).value).toBe(true)
+    // flag || (selected && flag)  =>  false || (true && false) => false
+    expect(evaluateWhen('param.flag || (prop.selected && param.flag)', ctx()).value).toBe(false)
+  })
+
+  it('parentheses actually change the result versus default precedence (not just legal syntax)', () => {
+    // a=true, b=false, c=false:
+    //   default (&& binds tighter):  a || (b && c)  =>  true || false        => true
+    //   grouped:                     (a || b) && c  =>  (true || false)&&false => false
+    const c = ctx({ bindings: { prop: { a: true, b: false, c: false }, param: {}, item: {} } })
+    expect(evaluateWhen('prop.a || prop.b && prop.c', c).value).toBe(true)
+    expect(evaluateWhen('(prop.a || prop.b) && prop.c', c).value).toBe(false)
+
+    // a=true, b=false: !(a && b) => !false => true ; !a && b => false && false => false
+    const c2 = ctx({ bindings: { prop: { a: true, b: false }, param: {}, item: {} } })
+    expect(evaluateWhen('!(prop.a && prop.b)', c2).value).toBe(true)
+    expect(evaluateWhen('!prop.a && prop.b', c2).value).toBe(false)
+  })
+
+  it('malformed parens (unclosed) resolve to false with expr-parse-error, never throws', () => {
+    const r = evaluateWhen('(prop.selected && param.flag', ctx())
+    expect(r.value).toBe(false)
+    expect(r.reports[0]?.code).toBe('expr-parse-error')
   })
 })

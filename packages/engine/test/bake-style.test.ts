@@ -131,3 +131,144 @@ describe('bake: conformance audit — tokens', () => {
     expect(result.report.lines.some((l) => l.code === 'unused-token')).toBe(false)
   })
 })
+
+describe('bake: conformance audit — category-aware off-token-value (round 3)', () => {
+  it('positive: a space-* token is suggested for a padding value it matches', () => {
+    const d = doc({
+      tokens: { 'space-2': '8px' },
+      body: [node({ id: 'n1', tag: 'div', style: { padding: '8px' } })],
+    })
+    const result = bakeDocument(d)
+    const line = result.report.lines.find((l) => l.code === 'off-token-value')
+    expect(line).toBeDefined()
+    expect(line?.message).toContain('space-2')
+  })
+
+  it('positive: a radius-* token is suggested for a border-radius value it matches', () => {
+    const d = doc({
+      tokens: { 'radius-lg': '8px' },
+      body: [node({ id: 'n1', tag: 'div', style: { 'border-radius': '8px' } })],
+    })
+    const result = bakeDocument(d)
+    const line = result.report.lines.find((l) => l.code === 'off-token-value')
+    expect(line).toBeDefined()
+    expect(line?.message).toContain('radius-lg')
+  })
+
+  it('negative: no cross-category suggestion — a radius-* token matching the raw VALUE is never suggested for padding', () => {
+    // the exact regression this round exists to fix: "radius-lg for padding"
+    const d = doc({
+      tokens: { 'radius-lg': '8px' },
+      body: [node({ id: 'n1', tag: 'div', style: { padding: '8px' } })],
+    })
+    const result = bakeDocument(d)
+    expect(result.report.lines.some((l) => l.code === 'off-token-value')).toBe(false)
+  })
+
+  it('negative: a space-* token matching the raw value is never suggested for border-radius', () => {
+    const d = doc({
+      tokens: { 'space-2': '8px' },
+      body: [node({ id: 'n1', tag: 'div', style: { 'border-radius': '8px' } })],
+    })
+    const result = bakeDocument(d)
+    expect(result.report.lines.some((l) => l.code === 'off-token-value')).toBe(false)
+  })
+
+  it('positive: font-size-* and font-weight-* categories match their own properties only', () => {
+    const d = doc({
+      tokens: { 'font-size-xs': '600', 'font-weight-semibold': '600' },
+      body: [
+        node({ id: 'n1', tag: 'div', style: { 'font-weight': '600' } }),
+        node({ id: 'n2', tag: 'div', style: { 'font-size': '600' } }),
+      ],
+    })
+    const result = bakeDocument(d)
+    const weightLine = result.report.lines.find((l) => l.message.includes('"font-weight"'))
+    const sizeLine = result.report.lines.find((l) => l.message.includes('"font-size"'))
+    expect(weightLine?.message).toContain('font-weight-semibold')
+    expect(weightLine?.message).not.toContain('font-size-xs')
+    expect(sizeLine?.message).toContain('font-size-xs')
+    expect(sizeLine?.message).not.toContain('font-weight-semibold')
+  })
+
+  it('positive: color category matches by VALUE shape (hex), for color-family properties', () => {
+    const d = doc({
+      tokens: { 'brand-ink': '#2E2B27' }, // deliberately NOT "color-" prefixed
+      body: [node({ id: 'n1', tag: 'div', style: { color: '#2E2B27', 'background-color': '#2E2B27' } })],
+    })
+    const result = bakeDocument(d)
+    const lines = result.report.lines.filter((l) => l.code === 'off-token-value')
+    expect(lines).toHaveLength(2)
+    expect(lines.every((l) => l.message.includes('brand-ink'))).toBe(true)
+  })
+
+  it('negative: an unprefixed, non-color-shaped token never matches (same-category impossibility -> skip)', () => {
+    const d = doc({
+      tokens: { 'weird-name': '8px' }, // no recognized prefix, not a color value
+      body: [node({ id: 'n1', tag: 'div', style: { padding: '8px' } })],
+    })
+    const result = bakeDocument(d)
+    expect(result.report.lines.some((l) => l.code === 'off-token-value')).toBe(false)
+  })
+
+  it('negative: a property with no recognized category never triggers a suggestion, even on exact value match', () => {
+    const d = doc({
+      tokens: { 'space-2': '8px' },
+      body: [node({ id: 'n1', tag: 'div', style: { 'letter-spacing': '8px' } })],
+    })
+    const result = bakeDocument(d)
+    expect(result.report.lines.some((l) => l.code === 'off-token-value')).toBe(false)
+  })
+})
+
+describe('bake: report dedup (round 3)', () => {
+  it('collapses identical (code, message) report lines from repeated component instances into one, with a count', () => {
+    const badge = {
+      name: 'Badge',
+      props: [],
+      slots: [],
+      body: [node({ id: 'root', tag: 'div', style: { padding: '8px' } })],
+    }
+    const d = doc({
+      tokens: { 'space-2': '8px' },
+      components: [badge],
+      body: [
+        node({ id: 'use1', tag: 'fdn-use', attrs: { component: 'Badge' } }),
+        node({ id: 'use2', tag: 'fdn-use', attrs: { component: 'Badge' } }),
+        node({ id: 'use3', tag: 'fdn-use', attrs: { component: 'Badge' } }),
+      ],
+    })
+    const result = bakeDocument(d)
+    const lines = result.report.lines.filter((l) => l.code === 'off-token-value')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]?.message).toContain('(x3)')
+    expect(lines[0]?.detail).toMatchObject({ count: 3 })
+    // nodeId no longer identifies a single node once collapsed
+    expect(lines[0]?.nodeId).toBeUndefined()
+  })
+
+  it('does not collapse genuinely distinct (different code/message) lines', () => {
+    const d = doc({
+      tokens: { 'space-2': '8px', 'radius-lg': '4px' },
+      body: [
+        node({ id: 'n1', tag: 'div', style: { padding: '8px' } }),
+        node({ id: 'n2', tag: 'div', style: { 'border-radius': '4px' } }),
+      ],
+    })
+    const result = bakeDocument(d)
+    const lines = result.report.lines.filter((l) => l.code === 'off-token-value')
+    expect(lines).toHaveLength(2)
+    expect(lines.every((l) => !l.message.includes('(x'))).toBe(true)
+  })
+
+  it('a single (non-repeated) report line is left untouched, nodeId included', () => {
+    const d = doc({
+      tokens: { 'space-2': '8px' },
+      body: [node({ id: 'only-node', tag: 'div', style: { padding: '8px' } })],
+    })
+    const result = bakeDocument(d)
+    const line = result.report.lines.find((l) => l.code === 'off-token-value')
+    expect(line?.nodeId).toBe('only-node')
+    expect(line?.message).not.toContain('(x')
+  })
+})

@@ -83,7 +83,7 @@ describe('bake: component instantiation', () => {
     expect(result.report.lines).toEqual([])
   })
 
-  it('unbound props with no default bake empty and report prop-missing-default', () => {
+  it('unbound REQUIRED props with no default bake empty and report prop-missing-default', () => {
     const c: FdnComponent = {
       name: 'C',
       props: [{ name: 'label', type: 'string', required: true }],
@@ -94,6 +94,32 @@ describe('bake: component instantiation', () => {
     const result = bakeDocument(d)
     expect(result.tree[0]?.children[0]?.text).toBe('')
     expect(result.report.lines.some((l) => l.code === 'prop-missing-default')).toBe(true)
+  })
+
+  it('round 3: unbound OPTIONAL props (no required flag, no default) bake empty SILENTLY — that is their declared contract', () => {
+    const c: FdnComponent = {
+      name: 'C',
+      props: [{ name: 'label', type: 'string' }], // no `required`, no `default`
+      slots: [],
+      body: [node({ id: 'root', tag: 'span', text: '{{ prop.label }}' })],
+    }
+    const d = doc({ components: [c], body: [node({ id: 'use1', tag: 'fdn-use', attrs: { component: 'C' } })] })
+    const result = bakeDocument(d)
+    expect(result.tree[0]?.children[0]?.text).toBe('')
+    expect(result.report.lines.some((l) => l.code === 'prop-missing-default')).toBe(false)
+    expect(result.report.lines).toEqual([])
+  })
+
+  it('round 3: unbound props with required explicitly false also bake empty silently', () => {
+    const c: FdnComponent = {
+      name: 'C',
+      props: [{ name: 'label', type: 'string', required: false }],
+      slots: [],
+      body: [node({ id: 'root', tag: 'span', text: '{{ prop.label }}' })],
+    }
+    const d = doc({ components: [c], body: [node({ id: 'use1', tag: 'fdn-use', attrs: { component: 'C' } })] })
+    const result = bakeDocument(d)
+    expect(result.report.lines.some((l) => l.code === 'prop-missing-default')).toBe(false)
   })
 
   it('fills a named slot from fdn-fill children', () => {
@@ -243,5 +269,47 @@ describe('bake: component instantiation', () => {
     const id1 = result.tree[0]?.children[0]?.id
     const id2 = result.tree[1]?.children[0]?.id
     expect(id1).not.toBe(id2)
+  })
+})
+
+describe('bake: round 3 end-to-end — the selection idiom (item.id == prop.selecteditemid)', () => {
+  it('each row over data, comparing its own id to the selected param, applies the selected style only to the matching row', () => {
+    // this is exactly boards/inbox-unified.fdn.html's QueueRow pattern: a bare
+    // ref-vs-ref comparison bound as a boolean prop, driving a ternary style.
+    const queueRow: FdnComponent = {
+      name: 'QueueRow',
+      props: [{ name: 'selected', type: 'boolean', default: false }],
+      slots: [],
+      body: [
+        node({
+          id: 'row',
+          tag: 'div',
+          style: { background: "{{ prop.selected ? 'var(--color-selected-bg)' : 'transparent' }}" },
+        }),
+      ],
+    }
+    const d = doc({
+      params: [{ name: 'selecteditemid', type: 'string', default: 'pay-webhooks' }],
+      data: [{ name: 'items', items: [{ id: 'pay-webhooks' }, { id: 'checkout-guest-cart' }] }],
+      components: [queueRow],
+      body: [
+        node({
+          id: 'use',
+          tag: 'fdn-use',
+          each: 'item in data.items',
+          attrs: { component: 'QueueRow', 'data-fdn-prop-selected': '{{ item.id == param.selecteditemid }}' },
+        }),
+      ],
+    })
+    const result = bakeDocument(d)
+    expect(result.report.lines).toEqual([])
+    expect(result.tree).toHaveLength(2)
+
+    const first = result.tree[0] as FdnNode
+    const second = result.tree[1] as FdnNode
+    expect(first.attrs['data-fdn-prop-selected']).toBe('true')
+    expect(first.children[0]?.style['background']).toBe('var(--color-selected-bg)')
+    expect(second.attrs['data-fdn-prop-selected']).toBe('false')
+    expect(second.children[0]?.style['background']).toBe('transparent')
   })
 })

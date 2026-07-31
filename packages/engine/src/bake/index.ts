@@ -15,8 +15,11 @@
  *   7. interpolation of text/attrs/style values.
  *   8. named-style inlining (styleRef merged under the node's own style —
  *      node wins) + styleStates → style-hover/-focus/-active/-disabled.
- *   9. conformance audit (off-token values, unused tokens) threaded
- *      throughout steps 7–8.
+ *   9. conformance audit (category-aware off-token values, unused tokens)
+ *      threaded throughout steps 7–8.
+ *   10. report dedup (see dedupeReports) as the very last step, over the
+ *       whole accumulated report — never during the walk, so nothing about
+ *       the walk itself depends on report contents.
  */
 
 import type {
@@ -115,7 +118,47 @@ export function bakeDocument(doc: FdnDocument, opts?: { state?: string }): { htm
 
   const html = emitHtml(doc, tree)
 
-  return { html, tree, state: stateName, report: { lines: reports } }
+  return { html, tree, state: stateName, report: { lines: dedupeReports(reports) } }
+}
+
+/**
+ * Collapse report-line noise (round 3 report hygiene). The dominant source
+ * of duplication is NOT the same node reporting twice — it's the same
+ * template expression (e.g. an off-token style value, or a component prop
+ * binding) evaluating identically at every `each`/component-instance site
+ * that reuses it: one `<fdn-use component="QueueRow">` used 8 times produces
+ * the same "off-token-value ... font-weight ..." line 8 times with 8
+ * different (instance-namespaced) nodeIds. Grouping by nodeId as well as
+ * (code, message) would therefore never collapse the case this exists to
+ * fix, so the group key is (code, severity, message) only; nodeId stops
+ * identifying a single node once N>1 lines collapse into one, so it's
+ * dropped from the collapsed line (kept as-is when N===1 — no information
+ * lost for a genuine one-off).
+ */
+function dedupeReports(lines: ReportLine[]): ReportLine[] {
+  const order: string[] = []
+  const groups = new Map<string, { first: ReportLine; count: number }>()
+  for (const line of lines) {
+    const key = `${line.code} ${line.severity} ${line.message}`
+    const existing = groups.get(key)
+    if (existing) {
+      existing.count++
+    } else {
+      groups.set(key, { first: line, count: 1 })
+      order.push(key)
+    }
+  }
+  return order.map((key) => {
+    const { first, count } = groups.get(key) as { first: ReportLine; count: number }
+    if (count === 1) return first
+    const baseDetail = first.detail !== null && typeof first.detail === 'object' ? (first.detail as Record<string, unknown>) : undefined
+    return {
+      ...first,
+      nodeId: undefined,
+      message: `${first.message} (x${count})`,
+      detail: { ...baseDetail, count },
+    }
+  })
 }
 
 // ——— each / when / dispatch ———
@@ -249,7 +292,81 @@ interface ResolvedStyle {
   styleStates: Partial<Record<StateStyleKey, Record<string, string>>>
 }
 
-function auditStyleValue(prop: string, value: string, ctx: BakeCtx): void {
+// ——— off-token-value: category-aware matching (round 3 report hygiene) ———
+//
+// A raw value that happens to numerically/textually equal SOME declared
+// token's value is not necessarily a *relevant* suggestion — "8px" matches
+// both --space-2 and --radius-lg by coincidence, and suggesting a radius
+// token for a padding declaration ("radius-lg for padding") is noise, not
+// help. Categories are matched two ways:
+//   - name-prefix category: the token's OWN NAME starts with a reserved
+//     prefix (space-, radius-, font-size-, font-weight-) — this is the
+//     token-authoring convention the audit assumes design-system tokens
+//     follow (see docs/SPEC.md D1's token-taxonomy intent).
+//   - color category: matched BY VALUE instead of by name (a hex/rgb/hsl
+//     shaped value is unambiguously a color regardless of what its token
+//     happens to be named), since color tokens aren't guaranteed a uniform
+//     name prefix the way spacing/radius/type scales are.
+// A token with neither a recognized name prefix nor a color-shaped value is
+// "unprefixed": it cannot be placed in any category, so it can never satisfy
+// a category-gated property match (same-category impossibility) and is
+// simply skipped — never suggested, regardless of value equality alone.
+type TokenCategory = 'space' | 'radius' | 'font-size' | 'font-weight' | 'color'
+
+const PROPERTY_CATEGORY: Record<string, TokenCategory> = {
+  padding: 'space',
+  'padding-top': 'space',
+  'padding-right': 'space',
+  'padding-bottom': 'space',
+  'padding-left': 'space',
+  margin: 'space',
+  'margin-top': 'space',
+  'margin-right': 'space',
+  'margin-bottom': 'space',
+  'margin-left': 'space',
+  gap: 'space',
+  'row-gap': 'space',
+  'column-gap': 'space',
+  inset: 'space',
+  top: 'space',
+  right: 'space',
+  bottom: 'space',
+  left: 'space',
+  'border-radius': 'radius',
+  'border-top-left-radius': 'radius',
+  'border-top-right-radius': 'radius',
+  'border-bottom-left-radius': 'radius',
+  'border-bottom-right-radius': 'radius',
+  'font-size': 'font-size',
+  'font-weight': 'font-weight',
+  color: 'color',
+  'background-color': 'color',
+  'border-color': 'color',
+  'border-top-color': 'color',
+  'border-right-color': 'color',
+  'border-bottom-color': 'color',
+  'border-left-color': 'color',
+  'outline-color': 'color',
+}
+
+const NAME_PREFIX_CATEGORIES: { prefix: string; category: TokenCategory }[] = [
+  { prefix: 'space-', category: 'space' },
+  { prefix: 'radius-', category: 'radius' },
+  { prefix: 'font-size-', category: 'font-size' },
+  { prefix: 'font-weight-', category: 'font-weight' },
+]
+
+const COLOR_VALUE_RE = /^(#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\()/i
+
+function tokenCategory(tokenName: string, tokenValue: string): TokenCategory | undefined {
+  for (const { prefix, category } of NAME_PREFIX_CATEGORIES) {
+    if (tokenName.startsWith(prefix)) return category
+  }
+  if (COLOR_VALUE_RE.test(tokenValue.trim())) return 'color'
+  return undefined
+}
+
+function auditStyleValue(prop: string, value: string, ctx: BakeCtx, nodeId: NodeId): void {
   const varRe = /var\(\s*--([A-Za-z0-9_-]+)/g
   let m: RegExpExecArray | null
   let sawVar = false
@@ -260,13 +377,19 @@ function auditStyleValue(prop: string, value: string, ctx: BakeCtx): void {
   if (sawVar) return
   const trimmed = value.trim()
   if (trimmed === '') return
-  const matches = ctx.tokenValueIndex.get(trimmed)
-  if (matches && matches.length > 0) {
+
+  const propCategory = PROPERTY_CATEGORY[prop]
+  if (!propCategory) return // no category for this property: same-category impossibility -> skip
+
+  const candidates = ctx.tokenValueIndex.get(trimmed) ?? []
+  const matches = candidates.filter((name) => tokenCategory(name, trimmed) === propCategory)
+  if (matches.length > 0) {
     pushReport(ctx, {
       code: 'off-token-value',
       severity: 'info',
       message: `value "${value}" for "${prop}" matches token(s) ${matches.join(', ')} — consider var(--${matches[0]})`,
-      detail: { prop, value, tokens: matches },
+      nodeId,
+      detail: { prop, value, tokens: matches, category: propCategory },
     })
   }
 }
@@ -292,7 +415,7 @@ function resolveNodeStyle(node: FdnNode, ctx: BakeCtx): ResolvedStyle {
     const { value, reports } = interpolateString(raw, ctx, node.id)
     ctx.reports.push(...reports)
     style[prop] = value
-    auditStyleValue(prop, value, ctx)
+    auditStyleValue(prop, value, ctx, node.id)
   }
   if (node.styleRef) attrs['data-fdn-style'] = node.styleRef
 
@@ -311,7 +434,7 @@ function resolveNodeStyle(node: FdnNode, ctx: BakeCtx): ResolvedStyle {
       ctx.reports.push(...reports)
       resolved[propName] = value
       parts.push(`${propName}:${value}`)
-      auditStyleValue(propName, value, ctx)
+      auditStyleValue(propName, value, ctx, node.id)
     }
     styleStates[key] = resolved
     attrs[`style-${key}`] = parts.join(';')
@@ -420,12 +543,17 @@ function instantiateComponent(node: FdnNode, ctx: BakeCtx): FdnNode[] {
         propsTyped[propDef.name] = propDef.default
       } else {
         propsTyped[propDef.name] = ''
-        pushReport(ctx, {
-          code: 'prop-missing-default',
-          severity: 'warning',
-          message: `prop "${propDef.name}" on component "${componentName}" has no bound value and no default; baked empty`,
-          nodeId: node.id,
-        })
+        // Only a REQUIRED prop with no bound value and no default is a real
+        // problem (round 3: an optional prop baking empty is its declared
+        // contract, not something worth a report line).
+        if (propDef.required) {
+          pushReport(ctx, {
+            code: 'prop-missing-default',
+            severity: 'warning',
+            message: `prop "${propDef.name}" on component "${componentName}" is required but has no bound value and no default; baked empty`,
+            nodeId: node.id,
+          })
+        }
       }
     } else {
       propsTyped[propDef.name] = coercePropValue(raw, propDef.type, ctx, node.id)

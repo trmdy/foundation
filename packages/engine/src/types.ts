@@ -118,9 +118,15 @@ export interface FdnDocument {
 //   ternary    := <cond> '?' <value> ':' <value>
 //   lookupref  := ident '[' ref ']'          // ident names an FdnLookup
 //   value      := ref | lookupref | quoted-string-literal | number-literal
-//   cond       := ref | ref ('==' | '!=') (quoted-string-literal | number | boolean)
-// `when` attributes accept <cond> plus '&&' / '||' / '!' composition
-// (precedence: '!' > '&&' > '||').
+//               | <cond>                      // comparison as boolean value
+//               | '(' <value> ')'             // grouping (incl. nested ternary)
+//   cond       := ref
+//               | <operand> ('==' | '!=') <operand>
+//   operand    := ref | quoted-string-literal | number-literal | boolean
+//                 // ref-vs-ref comparison is legal (selection idiom:
+//                 // item.id == prop.selecteditemid) — dogfood round 2
+// `when` attributes accept <cond> plus '&&' / '||' / '!' composition and
+// parentheses (precedence: '!' > '&&' > '||').
 // NOTHING else: no arithmetic, no method calls, no string operations.
 // Conventions: primitive list items are addressed as <binding>.value (the bake
 // wraps primitives as { value: item }); doc.tokens keys are stored WITHOUT the

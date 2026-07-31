@@ -427,12 +427,15 @@ To fill: the fixtures.
    repeated declaration sets become a shared named style vs stay node-attached?
    (Lean: node-attached by default; named-style extraction is an explicit verb or an
    importer heuristic with a report line — never silent.)
-9. ~~Interpolation and the expression budget~~ — **resolved 2026-07-31**: `{{ … }}`
-   admits exactly: property/data references, one ternary, and references into
-   **declared lookup tables** (the enum→value mapping primitive; syntax TBD in L1).
-   No arithmetic, no method calls, no string operations — the spike's one `.split()`
+9. ~~Interpolation and the expression budget~~ — **resolved 2026-07-31, widened
+   same day by dogfooding**: `{{ … }}` admits: property/data references, ternary
+   (nestable via parentheses), comparisons with **refs on either side** (the
+   selection idiom `item.id == prop.selecteditemid`) usable both as conditions and
+   as boolean values, and references into **declared lookup tables**. Still no
+   arithmetic, no method calls, no string operations — the spike's one `.split()`
    need is answered by real `list`/`record` prop types (§4), not expressions.
-   Non-Turing, fully auditable.
+   Non-Turing, fully auditable. (Original draft allowed only ref-vs-literal
+   comparison and no grouping; real boards needed both within hours of use.)
 10. ~~Projection semantics for parameterized content~~ — **resolved 2026-07-31**:
     the canonical projection is the **unresolved template document** — one file, one
     hash, all states; parameterized content stays symbolic. Fully resolved per-state

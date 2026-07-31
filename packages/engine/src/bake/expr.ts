@@ -39,6 +39,8 @@ type Tok =
   | { t: 'dot' }
   | { t: 'lbrack' }
   | { t: 'rbrack' }
+  | { t: 'lparen' }
+  | { t: 'rparen' }
   | { t: 'qmark' }
   | { t: 'colon' }
   | { t: 'eqeq' }
@@ -84,6 +86,16 @@ function tokenize(src: string): Tok[] {
     }
     if (c === ']') {
       toks.push({ t: 'rbrack' })
+      i++
+      continue
+    }
+    if (c === '(') {
+      toks.push({ t: 'lparen' })
+      i++
+      continue
+    }
+    if (c === ')') {
+      toks.push({ t: 'rparen' })
       i++
       continue
     }
@@ -165,19 +177,38 @@ function tokenize(src: string): Tok[] {
 }
 
 // ——— AST ———
+//
+// types.ts's EXPRESSION GRAMMAR (dogfood round 3):
+//   value := ref | lookupref | quoted-string-literal | number-literal
+//          | <cond>                      // comparison as boolean value
+//          | '(' <value> ')'             // grouping (incl. nested ternary)
+//   cond  := ref | <operand> ('==' | '!=') <operand>
+//   operand := ref | quoted-string-literal | number-literal | boolean
+//
+// Implementation note: `value` and `cond` are unified into one ValueNode type
+// below (a bare ref/lit/lookup, a 'cmp' comparison, or a 'ternary'). This is
+// what makes nested ternary reachable through parens in practice: a paren
+// group re-enters the SAME top-level parser (parseExpr), so its contents may
+// themselves be a full ternary, not just a leaf value — the grammar comment's
+// `'(' <value> ')'` is read here as "parens group any nested expression",
+// which is the only reading under which round 3's own worked example
+// (`cond ? 'A' : (nested ? 'B' : 'C')`) is representable at all.
+
+/** One side of a `cond` comparison — never a lookupref or a paren group. */
+type Operand = { kind: 'ref'; path: string[] } | { kind: 'lit'; value: string | number | boolean }
 
 type ValueNode =
-  | { kind: 'lit'; value: string | number }
+  | { kind: 'lit'; value: string | number | boolean }
   | { kind: 'ref'; path: string[] }
   | { kind: 'lookup'; name: string; ref: string[] }
+  | { kind: 'cmp'; left: Operand; op: '==' | '!='; right: Operand }
+  | { kind: 'ternary'; cond: ValueNode; then: ValueNode; else: ValueNode }
 
-type Literal = { kind: 'lit'; value: string | number | boolean }
-
-type CondNode = { kind: 'truthy'; ref: string[] } | { kind: 'cmp'; ref: string[]; op: '==' | '!='; literal: Literal }
-
-type BoolNode = { kind: 'cond'; cond: CondNode } | { kind: 'and'; left: BoolNode; right: BoolNode } | { kind: 'or'; left: BoolNode; right: BoolNode } | { kind: 'not'; inner: BoolNode }
-
-type InterpTop = { kind: 'value'; node: ValueNode } | { kind: 'ternary'; cond: CondNode; then: ValueNode; else: ValueNode }
+type BoolNode =
+  | { kind: 'leaf'; value: ValueNode }
+  | { kind: 'and'; left: BoolNode; right: BoolNode }
+  | { kind: 'or'; left: BoolNode; right: BoolNode }
+  | { kind: 'not'; inner: BoolNode }
 
 // ——— parser ———
 
@@ -218,9 +249,45 @@ class Parser {
     return path
   }
 
-  /** value := ref | lookupref | quoted-string-literal | number-literal */
-  parseValue(): ValueNode {
+  /** operand := ref | quoted-string-literal | number-literal | boolean */
+  parseOperand(): Operand {
     const t = this.peek()
+    if (t.t === 'str') {
+      this.next()
+      return { kind: 'lit', value: t.v }
+    }
+    if (t.t === 'num') {
+      this.next()
+      return { kind: 'lit', value: Number(t.v) }
+    }
+    if (t.t === 'ident') {
+      if (t.v === 'true' || t.v === 'false') {
+        const save = this.pos
+        this.next()
+        if (this.peek().t === 'dot') {
+          // a ref rooted at a prefix literally named "true"/"false" — rare,
+          // but the grammar doesn't reserve these words, so back off and
+          // parse it as an ordinary ref rather than a boolean literal.
+          this.pos = save
+          return { kind: 'ref', path: this.parseRefPath() }
+        }
+        return { kind: 'lit', value: t.v === 'true' }
+      }
+      return { kind: 'ref', path: this.parseRefPath() }
+    }
+    throw new ExprSyntaxError('expected an operand (ref, quoted string, number, or boolean)')
+  }
+
+  /** atom := ref | lookupref | quoted-string-literal | number-literal | '(' <expr> ')' */
+  parseAtom(): ValueNode {
+    const t = this.peek()
+    if (t.t === 'lparen') {
+      this.next()
+      const inner = this.parseExpr()
+      if (this.peek().t !== 'rparen') throw new ExprSyntaxError("expected ')' to close a parenthesized expression")
+      this.next()
+      return inner
+    }
     if (t.t === 'str') {
       this.next()
       return { kind: 'lit', value: t.v }
@@ -247,67 +314,62 @@ class Parser {
         }
         return { kind: 'ref', path }
       }
+      if (name === 'true' || name === 'false') return { kind: 'lit', value: name === 'true' }
       throw new ExprSyntaxError(`expected '.' or '[' after identifier '${name}'`)
     }
-    throw new ExprSyntaxError('expected a value (ref, lookup[ref], or quoted string)')
+    throw new ExprSyntaxError('expected a value (ref, lookup[ref], quoted string, number, boolean, or a parenthesized expression)')
   }
 
-  parseLiteral(): Literal {
-    const t = this.next()
-    if (t.t === 'str') return { kind: 'lit', value: t.v }
-    if (t.t === 'num') return { kind: 'lit', value: Number(t.v) }
-    if (t.t === 'ident' && (t.v === 'true' || t.v === 'false')) return { kind: 'lit', value: t.v === 'true' }
-    throw new ExprSyntaxError('expected a literal (quoted string, number, or boolean) after comparison operator')
+  /**
+   * expr := atom [ ('==' | '!=') operand ] [ '?' expr ':' expr ]
+   * A comparison is only legal when the left atom is itself operand-shaped
+   * (ref or literal — matches `operand := ref | string | number | boolean`;
+   * a lookupref or a paren group may not be a comparison side). A ternary
+   * condition must be a ref (bare truthy) or a comparison — matches
+   * `cond := ref | operand cmp operand` — never a bare literal/lookup/group.
+   */
+  parseExpr(): ValueNode {
+    const left = this.parseAtom()
+    let node: ValueNode = left
+    if ((left.kind === 'ref' || left.kind === 'lit') && (this.peek().t === 'eqeq' || this.peek().t === 'noteq')) {
+      const opTok = this.next()
+      const rightOperand = this.parseOperand()
+      const leftOperand: Operand = left.kind === 'ref' ? { kind: 'ref', path: left.path } : { kind: 'lit', value: left.value }
+      node = { kind: 'cmp', left: leftOperand, op: opTok.t === 'eqeq' ? '==' : '!=', right: rightOperand }
+    }
+    if (this.peek().t === 'qmark') {
+      if (node.kind !== 'ref' && node.kind !== 'cmp') {
+        throw new ExprSyntaxError('a ternary condition must be a ref or a comparison')
+      }
+      this.next()
+      const thenV = this.parseExpr()
+      if (this.peek().t !== 'colon') throw new ExprSyntaxError("expected ':' in ternary")
+      this.next()
+      const elseV = this.parseExpr()
+      return { kind: 'ternary', cond: node, then: thenV, else: elseV }
+    }
+    return node
   }
 
-  /** cond := ref | ref ('==' | '!=') (quoted-string-literal | number | boolean) */
-  parseCond(): CondNode {
-    const ref = this.parseRefPath()
+  parseExprTop(): ValueNode {
+    const node = this.parseExpr()
+    this.expectEof()
+    return node
+  }
+
+  /** cond := ref | operand cmp operand — a `when`/boolean-composition leaf. */
+  parseCondLeaf(): ValueNode {
+    const left = this.parseOperand()
     const t = this.peek()
     if (t.t === 'eqeq' || t.t === 'noteq') {
       this.next()
-      const literal = this.parseLiteral()
-      return { kind: 'cmp', ref, op: t.t === 'eqeq' ? '==' : '!=', literal }
+      const right = this.parseOperand()
+      return { kind: 'cmp', left, op: t.t === 'eqeq' ? '==' : '!=', right }
     }
-    return { kind: 'truthy', ref }
-  }
-
-  /** {{ … }} top level: ternary | value */
-  parseInterpTop(): InterpTop {
-    const t = this.peek()
-    if (t.t === 'str' || t.t === 'num') {
-      const v = this.parseValue()
-      this.expectEof()
-      return { kind: 'value', node: v }
+    if (left.kind !== 'ref') {
+      throw new ExprSyntaxError('a bare literal or boolean is not a legal condition — expected a ref, or a comparison')
     }
-    if (t.t === 'ident') {
-      // lookahead: ident '[' => lookupref value, no ternary condition possible
-      const save = this.pos
-      this.next()
-      if (this.peek().t === 'lbrack') {
-        this.pos = save
-        const v = this.parseValue()
-        this.expectEof()
-        return { kind: 'value', node: v }
-      }
-      this.pos = save
-      const cond = this.parseCond()
-      if (this.peek().t === 'qmark') {
-        this.next()
-        const thenV = this.parseValue()
-        if (this.peek().t !== 'colon') throw new ExprSyntaxError("expected ':' in ternary")
-        this.next()
-        const elseV = this.parseValue()
-        this.expectEof()
-        return { kind: 'ternary', cond, then: thenV, else: elseV }
-      }
-      if (cond.kind === 'cmp') {
-        throw new ExprSyntaxError('a bare comparison is only valid as a ternary condition, not a standalone value')
-      }
-      this.expectEof()
-      return { kind: 'value', node: { kind: 'ref', path: cond.ref } }
-    }
-    throw new ExprSyntaxError('expected a value or condition')
+    return { kind: 'ref', path: left.path }
   }
 
   /** orExpr := andExpr ('||' andExpr)* */
@@ -332,13 +394,20 @@ class Parser {
     return left
   }
 
-  /** notExpr := '!' notExpr | cond */
+  /** notExpr := '!' notExpr | '(' orExpr ')' | cond */
   parseNot(): BoolNode {
     if (this.peek().t === 'bang') {
       this.next()
       return { kind: 'not', inner: this.parseNot() }
     }
-    return { kind: 'cond', cond: this.parseCond() }
+    if (this.peek().t === 'lparen') {
+      this.next()
+      const inner = this.parseOr()
+      if (this.peek().t !== 'rparen') throw new ExprSyntaxError("expected ')' to close a parenthesized when-expression")
+      this.next()
+      return inner
+    }
+    return { kind: 'leaf', value: this.parseCondLeaf() }
   }
 
   parseWhenTop(): BoolNode {
@@ -410,6 +479,15 @@ function makeReport(code: string, message: string, nodeId?: NodeId): ReportLine 
 
 // ——— value / cond evaluation ———
 
+function evalOperand(op: Operand, ctx: ExprContext, nodeId?: NodeId): { value: unknown; reports: ReportLine[] } {
+  if (op.kind === 'lit') return { value: op.value, reports: [] }
+  const r = resolveRef(op.path, ctx)
+  if (!r.ok) {
+    return { value: '', reports: [makeReport('unknown-ref', `unknown reference '${refLabel(op.path)}'`, nodeId)] }
+  }
+  return { value: r.value, reports: [] }
+}
+
 function evalValueNode(node: ValueNode, ctx: ExprContext, nodeId?: NodeId): { value: unknown; reports: ReportLine[] } {
   if (node.kind === 'lit') return { value: node.value, reports: [] }
   if (node.kind === 'ref') {
@@ -419,36 +497,45 @@ function evalValueNode(node: ValueNode, ctx: ExprContext, nodeId?: NodeId): { va
     }
     return { value: r.value, reports: [] }
   }
-  // lookup
-  const lookup = ctx.lookups.find((l) => l.name === node.name)
-  if (!lookup) {
-    return { value: '', reports: [makeReport('undeclared-lookup', `lookup table '${node.name}' is not declared`, nodeId)] }
+  if (node.kind === 'lookup') {
+    const lookup = ctx.lookups.find((l) => l.name === node.name)
+    if (!lookup) {
+      return { value: '', reports: [makeReport('undeclared-lookup', `lookup table '${node.name}' is not declared`, nodeId)] }
+    }
+    const keyRes = resolveRef(node.ref, ctx)
+    if (!keyRes.ok) {
+      return { value: '', reports: [makeReport('unknown-ref', `unknown reference '${refLabel(node.ref)}' used as lookup key`, nodeId)] }
+    }
+    const key = stringifyValue(keyRes.value)
+    if (!Object.prototype.hasOwnProperty.call(lookup.entries, key)) {
+      return { value: '', reports: [makeReport('lookup-key-miss', `lookup '${node.name}' has no entry for key '${key}'`, nodeId)] }
+    }
+    return { value: lookup.entries[key], reports: [] }
   }
-  const keyRes = resolveRef(node.ref, ctx)
-  if (!keyRes.ok) {
-    return { value: '', reports: [makeReport('unknown-ref', `unknown reference '${refLabel(node.ref)}' used as lookup key`, nodeId)] }
+  if (node.kind === 'cmp') {
+    const l = evalOperand(node.left, ctx, nodeId)
+    const r = evalOperand(node.right, ctx, nodeId)
+    const eq = toComparable(l.value) === toComparable(r.value)
+    return { value: node.op === '==' ? eq : !eq, reports: [...l.reports, ...r.reports] }
   }
-  const key = stringifyValue(keyRes.value)
-  if (!Object.prototype.hasOwnProperty.call(lookup.entries, key)) {
-    return { value: '', reports: [makeReport('lookup-key-miss', `lookup '${node.name}' has no entry for key '${key}'`, nodeId)] }
-  }
-  return { value: lookup.entries[key], reports: [] }
+  // ternary
+  const c = evalTruthyOf(node.cond, ctx, nodeId)
+  const branch = c.value ? node.then : node.else
+  const b = evalValueNode(branch, ctx, nodeId)
+  return { value: b.value, reports: [...c.reports, ...b.reports] }
 }
 
-function evalCond(cond: CondNode, ctx: ExprContext, nodeId?: NodeId): { value: boolean; reports: ReportLine[] } {
-  const r = resolveRef(cond.ref, ctx)
-  if (!r.ok) {
-    return { value: false, reports: [makeReport('unknown-ref', `unknown reference '${refLabel(cond.ref)}'`, nodeId)] }
-  }
-  if (cond.kind === 'truthy') return { value: isTruthy(r.value), reports: [] }
-  const lhs = toComparable(r.value)
-  const rhs = toComparable(cond.literal.value)
-  const eq = lhs === rhs
-  return { value: cond.op === '==' ? eq : !eq, reports: [] }
+/** Evaluate a ValueNode used as a boolean condition: a 'cmp' node's own
+ *  boolean result is used directly; anything else (ref, lit, lookup, nested
+ *  ternary) is evaluated to its raw value and then tested for truthiness. */
+function evalTruthyOf(node: ValueNode, ctx: ExprContext, nodeId?: NodeId): { value: boolean; reports: ReportLine[] } {
+  const r = evalValueNode(node, ctx, nodeId)
+  if (node.kind === 'cmp') return { value: r.value as boolean, reports: r.reports }
+  return { value: isTruthy(r.value), reports: r.reports }
 }
 
 function evalBool(node: BoolNode, ctx: ExprContext, nodeId?: NodeId): { value: boolean; reports: ReportLine[] } {
-  if (node.kind === 'cond') return evalCond(node.cond, ctx, nodeId)
+  if (node.kind === 'leaf') return evalTruthyOf(node.value, ctx, nodeId)
   if (node.kind === 'not') {
     const r = evalBool(node.inner, ctx, nodeId)
     return { value: !r.value, reports: r.reports }
@@ -462,19 +549,14 @@ function evalBool(node: BoolNode, ctx: ExprContext, nodeId?: NodeId): { value: b
 
 // ——— public entry points ———
 
-/** Evaluate the content of one `{{ … }}` span (grammar: ternary | value). */
+/** Evaluate the content of one `{{ … }}` span (grammar: value, which may
+ *  itself be a comparison or a ternary — see the ValueNode union above). */
 export function evaluateInterpolation(src: string, ctx: ExprContext, nodeId?: NodeId): EvalResult {
   try {
     const p = new Parser(tokenize(src))
-    const top = p.parseInterpTop()
-    if (top.kind === 'value') {
-      const r = evalValueNode(top.node, ctx, nodeId)
-      return { value: stringifyValue(r.value), reports: r.reports }
-    }
-    const c = evalCond(top.cond, ctx, nodeId)
-    const branch = c.value ? top.then : top.else
-    const r = evalValueNode(branch, ctx, nodeId)
-    return { value: stringifyValue(r.value), reports: [...c.reports, ...r.reports] }
+    const node = p.parseExprTop()
+    const r = evalValueNode(node, ctx, nodeId)
+    return { value: stringifyValue(r.value), reports: r.reports }
   } catch (e) {
     return { value: '', reports: [makeReport('expr-parse-error', describeError(e, src), nodeId)] }
   }
