@@ -109,15 +109,27 @@ export interface FdnDocument {
   body: FdnNode[]
 }
 
-// ——— EXPRESSION GRAMMAR (resolved SPEC Q9) ———
+// ——— EXPRESSION GRAMMAR (resolved SPEC Q9; reconciled with bake v0) ———
 // {{ <expr> }} where <expr> is exactly one of:
-//   ref        := ('prop' | 'item' | 'param') '.' ident ('.' ident)*
+//   ref        := prefix '.' ident ('.' ident)*
+//   prefix     := 'prop' | 'item' | 'param' | <active-each-binding-name>
+//                 // "row in items" makes `row` a dynamically-scoped prefix
+//                 // inside that each subtree; `item` is the default binding.
 //   ternary    := <cond> '?' <value> ':' <value>
 //   lookupref  := ident '[' ref ']'          // ident names an FdnLookup
 //   value      := ref | lookupref | quoted-string-literal
 //   cond       := ref | ref ('==' | '!=') (quoted-string-literal | number | boolean)
-// `when` attributes accept <cond> plus '&&' / '||' / '!' composition.
+// `when` attributes accept <cond> plus '&&' / '||' / '!' composition
+// (precedence: '!' > '&&' > '||').
 // NOTHING else: no arithmetic, no method calls, no string operations.
+// Conventions: primitive list items are addressed as <binding>.value (the bake
+// wraps primitives as { value: item }); doc.tokens keys are stored WITHOUT the
+// leading '--' (tokens['color-accent'], referenced as var(--color-accent)).
+// The `each` SOURCE ("<alias> in <source>") is its own small grammar, not a ref:
+//   source := 'data' '.' ident            // a declared FdnDataSet
+//           | 'prop' '.' ident            // a list-typed component prop
+//           | 'param' '.' ident           // a list-typed param
+// validated against declarations, never through the {{ }} ref checker.
 
 // ——— reports ———
 

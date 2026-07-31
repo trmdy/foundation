@@ -333,6 +333,13 @@ review surfaces will render it), matrix-level rollups.
 Intent: `.fdn.html` — a constrained HTML5 document with `data-fdn-*` carrying subset
 semantics; opens in any browser (degraded but visible), parses with any HTML parser,
 validates only with a Foundation validator. Lock header as a leading comment block.
+**Decided (L1 parse module, 2026-07-31):** the projection **never self-closes
+non-void elements**. HTML5 tree construction silently ignores `/>` on ordinary and
+custom elements, so a self-closed `<fdn-use …/>` mis-nests its siblings in every
+spec-conformant parser. Ingestion normalizes self-closed `fdn-*` tags to explicit
+open/close pairs (report line `self-closing-tag-normalized`); the conformance suite
+must carry this fixture class.
+
 To fill: exact serialization order rules (determinism), lock header schema, re-hydration
 (frozen file → live chain) and divergence detection (frozen file drifted from chain).
 
