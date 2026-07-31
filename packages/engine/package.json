@@ -1,0 +1,11 @@
+{
+  "name": "foundation-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "loro-crdt": "^1.13.8",
+    "parse5": "^8.0.0"
+  }
+}
