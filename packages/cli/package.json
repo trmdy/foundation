@@ -1,0 +1,10 @@
+{
+  "name": "foundation-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "foundation": "src/main.ts" },
+  "dependencies": {
+    "foundation-engine": "workspace:*"
+  }
+}

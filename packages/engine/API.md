@@ -37,7 +37,9 @@ bakeDocument(doc: FdnDocument, opts?: { state?: string }): BakeResult
 
 // chain
 createChain(doc: FdnDocument, meta: ChangeMeta, opts?: { actor?: string }): FdnChain
-loadChain(bytes: Uint8Array): FdnChain
+loadChain(bytes: Uint8Array, opts?: { actor?: string }): FdnChain
+// (actor on load added 2026-07-31: hash-of-bytes peer derivation collides when two
+//  independent loads of the same snapshot both edit locally before merging)
 interface FdnChain {
   doc(): FdnDocument
   apply(meta: ChangeMeta, ops: PatchOp[]): EnvelopeRecord   // one call = one change
@@ -53,6 +55,39 @@ interface FdnChain {
   verify(): { ok: boolean; brokenAt?: string }               // envelope hash chain
 }
 ```
+
+## Wave 2 signatures
+
+```ts
+// render (src/render/) — port of spikes/render learnings into the engine.
+interface RenderConfig { viewport: FdnViewport; deviceScaleFactor?: number }
+interface LayoutEntry { id: string; x: number; y: number; width: number; height: number }
+renderHtml(html: string, config: RenderConfig):
+  Promise<{ png: Uint8Array; layout: LayoutEntry[] }>
+// Bakes then renders every matrix cell (or the given state/viewport subset).
+renderDocument(doc: FdnDocument, opts?: { state?: string; viewport?: string }):
+  Promise<Array<{ state: string | null; viewport: FdnViewport; png: Uint8Array; layout: LayoutEntry[]; report: ConformanceReport }>>
+
+// diff (src/diff/)
+visualDiff(a: Uint8Array, b: Uint8Array):
+  { identical: boolean; diffPixels: number; width: number; height: number; diffPng: Uint8Array | null }
+conformanceDiff(a: ConformanceReport, b: ConformanceReport):
+  { added: ReportLine[]; resolved: ReportLine[] }
+
+// serve (src/serve/) — node:http + SSE live reload, no new deps.
+serveDocument(filePath: string, opts?: { port?: number }):
+  Promise<{ url: string; close: () => Promise<void> }>
+```
+
+## CLI (packages/cli)
+
+Zero-dependency argv parsing, bin name `foundation`. Commands v0:
+`new <name>` · `inspect <file>` · `validate <file>` · `ingest <file>` (normalize
+in place + print report) · `bake <file> [--state S] [-o out]` · `render <file>
+[--state S] [--viewport V] [-o dir]` · `diff <a.html> <b.html>` (structural via
+parse + visual via render) · `serve <file> [--port]` · `chain <file> log|verify`
+(operates on `<file>.chain` beside the document when present). Exit codes:
+0 ok, 1 validation errors, 2 usage.
 
 ## Canonical text rules (project)
 

@@ -200,7 +200,9 @@ export type SemanticOp =
   | { op: 'set-attr'; id: NodeId; key: string; value: string | null }
   | { op: 'set-style'; id: NodeId; prop: string; value: string | null; state?: StateStyleKey }
   | { op: 'set-text'; id: NodeId; text: string }
-  | { op: 'section-changed'; section: 'tokens' | 'params' | 'data' | 'lookups' | 'states' | 'viewports' | 'matrix' | 'namedStyles' | 'components'; name: string }
+  | { op: 'set-style-ref'; id: NodeId; styleRef: string | null }
+  | { op: 'set-when'; id: NodeId; when: string | null }
+  | { op: 'section-changed'; section: 'tokens' | 'params' | 'data' | 'lookups' | 'states' | 'viewports' | 'matrix' | 'namedStyles' | 'components' | 'meta'; name: string }
 
 export type AnchorRef = string
 
