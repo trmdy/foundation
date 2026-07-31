@@ -384,3 +384,164 @@ What D1's "closed by schema, not vocabulary" needed to actually exclude to make 
   This happens to align with D1's own framing ("form controls included as *presentational* elements
   (rendered, not functional)") — nothing needed excluding here, but it's worth noting the two example
   boards never actually exercised the presentational-form-control allowance either way.
+
+---
+
+## (f) Overlay evidence round 2 (SPEC open question 2 — closed)
+
+**Inputs:** `boards/overlay-evidence.fdn.html`, a new board drawing the two shapes §(c) explicitly
+flagged as never-drawn-open — a context menu and a tooltip — plus a dropdown/select popover, plus one
+small confirm dialog for contrast against the established dialog+scrim pattern. All four are drawn
+fully open, anchored, with real content (8-item menu with one destructive item and one submenu
+indicator; a genuinely truncated title with a hover tooltip; a 10-row scrollable single-select list
+with one row checked; a small centered confirm dialog). Checked for HTML well-formedness (Python
+`html.parser`) and rendered with Playwright at 1480×1100 and full-page; every overlay was inspected
+visually and iterated until it read correctly — see the process note at the end of this section for
+what the rendering pass itself caught, which turned out to be as informative as the grammar question.
+
+### Verdict: one `fdn-overlay` primitive is enough — structurally. It is not enough on its own for the tooltip.
+
+All four shapes compose from exactly the same three ingredients §(c) already had on the table —
+`data-fdn-role`, `data-fdn-anchor`, `data-fdn-dismiss` — plus one genuinely new fact this round
+surfaces (below): **what makes the overlay visible in the first place is not always "an ancestor state
+says so."** For menu, popover, and dialog, `data-fdn-role` alone (`menu` / `popover` / `dialog`)
+distinguishes them enough that no new *structural* primitive was needed — one `<fdn-overlay>` element,
+one substructure convention (`data-fdn-role="panel"`, `"scrim"` where applicable), one anchor fact, one
+dismiss fact, covers dialog, toast (§(c), prior round), menu, and popover. The tooltip is the outlier,
+and it is an outlier in **triggering**, not in structure — its panel is the simplest of the four (one
+node, no `panel`/`scrim` substructure needed at all). So the SPEC open question 2 verdict is: **yes,
+one sanctioned overlay context is enough for menus, popovers, dialogs, and toasts — the tooltip needs
+the *same* structural primitive plus one additional fact this grammar does not yet have a name for.**
+
+### Anchor vocabulary that emerged
+
+§(c)'s `data-fdn-anchor="viewport-center"` (dialog) was the only anchor fact on the table before this
+round. Trigger-anchored overlays need more than a single enum value, because "where" and "which way it
+opened" and "what the author originally wanted" are three different facts, and a **projection with no
+live layout engine can only ever show one already-resolved geometry per baked state** (open question 10
+— the canonical form has no room for "recompute on paint"). This board settled on five attributes,
+tested against the menu, which is the hardest case (drawn deliberately near a frame's right *and*
+bottom edge so both axes must flip):
+
+- `data-fdn-anchor="trigger"` — the anchor kind (`trigger` | `viewport-center`; a third,
+  `viewport-edge`, is implied by the toast in §(c) but wasn't re-tested here).
+- `data-fdn-anchor-ref="<id>"` — which element is the anchor source, by id. This is new: §(c)'s
+  `fdn-overlay` had no way to point *at* a specific node, because its one drawn instance
+  (`viewport-center`) doesn't need to. Trigger-anchoring does, so the trigger element itself needs a
+  stable identity — see the new `data-fdn-role="trigger"` convention below.
+- `data-fdn-anchor-preferred-edge="bottom-start"` — the author's declared, un-flipped intent (design
+  time). This board's menu declares `bottom-start` (open below, left-aligned to the trigger) as intent.
+- `data-fdn-anchor-edge="top-end"` — the **resolved** edge actually rendered in *this* baked instance
+  (render time), after flip. For the menu these two attributes disagree on purpose — that disagreement
+  is the whole point being demonstrated (a menu opened where a real one would end up, next to a trigger
+  near a corner) — and the disagreement is exactly why both facts need to be recorded separately rather
+  than collapsing to one `data-fdn-anchor-edge`. A validator that only kept one would either lose the
+  author's real intent (if it kept only the resolved value) or ship a static file that visibly
+  contradicts its own declared behavior (if it kept only the preferred value and rendered resolved).
+- `data-fdn-anchor-flip="viewport"` — declares that this instance is allowed to flip to stay inside its
+  containing frame at all (the dialog's `viewport-center` anchor sets this to `none`, since centering
+  has no "edge" to flip). This is metadata for the render/verb layer, exactly like `dismiss` — no script
+  runs client-side; a real engine would consult it when re-baking a state at a different geometry.
+- `data-fdn-anchor-offset="6"` — the px gap between trigger and panel (both the menu and the tooltip
+  needed this as a distinct, small, per-instance number; folding it into `edge` would make that
+  attribute's grammar do two unrelated jobs).
+
+A new **`data-fdn-role="trigger"`** value was needed on ordinary content nodes (the fleet row's kebab
+button, the truncated title span, the popover's own trigger chip) — §(c)'s `data-fdn-role` vocabulary
+only ever named *overlay substructure* (`scrim`, `panel`). Anchoring needs the anchor **source**
+identified too, and it lives outside the `<fdn-overlay>` entirely (a sibling, in ordinary document
+flow) — so the reserved-role vocabulary turns out to span two different kinds of element: the overlay's
+own internal parts, and the arbitrary content node an overlay points at. Worth making explicit in §3 as
+two sub-vocabularies of one attribute rather than one flat enum.
+
+One open question this round couldn't close: whether `data-fdn-role="menu"` and `data-fdn-role="popover"`
+are actually two different facts a validator should care about, or one structural shape (trigger-
+anchored panel, no scrim, dismiss on outside-click/item-select/esc) wearing two different content
+conventions (commands with shortcuts vs. a single-select list with a filter field). This board kept
+them distinct because they read as different *intents* to a human — but nothing in the anchor/dismiss
+contract actually depends on which one it is. A future pass should ask whether `role` here is doing
+real validation work or just documentation work.
+
+### The hover-visibility finding — this is the one that matters most
+
+**Showing the tooltip on hover is a visibility state, and the resolved Q11 mechanism (`style-hover`)
+does not reach it.** This needs to be said precisely, because it would be easy to wave at `style-hover`
+and assume the tooltip is covered:
+
+- `style-hover`/`style-focus`/`style-active`/`style-disabled` (Q11, resolved) are **same-node,
+  same-subtree** facts: they say "when this node is hovered, *this node's own declared style
+  properties* take these values instead." Every interactive row in this board actually uses this
+  mechanism for real (`style-hover="background:var(--color-selected-bg)"` on every menu row, popover
+  row, and fleet row) — it is the right tool for "this row highlights on hover," and it worked exactly
+  as specified.
+- The tooltip needs something categorically different: hovering **element A** (the truncated title)
+  must change whether **element B** (a sibling `<fdn-overlay>`, structurally unrelated in the tree)
+  renders *at all*. That is not a style property changing value on a hover — it's a node's presence in
+  the render tree gated by another node's pointer state. No amount of `style-hover` vocabulary
+  extension reaches this, because `style-hover` is defined (correctly, per Q11) as *"same value grammar
+  as `style`"* — and "does this node exist" is not a style property.
+- This board invented `data-fdn-trigger="hover:<ref>"` on the `<fdn-overlay>` itself to name this fact
+  explicitly, paired with `data-fdn-dismiss="none"` (deliberate, not an oversight: a tooltip has no
+  *user* dismiss action — dismiss answers "how does the user make an open overlay close," and a
+  tooltip's closing is symmetric with its opening, gated by the same hover fact, not a separate
+  action). `data-fdn-trigger` is genuinely new — it answers "what makes this overlay visible," a
+  question §(c)'s `fdn-overlay` never had to answer because both prior instances (dialog, toast) were
+  drawn as permanently-open baked states with no visibility gate at all.
+- Whether `data-fdn-trigger` should be scoped to `hover` only, or needs to generalize (`click:<ref>`
+  for a menu/popover's own open action, `focus:<ref>` for a focus-triggered affordance) is open — this
+  board only had to answer it for one case. But the shape of the answer seems right: overlay
+  *visibility* is its own declarative fact, siblings with `anchor` and `dismiss`, not a derived
+  consequence of per-node style state. **This is a new spec-level gap, not a drafting gap in this
+  board** — §4's interaction-state resolution (Q11) covers styling; it was never asked to cover
+  presence, and menus/popovers/dialogs sidestepped the question by being drawn as baked-open states
+  with their visibility already implied by the containing `<fdn-state>`. A tooltip is the first shape
+  in either round of evidence whose visibility genuinely depends on *another node's* interaction state
+  rather than the document's own param/state assignment, and that's a real, load-bearing distinction
+  the spec doesn't have a name for yet.
+
+### New pinch points
+
+1. **The named-style dual-carry gap from finding (b.3) is not hypothetical — this board reproduced it
+   as a real, working bug before the fix.** The first draft of every resolved `<fdn-use>` instance in
+   this board (menu rows, fleet rows, popover rows) carried `data-fdn-style="menu-row"` plus only the
+   *variable* per-instance style (e.g. `color`) inline, mirroring how `inbox-unified.fdn.html`'s
+   `<fdn-component>` **definitions** are written. Rendered, every row's children fell back to normal
+   inline flow with no gap and no right-alignment — text ran together unreadably. Cross-checking
+   against `inbox-unified.fdn.html`'s actual **resolved** `<fdn-use>` content (not its component
+   definitions) showed the real convention: resolved instances must inline the *complete* computed
+   style (`display:flex;align-items:center;gap:...;height:...;padding:...;border-radius:...`, not just
+   the variable slice), because a named style has no CSS home in a plain browser (b.3) and a
+   `data-fdn-style` reference on a resolved node does nothing by itself. This is the same finding as
+   (b.3) and (b.9) combined, but sharpened: it is not just that the two representations of a named
+   style *can* silently disagree — it's that a resolved instance that only dual-carries the *diff*
+   from a named style (a natural thing to write, since that's exactly how the component *definition*
+   is written) renders visibly broken, silently, with no parser error. A conformance check for
+   "resolved instance completeness" (b.9 already asked for this) should specifically include "carries
+   the full named-style declaration, not a delta" as one of its assertions.
+2. **The frame-as-viewport convention needs the page's own layout to actually respect the declared
+   matrix viewport width, or the "stays in viewport" demonstration is undermined by the document's own
+   chrome, not the overlay logic.** This board's first draft gave `<main>` 32px of horizontal padding
+   around a `width:1480px` frame — 1544px of real content width against a 1480px matrix viewport
+   (`<fdn-viewport name="board" width="1480">`). The menu, correctly flipped to stay inside its own
+   *frame*, still rendered past the edge of an actual 1480px screenshot, because the frame itself
+   didn't fit. Nothing in §5/§7 currently says a projection's outer chrome must reconcile with its own
+   declared matrix viewport size; this board's fix (zero horizontal padding on the outermost flow
+   container, inset padding pushed onto individual text nodes instead) is a workaround, not a spec
+   answer. A render-contract note that "the matrix viewport bounds the rendered surface, and a
+   projection's own layout is responsible for not exceeding it" would have caught this before render.
+3. **`data-fdn-anchor-preferred-edge` vs `data-fdn-anchor-edge` doubles the anchor fact, and that's
+   deliberate, but it interacts oddly with Q10's "template is canonical, resolved trees are derived
+   bake artifacts."** If parameterized content stays symbolic in the canonical projection (Q10,
+   resolved), which of these two attributes is even *stable* across bakes? `preferred-edge` should be
+   (it's authored intent, independent of any particular state's trigger geometry); `edge` is a
+   per-bake derived fact like the rest of a resolved tree. That means `preferred-edge` plausibly
+   belongs on the **component definition** (or a document-level default), while `edge` only ever makes
+   sense on a **resolved instance** — the same definition/instance split finding (a.3) already
+   identified for props in general, showing up again specifically for anchor geometry. Not resolved
+   here; flagged for whoever writes the real attribute schema.
+4. **A tooltip's panel needed no `data-fdn-role="panel"` substructure at all** — its entire content is
+   one styled `<div>`, no scrim, no separate panel wrapper. Worth confirming in §3 that `panel`/`scrim`
+   substructure roles are optional conveniences for overlays complex enough to need them (dialog,
+   menu-with-sections), not a required shape every `<fdn-overlay>` must carry — this board's tooltip is
+   the existence proof that the minimal legal `<fdn-overlay>` is just the wrapper plus content, no
+   substructure at all.
