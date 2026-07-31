@@ -2,13 +2,21 @@
  * `foundation new <name>` — writes a minimal, valid `.fdn.html` skeleton
  * (one param, one state, one component, a tokens block — API.md CLI section)
  * so a human or agent has a legal starting document rather than a blank file.
+ *
+ * Also runs `chain init` on the freshly-written document by default, so new
+ * documents are chain-tracked from birth rather than needing a separate
+ * opt-in step — pass `--no-chain` to skip that (e.g. throwaway scratch
+ * files). A chain-init failure (only realistic cause: a stray `<file>.chain`
+ * already sitting next to a brand-new file) is a warning, not a hard
+ * failure — the document itself was written successfully either way.
  */
 import { existsSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { projectDocument, validateDocument } from 'foundation-engine'
 import type { FdnDocument, FdnNode } from 'foundation-engine'
 import type { CliIO } from '../io.js'
-import { parseArgs } from '../argv.js'
+import { flagString, parseArgs } from '../argv.js'
+import { writeChainInit } from './chain.js'
 
 function leafNode(partial: Partial<FdnNode> & Pick<FdnNode, 'id' | 'tag'>): FdnNode {
   return { attrs: {}, style: {}, styleStates: {}, children: [], ...partial }
@@ -77,7 +85,7 @@ function titleFromName(name: string): string {
 }
 
 export async function runNew(args: string[], io: CliIO): Promise<number> {
-  const { positionals } = parseArgs(args)
+  const { positionals, flags } = parseArgs(args)
   const name = positionals[0]
   if (!name) {
     io.stderr('usage: foundation new <name>')
@@ -100,5 +108,13 @@ export async function runNew(args: string[], io: CliIO): Promise<number> {
 
   writeFileSync(filePath, projectDocument(doc), 'utf8')
   io.stdout(`wrote ${filePath}`)
+
+  if (!flags['no-chain']) {
+    const author = flagString(flags, 'author') ?? 'user:local'
+    const message = flagString(flags, 'm', 'message') ?? 'init'
+    const result = writeChainInit(filePath, doc, { author, message }, io)
+    if (result) io.stdout(`wrote ${result.chainPath} (head ${result.head.hash.slice(0, 12)})`)
+  }
+
   return 0
 }

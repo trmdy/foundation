@@ -7,14 +7,15 @@ import { runChain } from '../src/commands/chain.js'
 import { runNew } from '../src/commands/new.js'
 
 /**
- * `chain <file> log|verify` operates on `<file>.chain` beside the document
- * — most documents in this repo are plain text with no chain file at all
- * (the chain module IS implemented, but nothing here has ever run
- * createChain/save() against these fixtures), so "absent chain, friendly
- * message" is the realistic default path, not a stand-in for a missing
- * module. render.ts/diff.ts's *module-not-present* degradation is covered in
- * render-diff.test.ts, conditioned on whether src/render and src/diff
- * actually exist in this checkout (see that file's header comment).
+ * `chain <file> log|verify` operates on `<file>.chain` beside the document.
+ * `foundation new` now auto-inits a chain by default (see chain-workflow.
+ * test.ts), so this suite passes `--no-chain` explicitly to get back the
+ * "plain text, no chain file at all" fixture its "absent chain, friendly
+ * message" degradation path is actually about — not a stand-in for a
+ * missing module. render.ts/diff.ts's *module-not-present* degradation is
+ * covered in render-diff.test.ts, conditioned on whether src/render and
+ * src/diff actually exist in this checkout (see that file's header
+ * comment).
  */
 describe('chain command: friendly degradation when <file>.chain is absent', () => {
   let dir: string
@@ -23,7 +24,7 @@ describe('chain command: friendly degradation when <file>.chain is absent', () =
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'fdn-cli-chain-degrade-'))
     const target = join(dir, 'board')
-    await runNew([target], captureIo())
+    await runNew([target, '--no-chain'], captureIo())
     file = `${target}.fdn.html`
   })
 

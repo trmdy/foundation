@@ -19,6 +19,7 @@ import { runRender } from './commands/render.js'
 import { runDiff } from './commands/diff.js'
 import { runServe } from './commands/serve.js'
 import { runChain } from './commands/chain.js'
+import { runFreeze } from './commands/freeze.js'
 import type { CliIO } from './io.js'
 
 const COMMANDS: Record<string, (args: string[], io: CliIO) => Promise<number>> = {
@@ -31,6 +32,7 @@ const COMMANDS: Record<string, (args: string[], io: CliIO) => Promise<number>> =
   diff: runDiff,
   serve: runServe,
   chain: runChain,
+  freeze: runFreeze,
 }
 
 const USAGE = `foundation — a design-document engine CLI
@@ -38,15 +40,20 @@ const USAGE = `foundation — a design-document engine CLI
 usage: foundation <command> [args]
 
 commands:
-  new <name>                                write a minimal .fdn.html skeleton
+  new <name> [--no-chain]                    write a minimal .fdn.html skeleton (chain-inits it too)
   inspect <file>                             summarize a document
   validate <file>                            print validation issues
-  ingest <file>                              normalize in place, print the report
+  ingest <file> [--commit [-m msg] [--author A]]   normalize in place, print the report
   bake <file> [--state S] [-o out]           bake a state to HTML
   render <file> [--state S] [--viewport V] [-o dir]   render (Wave 2)
   diff <a.html> <b.html>                     structural (+ visual, when available) diff
   serve <file> [--port N]                    live-reload dev server
+  chain init <file> [--author A] [-m msg]    start a chain for <file>
   chain <file> log|verify                    operate on <file>.chain
+  chain anchor <file> <name>                 name the chain's current head
+  chain diff <file> <anchorA> <anchorB>      show SemanticOps between two anchors
+  freeze <file> -o <dest> [--author A] [-m msg]   crystallize a lock-headered frozen file
+  freeze --verify <frozenfile>               check a frozen file's lock header + pedigree
 `
 
 export async function runCli(argv: string[], io: CliIO = processIo): Promise<number> {
