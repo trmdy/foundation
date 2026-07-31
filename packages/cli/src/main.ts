@@ -20,6 +20,9 @@ import { runDiff } from './commands/diff.js'
 import { runServe } from './commands/serve.js'
 import { runChain } from './commands/chain.js'
 import { runFreeze } from './commands/freeze.js'
+import { runMcp } from './commands/mcp.js'
+import { runGateway } from './commands/gateway.js'
+import { runGitMergeDriver } from './commands/git-merge-driver.js'
 import type { CliIO } from './io.js'
 
 const COMMANDS: Record<string, (args: string[], io: CliIO) => Promise<number>> = {
@@ -33,6 +36,9 @@ const COMMANDS: Record<string, (args: string[], io: CliIO) => Promise<number>> =
   serve: runServe,
   chain: runChain,
   freeze: runFreeze,
+  mcp: runMcp,
+  gateway: runGateway,
+  'git-merge-driver': runGitMergeDriver,
 }
 
 const USAGE = `foundation — a design-document engine CLI
@@ -48,12 +54,24 @@ commands:
   render <file> [--state S] [--viewport V] [-o dir]   render (Wave 2)
   diff <a.html> <b.html>                     structural (+ visual, when available) diff
   serve <file> [--port N]                    live-reload dev server
-  chain init <file> [--author A] [-m msg]    start a chain for <file>
+  chain init <file> [--author A] [-m msg]    start a chain for <file> (mints a data-fdn-doc-id)
   chain <file> log|verify                    operate on <file>.chain
   chain anchor <file> <name>                 name the chain's current head
   chain diff <file> <anchorA> <anchorB>      show SemanticOps between two anchors
+  chain push <file> <dir>                    export missing blobs to <dir>/<docId>/
+  chain pull <file> <dir>                    import missing blobs from <dir>/<docId>/, then regenerate
+                                              <file> from the merged chain — UNLESS <file> has
+                                              uncommitted edits (differs from the chain's pre-pull head),
+                                              in which case the chain still imports but the text is left
+                                              alone and a warning to run 'ingest --commit' first is printed
+  chain sync <file> <dir>                    pull (same text-regeneration/uncommitted-edits behavior as
+                                              'chain pull', above) then push
+  chain merge <file> <theirs.chain>          merge chains, regenerate <file> text, print overlap report
   freeze <file> -o <dest> [--author A] [-m msg]   crystallize a lock-headered frozen file
   freeze --verify <frozenfile>               check a frozen file's lock header + pedigree
+  mcp                                        run a stdio MCP server exposing Foundation's verbs
+  gateway install|uninstall|status           publish/withdraw the operator-gateway registry entry
+  git-merge-driver <ancestor> <ours> <theirs>   git merge driver (see docs/GIT-INTEGRATION.md)
 `
 
 export async function runCli(argv: string[], io: CliIO = processIo): Promise<number> {

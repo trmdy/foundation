@@ -18,6 +18,8 @@ import { loadChain, parseDocument, projectDocument, validateDocument } from 'fou
 import type { NormalizationReport } from 'foundation-engine'
 import type { CliIO } from '../io.js'
 import { flagString, parseArgs } from '../argv.js'
+import { defaultAuthor } from '../identity.js'
+import { injectDocIdAttr, readDocIdAttr } from '../docid.js'
 import { chainPathFor } from './chain.js'
 
 function summarizeReport(report: NormalizationReport): string {
@@ -46,6 +48,14 @@ export async function runIngest(args: string[], io: CliIO): Promise<number> {
 
   const { doc, report } = parseDocument(source)
   const canonical = projectDocument(doc)
+  // SPEC 13a-i: the document id lives outside FdnDocument entirely (see
+  // packages/cli/src/docid.ts) — parseDocument/projectDocument never see it,
+  // so ingest must read it off the ORIGINAL source and re-stamp it onto the
+  // freshly-projected text itself, or a plain `ingest` would silently strip
+  // any existing data-fdn-doc-id (parse(project(doc)) is a fixpoint for
+  // FdnDocument, but data-fdn-doc-id isn't part of FdnDocument at all).
+  const docId = readDocIdAttr(source)
+  const canonicalWithDocId = docId ? injectDocIdAttr(canonical, docId) : canonical
 
   if (report.lines.length === 0) {
     io.stdout(`${file}: no normalization needed`)
@@ -56,8 +66,8 @@ export async function runIngest(args: string[], io: CliIO): Promise<number> {
     }
   }
 
-  const changed = canonical !== source
-  writeFileSync(file, canonical, 'utf8')
+  const changed = canonicalWithDocId !== source
+  writeFileSync(file, canonicalWithDocId, 'utf8')
   io.stdout(`${file}: ${changed ? 'rewritten to canonical form' : 'already canonical, unchanged'}`)
 
   const result = validateDocument(doc)
@@ -70,7 +80,7 @@ export async function runIngest(args: string[], io: CliIO): Promise<number> {
       return exitCode
     }
 
-    const author = flagString(flags, 'author') ?? 'user:local'
+    const author = flagString(flags, 'author') ?? defaultAuthor()
     try {
       const chain = loadChain(readFileSync(chainPath), { actor: author })
       const currentCanonical = projectDocument(chain.doc())

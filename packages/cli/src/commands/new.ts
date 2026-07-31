@@ -10,12 +10,15 @@
  * already sitting next to a brand-new file) is a warning, not a hard
  * failure — the document itself was written successfully either way.
  */
+import { randomUUID } from 'node:crypto'
 import { existsSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { projectDocument, validateDocument } from 'foundation-engine'
 import type { FdnDocument, FdnNode } from 'foundation-engine'
 import type { CliIO } from '../io.js'
 import { flagString, parseArgs } from '../argv.js'
+import { injectDocIdAttr } from '../docid.js'
+import { defaultAuthor } from '../identity.js'
 import { writeChainInit } from './chain.js'
 
 function leafNode(partial: Partial<FdnNode> & Pick<FdnNode, 'id' | 'tag'>): FdnNode {
@@ -106,13 +109,18 @@ export async function runNew(args: string[], io: CliIO): Promise<number> {
     return 1
   }
 
-  writeFileSync(filePath, projectDocument(doc), 'utf8')
+  // SPEC 13a-i: mint the document id here (CLI/surface layer — the engine
+  // stays randomness-free) and stamp it into the text at the string level
+  // (see packages/cli/src/docid.ts for why: FdnDocument has no field for it).
+  const docId = randomUUID()
+  const text = injectDocIdAttr(projectDocument(doc), docId)
+  writeFileSync(filePath, text, 'utf8')
   io.stdout(`wrote ${filePath}`)
 
   if (!flags['no-chain']) {
-    const author = flagString(flags, 'author') ?? 'user:local'
+    const author = flagString(flags, 'author') ?? defaultAuthor()
     const message = flagString(flags, 'm', 'message') ?? 'init'
-    const result = writeChainInit(filePath, doc, { author, message }, io)
+    const result = writeChainInit(filePath, doc, { author, message }, io, { docId })
     if (result) io.stdout(`wrote ${result.chainPath} (head ${result.head.hash.slice(0, 12)})`)
   }
 

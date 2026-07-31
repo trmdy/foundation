@@ -10,4 +10,8 @@ export { projectDocument } from './project/index.js'
 export { bakeDocument } from './bake/index.js'
 export { createChain, loadChain } from './chain/index.js'
 export type { FdnChain } from './chain/index.js'
+// Wave 3 (SPEC 13a-iv, API.md "chain exchange") — additive barrel export only;
+// implementation lives entirely in src/chain/ (see exchange.ts).
+export { exportBlobs, importBlobs, mergeChains } from './chain/index.js'
+export type { OverlapReport } from './chain/index.js'
 export { freezeDocument, verifyFrozen, thawFrozen } from './freeze/index.js'

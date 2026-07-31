@@ -5,6 +5,7 @@
   "type": "module",
   "bin": { "foundation": "src/main.ts" },
   "dependencies": {
-    "foundation-engine": "workspace:*"
+    "foundation-engine": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0"
   }
 }

@@ -4,9 +4,14 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadChain } from 'foundation-engine'
 import { captureIo } from '../src/io.js'
+import { defaultAuthor } from '../src/identity.js'
 import { runNew } from '../src/commands/new.js'
 import { runIngest } from '../src/commands/ingest.js'
 import { runChain } from '../src/commands/chain.js'
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
 
 /**
  * Wires the chain (engine/src/chain) into the authoring loop:
@@ -50,7 +55,7 @@ describe('chain wired into the authoring loop', () => {
       expect(initIo.out.some((l) => l.includes('wrote') && l.includes(chainPath))).toBe(true)
 
       const chain = loadChain(readFileSync(chainPath))
-      expect(chain.head().author).toBe('user:local')
+      expect(chain.head().author).toBe(defaultAuthor())
       expect(chain.head().message).toBe('init')
       expect(chain.log()).toHaveLength(1)
     })
@@ -122,14 +127,14 @@ describe('chain wired into the authoring loop', () => {
       const afterChain = loadChain(readFileSync(chainPath))
       expect(afterChain.log()).toHaveLength(2)
       expect(afterChain.head().message).toBe('rename card label')
-      expect(afterChain.head().author).toBe('user:local')
+      expect(afterChain.head().author).toBe(defaultAuthor())
 
       const logIo = captureIo()
       expect(await runChain([file, 'log'], logIo)).toBe(0)
       expect(logIo.out).toHaveLength(2)
       expect(logIo.out[1]).toContain('rename card label')
       // hash[0..12], author, message per line.
-      expect(logIo.out[1]).toMatch(/^[0-9a-f]{12}\s+user:local\s+rename card label$/)
+      expect(logIo.out[1]).toMatch(new RegExp(`^[0-9a-f]{12}\\s+${escapeRegExp(defaultAuthor())}\\s+rename card label$`))
     })
 
     it('skips the commit when the parsed doc canonically matches the chain head (no-op)', async () => {
