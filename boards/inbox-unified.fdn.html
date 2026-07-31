@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apiary · Inbox (unified) — Foundation grammar re-draw</title>
+
+<!-- ==========================================================================
+     The ONLY <style> block in this document. Per D1, only :root token custom
+     properties belong here — no descendant selectors, no classes, no cascade.
+     Everything else in this file is styled via inline node style="" and/or a
+     data-fdn-style="<name>" reference into the <fdn-styles> block below (see
+     GRAMMAR-FINDINGS.md §a.2 for why both are carried).
+     ========================================================================== -->
+<style>
+:root {
+  /* --- color: surface & structure --- */
+  --color-bg: #F5F4F1;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #FAFAF8;
+  --color-surface-sunken: #F7F6F3;
+  --color-border: #E7E5E0;
+  --color-border-subtle: #ECEAE5;
+  --color-border-faint: #F0EDE7;
+  --color-hover: #F6F5F2;
+  --color-selected-bg: #EEEDE9;
+
+  /* --- color: text --- */
+  --color-text-primary: #2A2620;
+  --color-text-secondary: #4A463F;
+  --color-text-tertiary: #6B6862;
+  --color-text-muted: #8A877F;
+  --color-text-faint: #A8A59E;
+  --color-text-disabled: #B5B1A9;
+  --color-text-ghost: #C4BFB6;
+
+  /* --- color: accent & status (the "status palette", per source d3) --- */
+  --color-accent: #B8842E;
+  --color-accent-hover: #A87826;
+  --color-status-failed: #B0512E;
+  --color-status-review: #BD6B3C;
+  --color-status-waiting: #8F8877;
+  --color-status-waiting-ring: #9A8E78;
+  --color-status-login: #A6552F;
+  --color-status-login-ring: #B0512E;
+  --color-status-neutral: #9B978F;
+  --color-success: #5E7E4F;
+
+  /* --- type --- */
+  --font-sans: 'Hanken Grotesk', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-size-2xs: 9.5px;
+  --font-size-xs: 10.5px;
+  --font-size-sm: 11px;
+  --font-size-base: 12px;
+  --font-size-md: 13px;
+  --font-size-lg: 14.5px;
+  --font-size-xl: 15px;
+  --font-size-2xl: 17px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* --- space & radius --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 10px;
+  --space-4: 14px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+
+  /* --- shadow (raw values, off-token by design — see findings d) --- */
+  --shadow-card: 0 1px 2px rgba(40,35,30,.04), 0 10px 30px rgba(40,35,30,.08);
+}
+
+/* Two bare element rules survive from D1's own allowance (box-sizing reset,
+   margin reset) — arguably these are exactly the kind of thing the "no
+   selectors" rule should forbid; kept here deliberately as a named pinch
+   point (findings b) rather than silently smuggled in as tokens. */
+*        { box-sizing: border-box; }
+html,body{ margin: 0; }
+body     { background: var(--color-bg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+</style>
+</head>
+<body>
+
+<!-- ==========================================================================
+     fdn-doc — document header block (INVENTED SYNTAX, proposal #1).
+     Declares every param this document varies on, the sample data it needs
+     to render headless, the named states (param assignments), and the
+     matrix (states × viewports) actually materialized below. See
+     GRAMMAR-FINDINGS.md (a) for rationale.
+     ========================================================================== -->
+<fdn-doc hidden style="display:none" data-fdn-spec-version="0.0.1-draft" data-fdn-title="Inbox (unified)">
+
+  <fdn-params>
+    <fdn-param name="selectedItemId" type="enum"
+      values="pay-webhooks,checkout-guest-cart,checkout-a11y,forum-adapter,grok-fleet-3,hem-approve,docs-sweep"
+      default="checkout-guest-cart"
+      description="which inbox row is focused; drives QueueRow selected styling and which record the detail pane renders"/>
+    <fdn-param name="detailMode" type="enum" values="review,failure,waiting" default="review"
+      description="which detail template the right pane / narrow-detail column renders for the selected item"/>
+    <fdn-param name="viewport" type="enum" values="wide,narrow" default="wide"
+      description="wide = master-detail; narrow (docked split &lt; ~640px) = single collapsing column, see board 4"/>
+    <fdn-param name="narrowScope" type="enum" values="queue,detail" default="queue"
+      description="narrow viewport only — which single column is currently pushed forward"/>
+    <fdn-param name="inboxEmpty" type="boolean" default="false"
+      description="true only for the inbox-zero celebratory state (board 3)"/>
+    <fdn-param name="whatToTestExpanded" type="boolean" default="true"
+      description="narrow board only — the checklist drawer under the wireframe defaults collapsed on narrow, expanded on wide"/>
+  </fdn-params>
+
+  <!-- Declared sample data (§4: "iteration over declared sample data" — the
+       queue rail is this design's clearest example). Every record here is
+       exactly the data the source board hand-wrote per row; nothing invented. -->
+  <fdn-data name="inboxItems">
+    <fdn-item id="pay-webhooks"         glyph="agent" title="pay-webhooks"                     state="failed"  age="1h44" note="tmux host died mid-write — revive"        outside="false" dimmed="false"/>
+    <fdn-item id="checkout-guest-cart"  glyph="web"   title="Checkout — guest cart merge"       state="review"  age="56m"  note="drone-12 · +412 −96 · preview live"        outside="false" dimmed="false"/>
+    <fdn-item id="checkout-a11y"        glyph="agent" title="checkout-a11y"                     state="waiting" age="34m"  note="focus trap: dialog or inert?"              outside="false" dimmed="false"/>
+    <fdn-item id="forum-adapter"        glyph="code"  title="forum adapter — verdict writer"    state="review"  age="20m"  note="scout-4 ✓ clean · +188 −41"                 outside="false" dimmed="false"/>
+    <fdn-item id="grok-fleet-3"         glyph="agent" title="grok-fleet-3"                      state="login"   age="12m"  note="credentials expired — open seat"           outside="false" dimmed="false"/>
+    <fdn-item id="hem-approve"          glyph="web"   title="hem approve flow"                  state="review"  age="2h05" note="scout-2 ✓"                                  outside="true"  dimmed="true" product="valhall-tools"/>
+    <fdn-item id="docs-sweep"           glyph="agent" title="docs-sweep"                        state="waiting" age="3h15" note="glossary: keep &quot;bee&quot;?"             outside="true"  dimmed="true" product="apiary"/>
+  </fdn-data>
+
+  <fdn-data name="testChecklist">
+    <fdn-item id="tc-1" label="add items as guest, then sign in" done="true"/>
+    <fdn-item id="tc-2" label="quantity conflict keeps newer" done="true"/>
+    <fdn-item id="tc-3" label="undo toast restores the guest cart" done="false"/>
+    <fdn-item id="tc-4" label="empty guest cart → no merge banner" done="false"/>
+  </fdn-data>
+
+  <fdn-states>
+    <fdn-state name="review-selected"       selectedItemId="checkout-guest-cart" detailMode="review"  viewport="wide"/>
+    <fdn-state name="failure-selected"      selectedItemId="pay-webhooks"        detailMode="failure"  viewport="wide"/>
+    <fdn-state name="inbox-zero"            inboxEmpty="true"                    viewport="wide"/>
+    <fdn-state name="narrow-queue"          viewport="narrow" narrowScope="queue"/>
+    <fdn-state name="narrow-detail-review"  selectedItemId="checkout-guest-cart" detailMode="review" viewport="narrow" narrowScope="detail" whatToTestExpanded="false"/>
+    <fdn-state name="waiting-detail"        selectedItemId="checkout-a11y"       detailMode="waiting" viewport="narrow"/>
+  </fdn-states>
+
+  <fdn-matrix>
+    <fdn-viewport name="wide"   width="1480" height="872"/>
+    <fdn-viewport name="narrow" width="448"  height="640"/>
+    <fdn-cell state="review-selected"      viewport="wide"/>
+    <fdn-cell state="failure-selected"     viewport="wide"/>
+    <fdn-cell state="inbox-zero"           viewport="wide"/>
+    <fdn-cell state="narrow-queue"         viewport="narrow"/>
+    <fdn-cell state="narrow-detail-review" viewport="narrow"/>
+    <fdn-cell state="waiting-detail"       viewport="narrow"/>
+  </fdn-matrix>
+
+</fdn-doc>
+
+<!-- ==========================================================================
+     fdn-styles — named style definitions (INVENTED SYNTAX, proposal #2).
+     A named style is a flat, non-cascading declaration bag: attributes other
+     than `name` are CSS property names in kebab-case, values are D1-legal
+     (raw or var()). It is referenced from any node via data-fdn-style="name"
+     (space-separated for more than one). This block is INERT to a plain
+     browser — it carries no selectors, so it cannot self-apply without an
+     engine. Every node below therefore ALSO carries the resolved value as
+     inline style="" for degraded-browser fidelity; data-fdn-style is kept
+     alongside purely as the audit/dedup/diff handle. See findings (a.2), (b).
+     ========================================================================== -->
+<fdn-styles hidden style="display:none">
+  <fdn-style name="rail-row"       display="flex" flex-direction="column" gap="3px" padding="7px 9px 8px" border-radius="var(--radius-md)" cursor="pointer"/>
+  <fdn-style name="rail-row-line1"  display="flex" align-items="center" gap="8px" min-width="0"/>
+  <fdn-style name="rail-row-line2"  display="flex" align-items="center" gap="7px" min-width="0" padding-left="22px"/>
+  <fdn-style name="section-label"   font-family="var(--font-sans)" font-weight="var(--font-weight-semibold)" font-size="10px" letter-spacing=".12em" color="var(--color-text-faint)"/>
+  <fdn-style name="pill-btn"        display="flex" align-items="center" gap="6px" height="28px" padding="0 12px" border-radius="var(--radius-md)" border="1px solid var(--color-border-subtle)" color="var(--color-text-tertiary)" font-family="var(--font-sans)" font-weight="var(--font-weight-medium)" font-size="12px" cursor="pointer"/>
+  <fdn-style name="pill-btn-accent" display="flex" align-items="center" gap="6px" height="28px" padding="0 13px" border-radius="var(--radius-md)" background="var(--color-accent)" color="#FFFFFF" font-family="var(--font-sans)" font-weight="var(--font-weight-medium)" font-size="12px" cursor="pointer"/>
+  <fdn-style name="detail-tab"      display="flex" align-items="center" gap="6px" padding="3px 10px" border-radius="var(--radius-md)" font-family="var(--font-sans)" font-weight="var(--font-weight-medium)" font-size="12px" color="var(--color-text-muted)" cursor="pointer"/>
+  <fdn-style name="wire-block"      border-radius="8px" background="#F4F2EE"/>
+</fdn-styles>
+
+<!-- ==========================================================================
+     fdn-component definitions.
+     Bodies use {{ prop.x }} / {{ item.x }} mustache-style interpolation
+     (INVENTED — the spec defines no text/attribute interpolation syntax at
+     all; see findings (a) + (b)). Definitions are the *template* form: they
+     are never projected verbatim. Every <fdn-use> below carries the fully
+     resolved/expanded subtree as its children (what a plain browser renders)
+     plus data-fdn-prop-* attributes (the binding, for diff/round-trip). This
+     dual carry is itself a documented pinch point — see findings (a.3), (b).
+     ========================================================================== -->
+
+<!-- Component 1 of 6: Icon — mirrors D3's own text ("icon libraries are the
+     degenerate case of the import contract: props name, size, color,
+     token-bound"). Native body (not sealed) since these are simple paths. -->
+<fdn-component name="Icon" hidden style="display:none">
+  <fdn-props>
+    <fdn-prop name="name"  type="enum" values="agent,web,code,git,search,check,chevron-down,arrow-up,close,more" required="true"/>
+    <fdn-prop name="size"  type="number" default="14"/>
+    <fdn-prop name="color" type="token" default="var(--color-text-muted)" description="expects a color token or var()"/>
+  </fdn-props>
+  <svg width="{{ prop.size }}" height="{{ prop.size }}" viewBox="0 0 16 16" fill="none" style="color:{{ prop.color }};flex:none">
+    <!-- one <path when="prop.name == '<value>'"> branch per icon — see findings (b):
+         value-dependent glyph selection has no lookup/switch, only N when branches. -->
+    <path when="prop.name == 'agent'" d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+    <g when="prop.name == 'web'">
+      <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+      <path d="M2 6.2h12" stroke="currentColor" stroke-width="1.3"/>
+      <circle cx="4.4" cy="4.6" r=".55" fill="currentColor"/>
+    </g>
+    <path when="prop.name == 'code'" d="M5.6 4.6L2.4 8l3.2 3.4M10.4 4.6L13.6 8l-3.2 3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path when="prop.name == 'git'" d="M6.5 3.5H3.8A1.3 1.3 0 002.5 4.8v7.4a1.3 1.3 0 001.3 1.3h7.4a1.3 1.3 0 001.3-1.3V9.5M9.5 2.5h4v4M13.2 2.8L7.5 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+    <g when="prop.name == 'search'">
+      <circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"/>
+      <path d="m10.6 10.6 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </g>
+    <path when="prop.name == 'check'" d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</fdn-component>
+
+<!-- Component 2 of 6: StatusDot — filled (broken) vs hollow (asking), per
+     source d3's own legend. Another N-branch when- fan for state → color. -->
+<fdn-component name="StatusDot" hidden style="display:none">
+  <fdn-props>
+    <fdn-prop name="state" type="enum" values="failed,review,waiting,login" required="true"/>
+    <fdn-prop name="dimmed" type="boolean" default="false"/>
+  </fdn-props>
+  <span when="prop.state == 'failed'"  style="width:7px;height:7px;border-radius:50%;background:var(--color-status-failed);flex:none;opacity:{{ prop.dimmed ? .5 : 1 }}"></span>
+  <span when="prop.state == 'review'"  style="width:7px;height:7px;border-radius:50%;background:var(--color-status-review);flex:none;opacity:{{ prop.dimmed ? .5 : 1 }}"></span>
+  <span when="prop.state == 'waiting'" style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-waiting-ring);box-sizing:border-box;flex:none"></span>
+  <span when="prop.state == 'login'"   style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-login-ring);box-sizing:border-box;flex:none"></span>
+</fdn-component>
+
+<!-- Component 3 of 6: QueueRow — the rail row. Structural + typed. -->
+<fdn-component name="QueueRow" hidden style="display:none">
+  <fdn-props>
+    <fdn-prop name="id"       type="string" required="true"/>
+    <fdn-prop name="glyph"    type="enum" values="agent,web,code" required="true"/>
+    <fdn-prop name="title"    type="string" required="true"/>
+    <fdn-prop name="state"    type="enum" values="failed,review,waiting,login" required="true"/>
+    <fdn-prop name="age"      type="string" required="true"/>
+    <fdn-prop name="note"     type="string" required="true"/>
+    <fdn-prop name="selected" type="boolean" default="false"/>
+    <fdn-prop name="dimmed"   type="boolean" default="false"/>
+    <fdn-prop name="product"  type="string" description="shown only for outside-yard rows"/>
+  </fdn-props>
+  <div data-fdn-style="rail-row" style="background:{{ prop.selected ? 'var(--color-selected-bg)' : 'transparent' }}">
+    <div data-fdn-style="rail-row-line1">
+      <fdn-use component="Icon" data-fdn-prop-name="{{ prop.glyph }}" data-fdn-prop-color="{{ prop.dimmed ? 'var(--color-text-ghost)' : 'var(--color-text-muted)' }}"/>
+      <span style="flex:1;min-width:0;font:{{ prop.glyph == 'agent' ? '600' : '500' }} var(--font-size-md) var(--font-sans);color:{{ prop.dimmed ? 'var(--color-text-disabled)' : 'var(--color-text-primary)' }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ prop.title }}</span>
+      <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:{{ prop.state == 'failed' ? 'var(--color-status-failed)' : (prop.dimmed ? 'var(--color-text-ghost)' : 'var(--color-text-faint)') }}">{{ prop.age }}</span>
+    </div>
+    <div data-fdn-style="rail-row-line2">
+      <fdn-use component="StatusDot" data-fdn-prop-state="{{ prop.state }}" data-fdn-prop-dimmed="{{ prop.dimmed }}"/>
+      <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-{{ prop.state }})">{{ prop.state }}</span>
+      <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:{{ prop.dimmed ? 'var(--color-text-disabled)' : 'var(--color-text-muted)' }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ prop.note }}</span>
+      <span when="prop.product" style="display:flex;align-items:center;gap:4px;flex:none">
+        <fdn-use component="Icon" data-fdn-prop-name="agent" data-fdn-prop-size="9" data-fdn-prop-color="var(--color-text-ghost)"/>
+        <span style="font:400 10px var(--font-mono);color:var(--color-text-disabled)">{{ prop.product }}</span>
+      </span>
+    </div>
+  </div>
+</fdn-component>
+
+<!-- Component 4 of 6: ActionButton — the pill/chip CTA, with an optional
+     trailing kbd hint. Two variants (default / accent) via a `variant` prop. -->
+<fdn-component name="ActionButton" hidden style="display:none">
+  <fdn-props>
+    <fdn-prop name="label"   type="string" required="true"/>
+    <fdn-prop name="hint"    type="string" description="short kbd-style hint rendered dim at trailing edge"/>
+    <fdn-prop name="variant" type="enum" values="default,accent" default="default"/>
+  </fdn-props>
+  <span when="prop.variant == 'default'" data-fdn-style="pill-btn">
+    {{ prop.label }}<span when="prop.hint" style="font:400 var(--font-size-2xs) var(--font-mono);color:var(--color-text-disabled)">{{ prop.hint }}</span>
+  </span>
+  <span when="prop.variant == 'accent'" data-fdn-style="pill-btn-accent">
+    {{ prop.label }}<span when="prop.hint" style="font:400 var(--font-size-2xs) var(--font-mono);color:rgba(255,255,255,.6)">{{ prop.hint }}</span>
+  </span>
+</fdn-component>
+
+<!-- Component 5 of 6: SectionLabel — small letter-spaced uppercase caption
+     used throughout the evidence rail / failure triage / decision cards. -->
+<fdn-component name="SectionLabel" hidden style="display:none">
+  <fdn-props>
+    <fdn-prop name="text" type="string" required="true"/>
+    <fdn-prop name="trailing" type="string" description="optional right-aligned mono note, e.g. a progress count"/>
+  </fdn-props>
+  <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+    <span data-fdn-style="section-label">{{ prop.text }}</span>
+    <span when="prop.trailing" style="margin-left:auto;font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">{{ prop.trailing }}</span>
+  </div>
+</fdn-component>
+
+<!-- Component 6 of 6: DetailTab — the test/diff/evidence/agent tab chip. -->
+<fdn-component name="DetailTab" hidden style="display:none">
+  <fdn-props>
+    <fdn-prop name="label"  type="string" required="true"/>
+    <fdn-prop name="index"  type="number" required="true"/>
+    <fdn-prop name="active" type="boolean" default="false"/>
+  </fdn-props>
+  <span data-fdn-style="detail-tab" style="background:{{ prop.active ? 'var(--color-selected-bg)' : 'transparent' }};color:{{ prop.active ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}">
+    {{ prop.label }}<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">{{ prop.index }}</span>
+  </span>
+</fdn-component>
+
+<!-- ==========================================================================
+     InboxChrome — the big one. Two whole detail templates (review-packet,
+     failure-triage) gated with when="param.detailMode == '...'" on the
+     document-level param. This mirrors the source's own dc-import
+     name="InboxChrome" reused verbatim across board 1 / board 2 with only
+     the selection + right-pane content changed. Composes QueueRow via
+     each="item in data.inboxItems" over the doc-level sample data.
+     ========================================================================== -->
+<fdn-component name="InboxChrome" hidden style="display:none">
+  <fdn-props>
+    <fdn-prop name="selectedItemId" type="string" required="true"/>
+    <fdn-prop name="detailMode"     type="enum" values="review,failure" required="true"/>
+  </fdn-props>
+
+  <div style="display:flex;flex-direction:column;background:var(--color-surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-card);position:relative">
+    <div style="flex:1;min-height:0;display:flex">
+
+      <!-- queue rail -->
+      <div style="width:316px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--color-border-subtle);min-height:0">
+        <div style="height:44px;flex:none;display:flex;align-items:center;gap:9px;padding:0 10px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+          <span style="font:600 var(--font-size-xl) var(--font-sans);color:var(--color-text-primary)">Inbox</span>
+          <span style="font:600 10px var(--font-sans);color:var(--color-bg);background:var(--color-text-primary);border-radius:9px;padding:1px 6px;min-width:16px;text-align:center">7</span>
+          <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-faint)">5 here · 2 outside</span>
+          <span style="margin-left:auto"><fdn-use component="Icon" data-fdn-prop-name="more" data-fdn-prop-size="16"/></span>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;gap:2px;padding:8px 10px 6px">
+          <span style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-md);background:var(--color-surface-alt);border:1px solid var(--color-border-subtle);font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-primary)">All<span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">7</span></span>
+          <span style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-md);font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-muted)">Reviews<span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-disabled)">3</span></span>
+          <span style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-md);font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-muted)">Agents<span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-disabled)">4</span></span>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow:auto;padding:2px 8px 12px">
+          <!-- in-yard rows: each item in data.inboxItems where outside == false -->
+          <fdn-use each="item in data.inboxItems" data-fdn-each-filter="item.outside == 'false'" component="QueueRow"
+            data-fdn-prop-id="{{ item.id }}" data-fdn-prop-glyph="{{ item.glyph }}" data-fdn-prop-title="{{ item.title }}"
+            data-fdn-prop-state="{{ item.state }}" data-fdn-prop-age="{{ item.age }}" data-fdn-prop-note="{{ item.note }}"
+            data-fdn-prop-selected="{{ item.id == prop.selectedItemId }}" data-fdn-prop-dimmed="false"/>
+
+          <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 4px;margin-top:10px">
+            <span style="font:600 10px var(--font-sans);letter-spacing:.12em;color:var(--color-text-faint);white-space:nowrap">OUTSIDE KONTIKI</span>
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">2</span>
+            <span style="flex:1;height:1px;background:var(--color-border-faint)"></span>
+          </div>
+
+          <!-- out-of-yard rows: demoted, never hidden (§12.4) -->
+          <fdn-use each="item in data.inboxItems" data-fdn-each-filter="item.outside == 'true'" component="QueueRow"
+            data-fdn-prop-id="{{ item.id }}" data-fdn-prop-glyph="{{ item.glyph }}" data-fdn-prop-title="{{ item.title }}"
+            data-fdn-prop-state="{{ item.state }}" data-fdn-prop-age="{{ item.age }}" data-fdn-prop-note="{{ item.note }}"
+            data-fdn-prop-selected="false" data-fdn-prop-dimmed="true" data-fdn-prop-product="{{ item.product }}"/>
+        </div>
+      </div>
+
+      <!-- ===== detail: review-packet ===== -->
+      <div when="prop.detailMode == 'review'" style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0">
+        <div style="height:44px;flex:none;display:flex;align-items:center;gap:9px;padding:0 14px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+          <fdn-use component="Icon" data-fdn-prop-name="web" data-fdn-prop-size="16"/>
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--color-status-review);flex:none"></span>
+          <span style="font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">Checkout — guest cart merge</span>
+          <span style="display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 7px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font:500 10.5px var(--font-mono);color:var(--color-text-tertiary);flex:none">
+            <fdn-use component="Icon" data-fdn-prop-name="git" data-fdn-prop-size="10"/>PR #214
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 6px;border-radius:var(--radius-sm);font:400 var(--font-size-base) var(--font-mono);color:var(--color-text-faint);flex:none">drone-12<fdn-use component="Icon" data-fdn-prop-name="git" data-fdn-prop-size="10"/></span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex:none">
+            <fdn-use component="ActionButton" data-fdn-prop-label="re-request" data-fdn-prop-hint="r" data-fdn-prop-variant="default"/>
+            <fdn-use component="Icon" data-fdn-prop-name="more" data-fdn-prop-size="16"/>
+          </div>
+        </div>
+
+        <div style="height:38px;flex:none;display:flex;align-items:center;gap:2px;padding:0 12px">
+          <fdn-use component="DetailTab" data-fdn-prop-label="test" data-fdn-prop-index="1" data-fdn-prop-active="true"><span data-fdn-style="detail-tab" style="background:var(--color-selected-bg);color:var(--color-text-primary)">test<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">1</span></span></fdn-use>
+          <fdn-use component="DetailTab" data-fdn-prop-label="diff" data-fdn-prop-index="2" data-fdn-prop-active="false"><span data-fdn-style="detail-tab" style="background:transparent;color:var(--color-text-muted)">diff<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">2</span></span></fdn-use>
+          <fdn-use component="DetailTab" data-fdn-prop-label="evidence" data-fdn-prop-index="3" data-fdn-prop-active="false"><span data-fdn-style="detail-tab" style="background:transparent;color:var(--color-text-muted)">evidence<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">3</span></span></fdn-use>
+          <fdn-use component="DetailTab" data-fdn-prop-label="agent" data-fdn-prop-index="4" data-fdn-prop-active="false"><span data-fdn-style="detail-tab" style="background:transparent;color:var(--color-text-muted)">agent<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">4</span></span></fdn-use>
+          <span style="margin-left:auto;font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-muted)">+412 −96 · 12 files</span>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex">
+          <div style="flex:1;min-width:0;padding:4px 12px 12px;display:flex;flex-direction:column;min-height:0">
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden">
+              <div style="height:34px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--color-surface-sunken);border-bottom:1px solid var(--color-border-subtle)">
+                <fdn-use component="Icon" data-fdn-prop-name="search" data-fdn-prop-size="13"/>
+                <span style="font:400 11.5px var(--font-mono);color:var(--color-text-tertiary)">guest-cart.kontiki.nctr.site</span>
+                <span style="margin-left:auto;font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-muted)">open ↗</span>
+              </div>
+              <!-- wireframe viewport preview: static placeholder blocks, faithful to source's own greeked layout -->
+              <div style="flex:1;min-height:0;background:var(--color-surface);padding:22px 26px;display:flex;flex-direction:column;gap:16px;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span data-fdn-style="wire-block" style="width:26px;height:26px;border-radius:6px"></span>
+                  <span data-fdn-style="wire-block" style="width:90px;height:9px"></span>
+                  <span style="margin-left:auto;display:flex;gap:10px">
+                    <span data-fdn-style="wire-block" style="width:52px;height:9px;background:#F2F0EB"></span>
+                    <span data-fdn-style="wire-block" style="width:52px;height:9px;background:#F2F0EB"></span>
+                    <span data-fdn-style="wire-block" style="width:26px;height:26px;border-radius:13px"></span>
+                  </span>
+                </div>
+                <div style="flex:1;display:flex;gap:20px;min-height:0">
+                  <div style="flex:1.4;display:flex;flex-direction:column;gap:12px">
+                    <span data-fdn-style="wire-block" style="width:180px;height:13px;background:#E9E6E0"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:64px"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:64px"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:64px"></span>
+                    <span data-fdn-style="wire-block" style="width:62%;height:9px;background:#F2F0EB"></span>
+                  </div>
+                  <div style="flex:1;position:relative;border:1.5px dashed rgba(189,107,60,.55);border-radius:var(--radius-xl);padding:16px;display:flex;flex-direction:column;gap:11px">
+                    <span style="position:absolute;top:-8px;left:12px;background:var(--color-surface);padding:0 6px;font:500 9.5px var(--font-mono);color:var(--color-status-review);letter-spacing:.06em">CHANGED · CART MERGE</span>
+                    <span data-fdn-style="wire-block" style="width:120px;height:11px;background:#E9E6E0"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:38px"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:38px"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:30px;background:#EFE9DE"></span>
+                    <span data-fdn-style="wire-block" style="width:74%;height:9px;background:#F2F0EB"></span>
+                    <span data-fdn-style="wire-block" style="margin-top:auto;width:100%;height:34px;border-radius:7px;background:var(--color-text-primary);opacity:.85"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- evidence rail -->
+          <div style="width:260px;flex:none;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:16px">
+            <div>
+              <fdn-use component="SectionLabel" data-fdn-prop-text="SUMMARY"/>
+              <div style="font:400 12.5px/1.55 var(--font-sans);color:var(--color-text-secondary)">Guest carts now merge into the account cart on sign-in. Quantity conflicts keep the newer value; a toast offers undo.</div>
+            </div>
+            <div>
+              <fdn-use component="SectionLabel" data-fdn-prop-text="WHAT TO TEST · FROM DRONE-12" data-fdn-prop-trailing="2/4"/>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <!-- checklist: each over data.testChecklist, checkmark glyph gated by item.done -->
+                <div each="item in data.testChecklist" style="display:flex;align-items:flex-start;gap:8px">
+                  <span when="item.done == 'true'" style="width:14px;height:14px;border-radius:4px;background:var(--color-text-primary);flex:none;display:flex;align-items:center;justify-content:center;margin-top:1px">
+                    <fdn-use component="Icon" data-fdn-prop-name="check" data-fdn-prop-size="8" data-fdn-prop-color="#F5F4F1"/>
+                  </span>
+                  <span when="item.done == 'false'" style="width:14px;height:14px;border-radius:4px;border:1px solid #D6D2CA;flex:none;margin-top:1px"></span>
+                  <span style="font:400 var(--font-size-base) var(--font-sans);color:{{ item.done == 'true' ? 'var(--color-text-muted)' : 'var(--color-text-secondary)' }};text-decoration:{{ item.done == 'true' ? 'line-through' : 'none' }}">{{ item.label }}</span>
+                </div>
+              </div>
+              <div style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled);margin-top:8px">checks attach to your verdict</div>
+            </div>
+            <div>
+              <fdn-use component="SectionLabel" data-fdn-prop-text="MEDIA · 1"/>
+              <div data-fdn-style="wire-block" style="width:112px;height:64px;display:flex;align-items:center;justify-content:center">
+                <span style="width:0;height:0;border-left:11px solid #A8A29A;border-top:7px solid transparent;border-bottom:7px solid transparent"></span>
+              </div>
+              <div style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled);margin-top:5px">merge-flow.mp4</div>
+            </div>
+            <div>
+              <fdn-use component="SectionLabel" data-fdn-prop-text="LINEAGE"/>
+              <div style="font:400 10.5px/1.8 var(--font-mono);color:var(--color-text-muted)">packet f-2183<br>bee drone-12 ↗<br>kontiki/checkout · guest-cart-merge<br>PR #214 · checks ✓ 3</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- verdict dock -->
+        <div style="flex:none;padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;height:32px;padding:0 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);font:400 12.5px var(--font-sans);color:var(--color-text-faint)">Feedback — funnels back to the bee…</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border:1px solid var(--color-border);border-radius:var(--radius-md);font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-tertiary)">→ drone-12<span style="color:var(--color-text-disabled);font-size:9px">▾</span></span>
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">1 diff comment queued</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+              <fdn-use component="ActionButton" data-fdn-prop-label="request changes" data-fdn-prop-hint="⇧⌘↵" data-fdn-prop-variant="default"/>
+              <fdn-use component="ActionButton" data-fdn-prop-label="approve &amp; next" data-fdn-prop-hint="⌘↵" data-fdn-prop-variant="accent"/>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== detail: failure-triage ===== -->
+      <div when="prop.detailMode == 'failure'" style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0">
+        <div style="height:44px;flex:none;display:flex;align-items:center;gap:9px;padding:0 14px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--color-status-failed);flex:none"></span>
+          <span style="font:500 var(--font-size-sm) var(--font-mono);color:var(--color-status-failed);flex:none">failed</span>
+          <span style="font:600 var(--font-size-lg) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">pay-webhooks</span>
+          <span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint);flex:none">claude · opus 4.8</span>
+          <span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint);flex:none">kontiki/payments · hook-retries</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex:none">
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">blocking 1h44</span>
+            <fdn-use component="Icon" data-fdn-prop-name="more" data-fdn-prop-size="16"/>
+          </div>
+        </div>
+
+        <div style="flex:none;margin:14px 16px 0;background:var(--color-surface-alt);border:1px solid var(--color-border-faint);border-radius:var(--radius-lg);padding:12px 14px">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+            <span data-fdn-style="section-label">WHAT FAILED</span>
+            <span style="margin-left:auto;font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">last observed · dead · 18:26</span>
+          </div>
+          <div style="font:400 13px/1.55 var(--font-sans);color:var(--color-text-secondary);max-width:760px">The tmux server hosting this session died mid-run — the exit was not commanded and the harness was still working (hook state: <span style="font:500 11.5px var(--font-mono)">working</span>). Nothing after 17:52 was committed. <span style="font-weight:600;color:var(--color-text-primary)">Revive</span> restores the session and its context in place; <span style="font-weight:600;color:var(--color-text-primary)">retry fresh</span> re-runs the task from the original prompt.</div>
+        </div>
+
+        <div style="flex:1;min-height:0;margin:10px 16px 0;display:flex;flex-direction:column">
+          <div style="flex:none;display:flex;align-items:baseline;gap:10px;padding:0 2px 7px">
+            <span data-fdn-style="section-label">TRANSCRIPT · THE LAST MINUTES</span>
+            <span style="margin-left:auto;font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-muted)">open full run <span style="color:var(--color-text-disabled)">o</span> ↗</span>
+          </div>
+          <div style="flex:1;min-height:0;background:var(--color-surface-alt);border:1px solid var(--color-border-faint);border-radius:var(--radius-lg);padding:13px 16px;font:400 11.5px/1.75 var(--font-mono);color:var(--color-text-tertiary);overflow:hidden">
+            <span style="color:var(--color-text-faint)">17:44</span>  ⏺ Bash pnpm test --filter payments — 3 failing (backoff drift)<br>
+            <span style="color:var(--color-text-faint)">17:46</span>  the retry schedule needs jitter so simultaneous webhook storms<br>
+            <span style="padding-left:52px">don't re-align. Capping at 2h, adding ±10% jitter per step.</span><br>
+            <span style="color:var(--color-text-faint)">17:48</span>  ⏺ Edit payments/webhooks/retry.ts — backoff 1m → 2h, jittered<br>
+            <span style="color:var(--color-text-faint)">17:49</span>  ⏺ Bash pnpm test --filter payments  <span style="color:var(--color-success)">✓ 41 passed</span><br>
+            <span style="color:var(--color-text-faint)">17:50</span>  retry queue drains correctly. Now wiring the dead-letter alert<br>
+            <span style="padding-left:52px">into the ops channel, then updating the runbook —</span><br>
+            <span style="color:var(--color-text-faint)">17:52</span>  ⏺ Edit payments/webhooks/alerts.ts<br>
+            <span style="color:rgba(176,81,46,.75)">▌ transcript ends mid-write — no exit recorded</span>
+          </div>
+        </div>
+
+        <div style="flex:none;border-top:1px solid var(--color-border-subtle);margin-top:12px;padding:10px 16px 12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;height:32px;padding:0 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);font:400 12.5px var(--font-sans);color:var(--color-text-faint)">Steer or answer — queued, delivered the moment the session is back…</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">revive restores context · retry fresh re-runs the task</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+              <fdn-use component="ActionButton" data-fdn-prop-label="open run" data-fdn-prop-hint="o" data-fdn-prop-variant="default"/>
+              <fdn-use component="ActionButton" data-fdn-prop-label="retry fresh" data-fdn-prop-variant="default"/>
+              <fdn-use component="ActionButton" data-fdn-prop-label="revive" data-fdn-prop-hint="⇧R" data-fdn-prop-variant="accent"/>
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</fdn-component>
+
+<!-- ==========================================================================
+     Document body — one <section> per fdn-matrix cell. Each fdn-use of
+     InboxChrome carries the fully resolved subtree as children (see note
+     at top of the component-definitions block): what you see below IS what
+     a plain browser renders. The prop bindings on the wrapping <fdn-use>
+     are the machine-checkable truth of "which state is this."
+     ========================================================================== -->
+<main style="padding:26px 32px 60px;display:flex;flex-direction:column;gap:64px;max-width:1560px">
+
+  <header style="display:flex;flex-direction:column;gap:4px">
+    <div style="font:500 var(--font-size-base) var(--font-mono);color:var(--color-text-faint);letter-spacing:.04em">APIARY · INBOX v1 — one place for human-intervention work: reviews + blocked agents (more sources later) · master-detail, Linear-inbox rhythm · yard = kontiki</div>
+    <div style="font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-disabled)">first unification pass, replaces the separate Needs me + Review desk destinations · left: a compact queue rail — ↑↓ walks it continuously, failures pinned loudest · right: the selected item's COMPLETE working surface, never a reduced preview · All is the default, Reviews / Agents are filters inside the rail, not sibling destinations.</div>
+  </header>
+
+  <!-- state: review-selected -->
+  <section data-fdn-state="review-selected" data-fdn-viewport="wide">
+    <div style="font:500 var(--font-size-sm) var(--font-mono);letter-spacing:.04em;color:#9C6A1C;margin-bottom:8px">1 · inbox (g i) — a review packet selected: the rail stays quiet, the right side IS the review desk's full packet surface</div>
+    <div style="width:1480px">
+      <fdn-use component="InboxChrome" data-fdn-prop-selectedItemId="checkout-guest-cart" data-fdn-prop-detailMode="review">
+  <div style="display:flex;flex-direction:column;background:var(--color-surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-card);position:relative">
+    <div style="flex:1;min-height:0;display:flex">
+
+        <div style="width:316px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--color-border-subtle);min-height:0">
+          <div style="height:44px;flex:none;display:flex;align-items:center;gap:9px;padding:0 10px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+            <span style="font:600 var(--font-size-xl) var(--font-sans);color:var(--color-text-primary)">Inbox</span>
+            <span style="font:600 10px var(--font-sans);color:var(--color-bg);background:var(--color-text-primary);border-radius:9px;padding:1px 6px;min-width:16px;text-align:center">7</span>
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-faint)">5 here · 2 outside</span>
+            <span style="margin-left:auto"><span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;color:var(--color-text-muted);font-size:14px;line-height:1">⋯</span></span>
+          </div>
+          <div style="flex:none;display:flex;align-items:center;gap:2px;padding:8px 10px 6px">
+            <span style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-md);background:var(--color-surface-alt);border:1px solid var(--color-border-subtle);font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-primary)">All<span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">7</span></span>
+            <span style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-md);font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-muted)">Reviews<span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-disabled)">3</span></span>
+            <span style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-md);font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-muted)">Agents<span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-disabled)">4</span></span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:auto;padding:2px 8px 12px">
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="pay-webhooks">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">pay-webhooks</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-status-failed)">1h44</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-failed);flex:none;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-failed)">failed</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">tmux host died mid-write — revive</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:var(--color-selected-bg)" data-fdn-each-item="checkout-guest-cart">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M2 6.2h12" stroke="currentColor" stroke-width="1.3"/><circle cx="4.4" cy="4.6" r=".55" fill="currentColor"/></svg>
+              <span style="flex:1;min-width:0;font:500 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Checkout — guest cart merge</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">56m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-review);flex:none;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-review)">review</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">drone-12 · +412 −96 · preview live</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="checkout-a11y">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">checkout-a11y</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">34m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-waiting-ring);box-sizing:border-box;flex:none"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-waiting)">waiting</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">focus trap: dialog or inert?</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="forum-adapter">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M5.6 4.6L2.4 8l3.2 3.4M10.4 4.6L13.6 8l-3.2 3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:500 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">forum adapter — verdict writer</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">20m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-review);flex:none;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-review)">review</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scout-4 ✓ clean · +188 −41</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="grok-fleet-3">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">grok-fleet-3</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">12m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-login-ring);box-sizing:border-box;flex:none"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-login)">login</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">credentials expired — open seat</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 4px;margin-top:10px">
+            <span style="font:600 10px var(--font-sans);letter-spacing:.12em;color:var(--color-text-faint);white-space:nowrap">OUTSIDE KONTIKI</span>
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">2</span>
+            <span style="flex:1;height:1px;background:var(--color-border-faint)"></span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="hem-approve">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-ghost);flex:none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M2 6.2h12" stroke="currentColor" stroke-width="1.3"/><circle cx="4.4" cy="4.6" r=".55" fill="currentColor"/></svg>
+              <span style="flex:1;min-width:0;font:500 var(--font-size-md) var(--font-sans);color:var(--color-text-disabled);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">hem approve flow</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-ghost)">2h05</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-review);flex:none;opacity:.5;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-review)">review</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-disabled);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scout-2 ✓</span>
+              <span style="display:flex;align-items:center;gap:4px;flex:none"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-ghost);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg><span style="font:400 10px var(--font-mono);color:var(--color-text-disabled)">valhall-tools</span></span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="docs-sweep">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-ghost);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-disabled);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">docs-sweep</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-ghost)">3h15</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-waiting-ring);box-sizing:border-box;flex:none"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-waiting)">waiting</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-disabled);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">glossary: keep &quot;bee&quot;?</span>
+              <span style="display:flex;align-items:center;gap:4px;flex:none"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-ghost);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg><span style="font:400 10px var(--font-mono);color:var(--color-text-disabled)">apiary</span></span>
+            </div>
+          </div>
+          </div>
+        </div>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0" data-fdn-when="detailMode == 'review'">
+        <div style="height:44px;flex:none;display:flex;align-items:center;gap:9px;padding:0 14px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M2 6.2h12" stroke="currentColor" stroke-width="1.3"/><circle cx="4.4" cy="4.6" r=".55" fill="currentColor"/></svg>
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--color-status-review);flex:none"></span>
+          <span style="font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">Checkout — guest cart merge</span>
+          <span style="display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 7px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font:500 10.5px var(--font-mono);color:var(--color-text-tertiary);flex:none">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M6.5 3.5H3.8A1.3 1.3 0 002.5 4.8v7.4a1.3 1.3 0 001.3 1.3h7.4a1.3 1.3 0 001.3-1.3V9.5M9.5 2.5h4v4M13.2 2.8L7.5 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>PR #214
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 6px;border-radius:var(--radius-sm);font:400 var(--font-size-base) var(--font-mono);color:var(--color-text-faint);flex:none">drone-12<svg width="10" height="10" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-faint);flex:none"><path d="M6.5 3.5H3.8A1.3 1.3 0 002.5 4.8v7.4a1.3 1.3 0 001.3 1.3h7.4a1.3 1.3 0 001.3-1.3V9.5M9.5 2.5h4v4M13.2 2.8L7.5 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex:none">
+            <span data-fdn-style="pill-btn">re-request<span style="font:400 var(--font-size-2xs) var(--font-mono);color:var(--color-text-disabled)">r</span></span>
+            <span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;color:var(--color-text-muted);font-size:14px;line-height:1">⋯</span>
+          </div>
+        </div>
+
+        <div style="height:38px;flex:none;display:flex;align-items:center;gap:2px;padding:0 12px">
+          <span data-fdn-style="detail-tab" style="background:var(--color-selected-bg);color:var(--color-text-primary)">test<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">1</span></span>
+          <span data-fdn-style="detail-tab" style="background:transparent;color:var(--color-text-muted)">diff<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">2</span></span>
+          <span data-fdn-style="detail-tab" style="background:transparent;color:var(--color-text-muted)">evidence<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">3</span></span>
+          <span data-fdn-style="detail-tab" style="background:transparent;color:var(--color-text-muted)">agent<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">4</span></span>
+          <span style="margin-left:auto;font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-muted)">+412 −96 · 12 files</span>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex">
+          <div style="flex:1;min-width:0;padding:4px 12px 12px;display:flex;flex-direction:column;min-height:0">
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden">
+              <div style="height:34px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;background:var(--color-surface-sunken);border-bottom:1px solid var(--color-border-subtle)">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><circle cx="7" cy="7" r="4.6" stroke="currentColor" stroke-width="1.4"/><path d="m10.6 10.6 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                <span style="font:400 11.5px var(--font-mono);color:var(--color-text-tertiary)">guest-cart.kontiki.nctr.site</span>
+                <span style="margin-left:auto;font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-muted)">open ↗</span>
+              </div>
+              <div style="flex:1;min-height:0;background:var(--color-surface);padding:22px 26px;display:flex;flex-direction:column;gap:16px;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span data-fdn-style="wire-block" style="width:26px;height:26px;border-radius:6px"></span>
+                  <span data-fdn-style="wire-block" style="width:90px;height:9px"></span>
+                  <span style="margin-left:auto;display:flex;gap:10px">
+                    <span data-fdn-style="wire-block" style="width:52px;height:9px;background:#F2F0EB"></span>
+                    <span data-fdn-style="wire-block" style="width:52px;height:9px;background:#F2F0EB"></span>
+                    <span data-fdn-style="wire-block" style="width:26px;height:26px;border-radius:13px"></span>
+                  </span>
+                </div>
+                <div style="flex:1;display:flex;gap:20px;min-height:0">
+                  <div style="flex:1.4;display:flex;flex-direction:column;gap:12px">
+                    <span data-fdn-style="wire-block" style="width:180px;height:13px;background:#E9E6E0"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:64px"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:64px"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:64px"></span>
+                    <span data-fdn-style="wire-block" style="width:62%;height:9px;background:#F2F0EB"></span>
+                  </div>
+                  <div style="flex:1;position:relative;border:1.5px dashed rgba(189,107,60,.55);border-radius:var(--radius-xl);padding:16px;display:flex;flex-direction:column;gap:11px">
+                    <span style="position:absolute;top:-8px;left:12px;background:var(--color-surface);padding:0 6px;font:500 9.5px var(--font-mono);color:var(--color-status-review);letter-spacing:.06em">CHANGED · CART MERGE</span>
+                    <span data-fdn-style="wire-block" style="width:120px;height:11px;background:#E9E6E0"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:38px"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:38px"></span>
+                    <span data-fdn-style="wire-block" style="width:100%;height:30px;background:#EFE9DE"></span>
+                    <span data-fdn-style="wire-block" style="width:74%;height:9px;background:#F2F0EB"></span>
+                    <span data-fdn-style="wire-block" style="margin-top:auto;width:100%;height:34px;border-radius:7px;background:var(--color-text-primary);opacity:.85"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="width:260px;flex:none;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:16px">
+            <div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+                <span data-fdn-style="section-label">SUMMARY</span>
+                
+              </div>
+              <div style="font:400 12.5px/1.55 var(--font-sans);color:var(--color-text-secondary)">Guest carts now merge into the account cart on sign-in. Quantity conflicts keep the newer value; a toast offers undo.</div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+                <span data-fdn-style="section-label">WHAT TO TEST · FROM DRONE-12</span>
+                <span style="margin-left:auto;font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">2/4</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                  <span style="width:14px;height:14px;border-radius:4px;background:var(--color-text-primary);flex:none;display:flex;align-items:center;justify-content:center;margin-top:1px"><svg width="8" height="8" viewBox="0 0 16 16" fill="none" style="color:#F5F4F1;flex:none"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                  <span style="font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);text-decoration:line-through">add items as guest, then sign in</span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                  <span style="width:14px;height:14px;border-radius:4px;background:var(--color-text-primary);flex:none;display:flex;align-items:center;justify-content:center;margin-top:1px"><svg width="8" height="8" viewBox="0 0 16 16" fill="none" style="color:#F5F4F1;flex:none"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                  <span style="font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);text-decoration:line-through">quantity conflict keeps newer</span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                  <span style="width:14px;height:14px;border-radius:4px;border:1px solid #D6D2CA;flex:none;margin-top:1px"></span>
+                  <span style="font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-secondary)">undo toast restores the guest cart</span>
+                </div>
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                  <span style="width:14px;height:14px;border-radius:4px;border:1px solid #D6D2CA;flex:none;margin-top:1px"></span>
+                  <span style="font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-secondary)">empty guest cart → no merge banner</span>
+                </div>
+              </div>
+              <div style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled);margin-top:8px">checks attach to your verdict</div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+                <span data-fdn-style="section-label">MEDIA · 1</span>
+                
+              </div>
+              <div data-fdn-style="wire-block" style="width:112px;height:64px;display:flex;align-items:center;justify-content:center">
+                <span style="width:0;height:0;border-left:11px solid #A8A29A;border-top:7px solid transparent;border-bottom:7px solid transparent"></span>
+              </div>
+              <div style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled);margin-top:5px">merge-flow.mp4</div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+                <span data-fdn-style="section-label">LINEAGE</span>
+                
+              </div>
+              <div style="font:400 10.5px/1.8 var(--font-mono);color:var(--color-text-muted)">packet f-2183<br>bee drone-12 ↗<br>kontiki/checkout · guest-cart-merge<br>PR #214 · checks ✓ 3</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;height:32px;padding:0 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);font:400 12.5px var(--font-sans);color:var(--color-text-faint)">Feedback — funnels back to the bee…</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border:1px solid var(--color-border);border-radius:var(--radius-md);font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-tertiary)">→ drone-12<span style="color:var(--color-text-disabled);font-size:9px">▾</span></span>
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">1 diff comment queued</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+              <span data-fdn-style="pill-btn">request changes<span style="font:400 var(--font-size-2xs) var(--font-mono);color:var(--color-text-disabled)">⇧⌘↵</span></span>
+              <span data-fdn-style="pill-btn-accent">approve &amp; next<span style="font:400 var(--font-size-2xs) var(--font-mono);color:rgba(255,255,255,.6)">⌘↵</span></span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+      </fdn-use>
+    </div>
+  </section>
+
+  <!-- state: failure-selected -->
+  <section data-fdn-state="failure-selected" data-fdn-viewport="wide">
+    <div style="font:500 var(--font-size-sm) var(--font-mono);letter-spacing:.04em;color:#9C6A1C;margin-bottom:8px">2 · the failure register — a crashed agent selected: reason first, transcript to judge, real interventions</div>
+    <div style="width:1480px">
+      <fdn-use component="InboxChrome" data-fdn-prop-selectedItemId="pay-webhooks" data-fdn-prop-detailMode="failure">
+  <div style="display:flex;flex-direction:column;background:var(--color-surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-card);position:relative">
+    <div style="flex:1;min-height:0;display:flex">
+
+        <div style="width:316px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--color-border-subtle);min-height:0">
+          <div style="height:44px;flex:none;display:flex;align-items:center;gap:9px;padding:0 10px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+            <span style="font:600 var(--font-size-xl) var(--font-sans);color:var(--color-text-primary)">Inbox</span>
+            <span style="font:600 10px var(--font-sans);color:var(--color-bg);background:var(--color-text-primary);border-radius:9px;padding:1px 6px;min-width:16px;text-align:center">7</span>
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-faint)">5 here · 2 outside</span>
+            <span style="margin-left:auto"><span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;color:var(--color-text-muted);font-size:14px;line-height:1">⋯</span></span>
+          </div>
+          <div style="flex:none;display:flex;align-items:center;gap:2px;padding:8px 10px 6px">
+            <span style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-md);background:var(--color-surface-alt);border:1px solid var(--color-border-subtle);font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-primary)">All<span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">7</span></span>
+            <span style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-md);font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-muted)">Reviews<span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-disabled)">3</span></span>
+            <span style="display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:var(--radius-md);font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-muted)">Agents<span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-disabled)">4</span></span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:auto;padding:2px 8px 12px">
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:var(--color-selected-bg)" data-fdn-each-item="pay-webhooks">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">pay-webhooks</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-status-failed)">1h44</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-failed);flex:none;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-failed)">failed</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">tmux host died mid-write — revive</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="checkout-guest-cart">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M2 6.2h12" stroke="currentColor" stroke-width="1.3"/><circle cx="4.4" cy="4.6" r=".55" fill="currentColor"/></svg>
+              <span style="flex:1;min-width:0;font:500 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Checkout — guest cart merge</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">56m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-review);flex:none;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-review)">review</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">drone-12 · +412 −96 · preview live</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="checkout-a11y">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">checkout-a11y</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">34m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-waiting-ring);box-sizing:border-box;flex:none"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-waiting)">waiting</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">focus trap: dialog or inert?</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="forum-adapter">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M5.6 4.6L2.4 8l3.2 3.4M10.4 4.6L13.6 8l-3.2 3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:500 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">forum adapter — verdict writer</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">20m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-review);flex:none;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-review)">review</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scout-4 ✓ clean · +188 −41</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="grok-fleet-3">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">grok-fleet-3</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">12m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-login-ring);box-sizing:border-box;flex:none"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-login)">login</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">credentials expired — open seat</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 4px;margin-top:10px">
+            <span style="font:600 10px var(--font-sans);letter-spacing:.12em;color:var(--color-text-faint);white-space:nowrap">OUTSIDE KONTIKI</span>
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">2</span>
+            <span style="flex:1;height:1px;background:var(--color-border-faint)"></span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="hem-approve">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-ghost);flex:none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M2 6.2h12" stroke="currentColor" stroke-width="1.3"/><circle cx="4.4" cy="4.6" r=".55" fill="currentColor"/></svg>
+              <span style="flex:1;min-width:0;font:500 var(--font-size-md) var(--font-sans);color:var(--color-text-disabled);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">hem approve flow</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-ghost)">2h05</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-review);flex:none;opacity:.5;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-review)">review</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-disabled);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scout-2 ✓</span>
+              <span style="display:flex;align-items:center;gap:4px;flex:none"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-ghost);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg><span style="font:400 10px var(--font-mono);color:var(--color-text-disabled)">valhall-tools</span></span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="docs-sweep">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-ghost);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-disabled);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">docs-sweep</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-ghost)">3h15</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-waiting-ring);box-sizing:border-box;flex:none"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-waiting)">waiting</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-disabled);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">glossary: keep &quot;bee&quot;?</span>
+              <span style="display:flex;align-items:center;gap:4px;flex:none"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-ghost);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg><span style="font:400 10px var(--font-mono);color:var(--color-text-disabled)">apiary</span></span>
+            </div>
+          </div>
+          </div>
+        </div>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0" data-fdn-when="detailMode == 'failure'">
+        <div style="height:44px;flex:none;display:flex;align-items:center;gap:9px;padding:0 14px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--color-status-failed);flex:none"></span>
+          <span style="font:500 var(--font-size-sm) var(--font-mono);color:var(--color-status-failed);flex:none">failed</span>
+          <span style="font:600 var(--font-size-lg) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">pay-webhooks</span>
+          <span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint);flex:none">claude · opus 4.8</span>
+          <span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint);flex:none">kontiki/payments · hook-retries</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex:none">
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">blocking 1h44</span>
+            <span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;color:var(--color-text-muted);font-size:14px;line-height:1">⋯</span>
+          </div>
+        </div>
+
+        <div style="flex:none;margin:14px 16px 0;background:var(--color-surface-alt);border:1px solid var(--color-border-faint);border-radius:var(--radius-lg);padding:12px 14px">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+            <span data-fdn-style="section-label">WHAT FAILED</span>
+            <span style="margin-left:auto;font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">last observed · dead · 18:26</span>
+          </div>
+          <div style="font:400 13px/1.55 var(--font-sans);color:var(--color-text-secondary);max-width:760px">The tmux server hosting this session died mid-run — the exit was not commanded and the harness was still working (hook state: <span style="font:500 11.5px var(--font-mono)">working</span>). Nothing after 17:52 was committed. <span style="font-weight:600;color:var(--color-text-primary)">Revive</span> restores the session and its context in place; <span style="font-weight:600;color:var(--color-text-primary)">retry fresh</span> re-runs the task from the original prompt.</div>
+        </div>
+
+        <div style="flex:1;min-height:0;margin:10px 16px 0;display:flex;flex-direction:column">
+          <div style="flex:none;display:flex;align-items:baseline;gap:10px;padding:0 2px 7px">
+            <span data-fdn-style="section-label">TRANSCRIPT · THE LAST MINUTES</span>
+            <span style="margin-left:auto;font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-muted)">open full run <span style="color:var(--color-text-disabled)">o</span> ↗</span>
+          </div>
+          <div style="flex:1;min-height:0;background:var(--color-surface-alt);border:1px solid var(--color-border-faint);border-radius:var(--radius-lg);padding:13px 16px;font:400 11.5px/1.75 var(--font-mono);color:var(--color-text-tertiary);overflow:hidden">
+            <span style="color:var(--color-text-faint)">17:44</span>  ⏺ Bash pnpm test --filter payments — 3 failing (backoff drift)<br>
+            <span style="color:var(--color-text-faint)">17:46</span>  the retry schedule needs jitter so simultaneous webhook storms<br>
+            <span style="padding-left:52px">don't re-align. Capping at 2h, adding ±10% jitter per step.</span><br>
+            <span style="color:var(--color-text-faint)">17:48</span>  ⏺ Edit payments/webhooks/retry.ts — backoff 1m → 2h, jittered<br>
+            <span style="color:var(--color-text-faint)">17:49</span>  ⏺ Bash pnpm test --filter payments  <span style="color:var(--color-success)">✓ 41 passed</span><br>
+            <span style="color:var(--color-text-faint)">17:50</span>  retry queue drains correctly. Now wiring the dead-letter alert<br>
+            <span style="padding-left:52px">into the ops channel, then updating the runbook —</span><br>
+            <span style="color:var(--color-text-faint)">17:52</span>  ⏺ Edit payments/webhooks/alerts.ts<br>
+            <span style="color:rgba(176,81,46,.75)">▌ transcript ends mid-write — no exit recorded</span>
+          </div>
+        </div>
+
+        <div style="flex:none;border-top:1px solid var(--color-border-subtle);margin-top:12px;padding:10px 16px 12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;height:32px;padding:0 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);font:400 12.5px var(--font-sans);color:var(--color-text-faint)">Steer or answer — queued, delivered the moment the session is back…</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">revive restores context · retry fresh re-runs the task</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+              <span data-fdn-style="pill-btn">open run<span style="font:400 var(--font-size-2xs) var(--font-mono);color:var(--color-text-disabled)">o</span></span>
+              <span data-fdn-style="pill-btn">retry fresh</span>
+              <span data-fdn-style="pill-btn-accent">revive<span style="font:400 var(--font-size-2xs) var(--font-mono);color:rgba(255,255,255,.6)">⇧R</span></span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+      </fdn-use>
+    </div>
+  </section>
+
+  <!-- state: inbox-zero -->
+  <section data-fdn-state="inbox-zero" data-fdn-viewport="wide">
+    <div style="font:500 var(--font-size-sm) var(--font-mono);letter-spacing:.04em;color:#9C6A1C;margin-bottom:8px">3 · inbox zero — the rail collapses away, the whole pane becomes the one earned immersive moment</div>
+    <div style="width:1480px;height:520px;background:var(--color-surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-card);display:flex;flex-direction:column">
+      <div style="height:40px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+        <span style="font:600 var(--font-size-xl) var(--font-sans);color:var(--color-text-primary)">Inbox</span>
+        <span style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">kontiki · quiet</span>
+        <div style="margin-left:auto"><fdn-use component="Icon" data-fdn-prop-name="more" data-fdn-prop-size="16"><span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;color:var(--color-text-muted);font-size:14px;line-height:1">⋯</span></fdn-use></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+        <div style="font:600 17px var(--font-sans);color:var(--color-text-primary)">Inbox zero.</div>
+        <div style="font:400 var(--font-size-md) var(--font-sans);color:var(--color-text-muted)">4 agents running quietly — nothing needs you.</div>
+        <div style="font:400 var(--font-size-sm) var(--font-mono);color:var(--color-text-disabled);margin-top:6px">cleared 16:42 · 9 handled today</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- states: narrow-queue / narrow-detail-review, side by side (mirrors source boards 4a/4b) -->
+  <section style="display:flex;gap:32px;flex-wrap:wrap">
+    <div data-fdn-state="narrow-queue" data-fdn-viewport="narrow">
+      <div style="font:500 var(--font-size-sm) var(--font-mono);letter-spacing:.04em;color:#9C6A1C;margin-bottom:8px">4a · narrow (docked split &lt; ~640px) — master-detail collapses to the queue alone</div>
+      <div style="width:448px;height:640px;background:var(--color-surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-card);display:flex;flex-direction:column">
+        <div style="height:40px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+          <span style="font:600 var(--font-size-xl) var(--font-sans);color:var(--color-text-primary)">Inbox</span>
+          <span style="font:600 10px var(--font-sans);color:var(--color-bg);background:var(--color-text-primary);border-radius:9px;padding:1px 6px;min-width:16px;text-align:center">7</span>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:2px 8px 12px">
+          <fdn-use each="item in data.inboxItems" data-fdn-each-filter="item.outside == 'false'" component="QueueRow"
+            data-fdn-prop-id="{{ item.id }}" data-fdn-prop-glyph="{{ item.glyph }}" data-fdn-prop-title="{{ item.title }}"
+            data-fdn-prop-state="{{ item.state }}" data-fdn-prop-age="{{ item.age }}" data-fdn-prop-note="{{ item.note }}"
+            data-fdn-prop-selected="{{ item.id == 'checkout-guest-cart' }}" data-fdn-prop-dimmed="false">
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="pay-webhooks">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">pay-webhooks</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-status-failed)">1h44</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-failed);flex:none;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-failed)">failed</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">tmux host died mid-write — revive</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:var(--color-selected-bg)" data-fdn-each-item="checkout-guest-cart">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M2 6.2h12" stroke="currentColor" stroke-width="1.3"/><circle cx="4.4" cy="4.6" r=".55" fill="currentColor"/></svg>
+              <span style="flex:1;min-width:0;font:500 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Checkout — guest cart merge</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">56m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-review);flex:none;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-review)">review</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">drone-12 · +412 −96 · preview live</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="checkout-a11y">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">checkout-a11y</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">34m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-waiting-ring);box-sizing:border-box;flex:none"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-waiting)">waiting</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">focus trap: dialog or inert?</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="forum-adapter">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M5.6 4.6L2.4 8l3.2 3.4M10.4 4.6L13.6 8l-3.2 3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:500 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">forum adapter — verdict writer</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">20m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--color-status-review);flex:none;"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-review)">review</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scout-4 ✓ clean · +188 −41</span>
+              
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;padding:7px 9px 8px;border-radius:var(--radius-md);cursor:pointer;background:transparent" data-fdn-each-item="grok-fleet-3">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><path d="M8 1.6l5.2 3v6L8 13.6l-5.2-3v-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+              <span style="flex:1;min-width:0;font:600 var(--font-size-md) var(--font-sans);color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">grok-fleet-3</span>
+              <span style="flex:none;font:500 var(--font-size-sm) var(--font-mono);color:var(--color-text-faint)">12m</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;min-width:0;padding-left:22px">
+              <span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-login-ring);box-sizing:border-box;flex:none"></span>
+              <span style="flex:none;font:500 10.5px var(--font-mono);color:var(--color-status-login)">login</span>
+              <span style="flex:1;min-width:0;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">credentials expired — open seat</span>
+              
+            </div>
+          </div>
+          </fdn-use>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;height:28px;padding:0 14px;border-top:1px solid var(--color-border-subtle)">
+          <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-ghost)">↑↓ move · ↵ open · e done</span>
+        </div>
+      </div>
+    </div>
+
+    <div data-fdn-state="narrow-detail-review" data-fdn-viewport="narrow">
+      <div style="font:500 var(--font-size-sm) var(--font-mono);letter-spacing:.04em;color:#9C6A1C;margin-bottom:8px">4b · …and ↵ pushes the detail in place — ‹ esc returns · n/p walk the queue</div>
+      <div style="width:448px;height:640px;background:var(--color-surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-card);display:flex;flex-direction:column">
+        <div style="height:40px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px 0 10px;border-bottom:1px solid var(--color-border-subtle)">
+          <span style="font:500 var(--font-size-base) var(--font-sans);color:var(--color-text-tertiary)">‹ inbox</span>
+          <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-disabled)">2 of 7</span>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;gap:8px;padding:12px 14px 8px">
+          <fdn-use component="Icon" data-fdn-prop-name="web" data-fdn-prop-size="15"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="color:var(--color-text-muted);flex:none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M2 6.2h12" stroke="currentColor" stroke-width="1.3"/><circle cx="4.4" cy="4.6" r=".55" fill="currentColor"/></svg></fdn-use>
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--color-status-review);flex:none"></span>
+          <span style="font:600 var(--font-size-lg) var(--font-sans);color:var(--color-text-primary)">Checkout — guest cart merge</span>
+        </div>
+        <div style="flex:none;padding:0 14px 8px;font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-faint)">drone-12 · +412 −96 · PR #214</div>
+        <div style="flex:none;display:flex;align-items:center;gap:2px;padding:0 12px 8px">
+          <fdn-use component="DetailTab" data-fdn-prop-label="test" data-fdn-prop-index="1" data-fdn-prop-active="true"><span data-fdn-style="detail-tab" style="background:var(--color-selected-bg);color:var(--color-text-primary)">test<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">1</span></span></fdn-use>
+          <fdn-use component="DetailTab" data-fdn-prop-label="diff" data-fdn-prop-index="2" data-fdn-prop-active="false"><span data-fdn-style="detail-tab" style="background:transparent;color:var(--color-text-muted)">diff<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">2</span></span></fdn-use>
+          <fdn-use component="DetailTab" data-fdn-prop-label="evidence" data-fdn-prop-index="3" data-fdn-prop-active="false"><span data-fdn-style="detail-tab" style="background:transparent;color:var(--color-text-muted)">evidence<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">3</span></span></fdn-use>
+          <fdn-use component="DetailTab" data-fdn-prop-label="agent" data-fdn-prop-index="4" data-fdn-prop-active="false"><span data-fdn-style="detail-tab" style="background:transparent;color:var(--color-text-muted)">agent<span style="font:400 9.5px var(--font-mono);color:var(--color-text-disabled)">4</span></span></fdn-use>
+        </div>
+        <div style="flex:1;min-height:0;margin:0 12px;display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden">
+          <div style="height:30px;flex:none;display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--color-surface-sunken);border-bottom:1px solid var(--color-border-subtle)">
+            <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-tertiary)">guest-cart.kontiki.nctr.site</span>
+            <span style="margin-left:auto;font:400 10px var(--font-mono);color:var(--color-text-muted)">open ↗</span>
+          </div>
+          <div style="flex:1;background:var(--color-surface);padding:14px;display:flex;flex-direction:column;gap:10px">
+            <span data-fdn-style="wire-block" style="width:110px;height:10px;background:#E9E6E0"></span>
+            <span data-fdn-style="wire-block" style="width:100%;height:44px"></span>
+            <span data-fdn-style="wire-block" style="width:100%;height:44px"></span>
+          </div>
+        </div>
+        <!-- when="param.whatToTestExpanded == 'false'": collapsed drawer, chevron closed -->
+        <div when="param.whatToTestExpanded == 'false'" style="flex:none;display:flex;align-items:center;gap:8px;height:34px;margin:8px 12px 0;padding:0 10px;border:1px solid var(--color-border-faint);border-radius:7px;background:var(--color-surface-alt);cursor:pointer">
+          <span style="font:600 10px var(--font-sans);letter-spacing:.1em;color:var(--color-text-faint)">WHAT TO TEST</span>
+          <span style="font:400 10px var(--font-mono);color:var(--color-text-disabled)">2/4</span>
+          <span style="margin-left:auto;color:var(--color-text-disabled);font-size:10px">⌄</span>
+        </div>
+        <div style="flex:none;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;height:30px;padding:0 10px;border:1px solid var(--color-border);border-radius:var(--radius-md);font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-faint)">Feedback…</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <fdn-use component="ActionButton" data-fdn-prop-label="changes" data-fdn-prop-hint="⇧⌘↵" data-fdn-prop-variant="default"><span data-fdn-style="pill-btn">changes<span style="font:400 var(--font-size-2xs) var(--font-mono);color:var(--color-text-disabled)">⇧⌘↵</span></span></fdn-use>
+            <span style="flex:1"><fdn-use component="ActionButton" data-fdn-prop-label="approve &amp; next" data-fdn-prop-hint="⌘↵" data-fdn-prop-variant="accent"><span data-fdn-style="pill-btn-accent">approve &amp; next<span style="font:400 var(--font-size-2xs) var(--font-mono);color:rgba(255,255,255,.6)">⌘↵</span></span></fdn-use></span>
+          </div>
+          <div style="font:400 10px var(--font-mono);color:var(--color-text-ghost);text-align:center">n/p next · esc back</div>
+        </div>
+      </div>
+    </div>
+
+    <div data-fdn-state="waiting-detail" data-fdn-viewport="narrow">
+      <div style="font:500 var(--font-size-sm) var(--font-mono);letter-spacing:.04em;color:#9C6A1C;margin-bottom:8px">5 · the waiting register (detail only) — the ask is the hero, the answer is the CTA</div>
+      <div style="width:520px;height:640px;background:var(--color-surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-card);display:flex;flex-direction:column">
+        <div style="height:44px;flex:none;display:flex;align-items:center;gap:9px;padding:0 14px 0 16px;border-bottom:1px solid var(--color-border-subtle)">
+          <fdn-use component="StatusDot" data-fdn-prop-state="waiting" data-fdn-prop-dimmed="false"><span style="width:7px;height:7px;border-radius:50%;border:1.5px solid var(--color-status-waiting-ring);box-sizing:border-box;flex:none"></span></fdn-use>
+          <span style="font:500 var(--font-size-sm) var(--font-mono);color:var(--color-status-waiting);flex:none">waiting</span>
+          <span style="font:600 var(--font-size-lg) var(--font-sans);color:var(--color-text-primary);flex:1">checkout-a11y</span>
+          <span style="font:400 var(--font-size-xs) var(--font-mono);color:var(--color-text-faint)">claude · sonnet 5</span>
+        </div>
+        <div style="flex:1;min-height:0;margin:14px 16px 0;display:flex;flex-direction:column">
+          <fdn-use component="SectionLabel" data-fdn-prop-text="TRANSCRIPT · LEADING UP TO THE ASK"><div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+  <span data-fdn-style="section-label">TRANSCRIPT · LEADING UP TO THE ASK</span>
+  
+</div></fdn-use>
+          <div style="flex:1;min-height:0;background:var(--color-surface-alt);border:1px solid var(--color-border-faint);border-radius:var(--radius-lg);padding:12px 14px;font:400 11px/1.7 var(--font-mono);color:var(--color-text-tertiary)">
+            <span style="color:var(--color-text-faint)">14:02</span>  ⏺ Edit MigrationDialog.tsx — trap Tab inside the dialog<br>
+            <span style="color:var(--color-text-faint)">14:04</span>  ⏺ Bash pnpm test --filter desktop  <span style="color:var(--color-success)">✓ 118 passed</span><br>
+            <span style="color:var(--color-text-faint)">14:05</span>  both approaches pass — but they differ in Safari 16 support<br>
+            <span style="padding-left:48px">and in how screen readers announce the backdrop.</span>
+          </div>
+        </div>
+        <div style="flex:none;margin:10px 16px 0;border:1px solid var(--color-border-subtle);border-radius:var(--radius-lg);padding:13px 15px">
+          <div style="font:600 10px var(--font-sans);letter-spacing:.12em;color:var(--color-text-faint);margin-bottom:6px">THE ASK</div>
+          <div style="font:400 13.5px/1.55 var(--font-sans);color:var(--color-text-primary)">Focus handling for the migration dialog: a classic focus trap inside the dialog, or <span style="font:500 var(--font-size-base) var(--font-mono)">inert</span> on the background? <span style="font:500 var(--font-size-base) var(--font-mono)">inert</span> is cleaner but drops Safari 16. Which do you want?</div>
+        </div>
+        <div style="flex:none;padding:12px 16px 14px;display:flex;flex-direction:column;gap:7px">
+          <div style="border:1px solid var(--color-border);border-radius:var(--radius-xl);min-height:68px;padding:10px 46px 10px 12px;font:400 var(--font-size-md) var(--font-sans);color:var(--color-text-faint)">Answer — resumes the agent…</div>
+          <div style="font:400 10px var(--font-mono);color:var(--color-text-ghost)">↵ send &amp; resume · o open full run · esc back to queue</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- decision-card rail — plain subset markup, no component extraction (not
+       repeated structure; each card is a one-off), named styles for typography -->
+  <aside style="display:flex;flex-direction:column;gap:24px;max-width:640px">
+    <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);padding:18px 20px">
+      <div style="font:600 10.5px var(--font-mono);letter-spacing:.16em;color:var(--color-text-faint);margin-bottom:14px">WHAT EARNS A ROW</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
+        <div>
+          <div style="font:600 var(--font-size-sm) var(--font-sans);letter-spacing:.08em;color:var(--color-text-tertiary);margin-bottom:9px">IN — SOMEONE IS STUCK ON YOU</div>
+          <div style="display:flex;flex-direction:column;gap:8px;font:400 12.5px/1.45 var(--font-sans);color:var(--color-text-secondary)">
+            <div><b>waiting</b> — the agent asked a question</div>
+            <div><b>login</b> — credentials expired, a human seat is needed</div>
+            <div><b>failed</b> — crashed / un-commanded death · <b>blocked</b> — stuck any other way</div>
+            <div><b>review</b> — a packet in needs_review / in_review</div>
+          </div>
+        </div>
+        <div>
+          <div style="font:600 var(--font-size-sm) var(--font-sans);letter-spacing:.08em;color:var(--color-text-tertiary);margin-bottom:9px">OUT — NOTHING TO DO RIGHT NOW</div>
+          <div style="display:flex;flex-direction:column;gap:8px;font:400 12.5px/1.45 var(--font-sans);color:var(--color-text-muted)">
+            <div>running · idle · done — routine lifecycle stays in Agents</div>
+            <div>changes_requested — the ball is with the agent; it re-enters Inbox when re-published</div>
+            <div>archived, and anything demoted with <span style="font:500 var(--font-size-sm) var(--font-mono)">m</span> (not-important)</div>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--color-border-faint);margin-top:16px;padding-top:12px;font:400 var(--font-size-base) var(--font-sans);color:var(--color-text-muted)">One test: <b style="color:var(--color-text-secondary)">a row exists only while a human unblocks something.</b> A new source is never a new destination.</div>
+    </div>
+
+    <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);padding:18px 20px">
+      <div style="font:600 10.5px var(--font-mono);letter-spacing:.16em;color:var(--color-text-faint);margin-bottom:14px">HANDLED · SELECTION CONTINUITY &amp; UNDO</div>
+      <div style="display:flex;flex-direction:column;gap:9px;font:400 12.5px/1.5 var(--font-sans);color:var(--color-text-secondary)">
+        <div><b>The row slides out (~160ms)</b> and selection falls to the item that now holds the same position — never back to the top.</div>
+        <div><b>One dark toast, one undo:</b> ⌘Z restores the item, its selection, and reverses the verdict/archive — identical grammar for approve, done, revive, not-important.</div>
+        <div style="color:var(--color-text-muted)">Handled items aren't gone: reviews live on in Library → Reviews, sessions in Runs. Inbox only ever shows the open ask.</div>
+      </div>
+    </div>
+  </aside>
+
+</main>
+
+</body>
+</html>

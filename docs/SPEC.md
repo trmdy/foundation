@@ -260,10 +260,21 @@ lacks — `fdn-component` (definition: props, slots, variants), `fdn-use` (insta
 with prop bindings), `fdn-slot` — and `when`/`each` attributes for declarative
 conditionals (§4), plus one sanctioned overlay context (open question 2). Everything
 outside the grammar is normalized in where mappable (D1) before validation rejects
-the remainder. To fill: the exclusion list made exact, attribute enumeration per
-element, full grammar (schema), node identity rules (stable ids for
-diff/anchoring/comments), named styles, component/variant declaration syntax,
-inheritance from design system documents.
+the remainder.
+
+Decided leans from the grammar spike (evidence: `boards/GRAMMAR-FINDINGS.md`):
+inline `<svg>` is legal subset content (embedded content model, not scripting);
+`fdn-*` elements and `data-fdn-*` attributes are a **reserved namespace** for grammar
+bookkeeping — ordinary HTML attributes (`id`, `aria-*`, `data-testid`) coexist freely;
+all metadata/definition elements (`fdn-doc` header block, `fdn-styles`,
+`fdn-component` definitions) are **browser-inert** in the projection via the `hidden`
+attribute, so a plain browser renders only design content.
+
+To fill: the exclusion list made exact, attribute enumeration per element, full
+grammar (schema), node identity rules (stable ids for diff/anchoring/comments), named
+styles (see open question 12), component/variant declaration syntax, inheritance from
+design system documents (both boards duplicated their full token + component sets for
+lack of it — finding b.6).
 
 ## 4. Tokens, params, conditionals, data — *skeleton*
 
@@ -272,8 +283,14 @@ params are the only variability channel. Declarative conditionals (`when` on nod
 data — no expressions beyond comparison and boolean composition; if a design needs more
 logic, that logic belongs in an imported component. Sample data is declared in-document or inherited
 from the design system document, so states are self-contained and renderable headless.
-To fill: token taxonomy and theming (light/dark as token planes), param types, state
-declaration syntax, the matrix declaration (states × viewports).
+To fill: token taxonomy and theming (light/dark as token planes), param types —
+including `enum`, `token`, and structured `list`/`record` shapes (finding b.4: real
+component props are lists, e.g. keyboard chord groups) — state declaration syntax, the
+matrix declaration (states × viewports), the **interpolation facility** (open
+question 9 — the grammar spike found this more foundational than `when`/`each`: props
+are inert without a way into text and attribute values), and a bounded value-mapping
+primitive (open question 9; finding b.2: enum→style mapping via N `when` branches
+scales linearly and badly).
 
 ## 5. Render contract — *skeleton*
 
@@ -339,15 +356,24 @@ To fill: the fixtures.
 
 ## Open questions
 
-1. Chain library: **Loro vs Automerge 3**, one comparative one-week spike (Yjs only if
-   both fail — see D2). Decided by the concurrency gauntlet: move-vs-move on one node,
-   edit-inside-a-concurrently-moved-subtree, delete-vs-edit, reorder-vs-insert, merged
-   across three offline authors. Disqualifiers: duplication, cycles, lost edits,
-   nondeterministic merge. Secondary: semantic-diff ergonomics (lifting library
-   patches to patch-verb vocabulary), 10k-edit append/load/memory/disk, inverse-append
-   undo incl. undo-of-move, metadata roundtrip.
-2. Exact subset boundary: is `overlay` enough for menus/toasts/tooltips, or does the
-   grammar need a portal primitive? Decide from real explorations, not speculation.
+1. ~~Chain library~~ — **resolved 2026-07-31: Loro** (spike:
+   `spikes/chain/RESULTS.md`). Loro passed the full concurrency gauntlet including
+   G5 move-cycle; Automerge 3 hit the pre-agreed disqualifier on G5 (no native move —
+   its parent-pointer workaround orphans a node under concurrent cyclic moves), and
+   was also ~40× slower on append with a costlier diff-lift. Conditions bound to the
+   decision (see RESULTS.md Recommendation): the Foundation change envelope is
+   mandatory from day one (Foundation-owned SHA-256 + author/message over Loro's
+   positional op ids), loro-crdt is pinned exactly, and engine time-travel reads
+   serialize around Loro's detaching `checkout()`. The ChainAdapter contract was
+   implemented twice, so migration-by-replay remains real, and this spec continues to
+   never name the library normatively.
+2. Exact subset boundary: is one sanctioned overlay context enough for
+   menus/toasts/tooltips, or does the grammar need a portal primitive? **Partial
+   evidence (grammar spike, findings §c):** dialog + toast fit one `fdn-overlay`
+   primitive with `role`/`anchor`/`dismiss` metadata; menus and tooltips were never
+   drawn open in the source boards, so coverage there is unconfirmed. Next evidence:
+   draw a menu and a tooltip fully open in a real exploration and re-run the
+   translation.
 3. Capsule interactivity budget: how much sandboxed behavior may a sealed capsule
    carry (hover/focus/open states) before it stops being presentational? Current lean:
    CSS-state + declarative variants only in v1; no event handlers.
@@ -373,3 +399,31 @@ To fill: the fixtures.
    repeated declaration sets become a shared named style vs stay node-attached?
    (Lean: node-attached by default; named-style extraction is an explicit verb or an
    importer heuristic with a report line — never silent.)
+9. **Interpolation and the expression budget** (grammar spike, findings b.1/b.2 —
+   found more foundational than `when`/`each`): what may appear inside `{{ … }}` in
+   text and attribute values? Candidate budget: property/data references, a ternary
+   or `when`-equivalent, and a bounded lookup/map primitive for enum→value mapping —
+   still non-Turing, fully auditable. Without interpolation, props are inert metadata.
+10. **Projection semantics for parameterized content** (findings a.3/b.5 — one-way-
+    door-adjacent, interacts with D2 hashing and D4): does canonical text carry the
+    unresolved template tree (one document, all states) or fully resolved per-state
+    trees (N projections)? The spike's working hybrid — hidden template definitions
+    plus resolved literal instances in one file — satisfies browser-openability but
+    creates two sources of truth per instance with nothing keeping them in sync.
+    A real engine must pick one meaning of "the projection" and enforce coherence
+    (e.g. resolved instances are engine-generated, never hand-edited, validated
+    against their template).
+11. **Interaction-state styling** (findings §e — the largest unresolved gap): `:hover`
+    / `:focus` / `:active` / `:disabled` have no answer under "no selectors"; both
+    source boards needed hover styling on nearly every clickable row (`.dc.html`
+    itself invented a `style-hover=""` attribute). Candidates: sanctioned per-state
+    style attributes (`style-hover=""`-shaped, validator-owned — ironically the
+    `.dc.html` answer), state planes inside named styles, or pushing all interaction
+    states to sealed capsules (in tension with D3's native-by-default stance). Must be
+    resolved before the grammar freezes; product chrome is mostly hover states.
+12. **Named styles' rendering home** (finding b.3): with no selectors allowed, a
+    named style has no browser-native application mechanism, forcing dual-carry
+    (reference attribute + identical inline `style`), which can silently drift.
+    Lean: the projection always materializes named styles inline; `data-fdn-style`
+    is the audit/dedup handle; any divergence between the two is a validation error
+    the engine detects mechanically.
