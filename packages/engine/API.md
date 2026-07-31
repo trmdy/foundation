@@ -114,3 +114,8 @@ deterministic for a given input text.
 primary fixtures (parse → project fixpoint; bake of at least one declared state each).
 `boards/inbox-unified.fdn.html` is stretch. Synthetic micro-fixtures per module are
 expected and live in the module's test directory.
+
+**Standing rule (post-dogfood, 2026-07-31): every fixture that validates clean must
+also bake non-trivially** — a validator acceptance test whose document bakes to
+empty/hollow output is a contract split between validate and bake (the each-over-data
+bug shipped exactly this way: valid and hollow simultaneously).
