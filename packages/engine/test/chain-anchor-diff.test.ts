@@ -97,6 +97,34 @@ describe('chain diff — structural, tree ops', () => {
     expect(ops).toContainEqual({ op: 'set-text', id: 'n-child-1', text: 'changed' })
   })
 
+  it('detects set-style-ref (contract amendment 2026-07-31)', () => {
+    const chain = createChain(baseDocument(), AUTHOR)
+    chain.anchor('a')
+    chain.apply(M('ref'), [{ op: 'set-style-ref', id: 'n-child-2', styleRef: 'card' }])
+    chain.anchor('b')
+    const ops = chain.diff('a', 'b')
+    expect(ops).toContainEqual({ op: 'set-style-ref', id: 'n-child-2', styleRef: 'card' })
+
+    chain.anchor('c')
+    chain.apply(M('unref'), [{ op: 'set-style-ref', id: 'n-child-2', styleRef: null }])
+    chain.anchor('d')
+    expect(chain.diff('c', 'd')).toContainEqual({ op: 'set-style-ref', id: 'n-child-2', styleRef: null })
+  })
+
+  it('detects set-when (contract amendment 2026-07-31)', () => {
+    const chain = createChain(baseDocument(), AUTHOR)
+    chain.anchor('a')
+    chain.apply(M('when'), [{ op: 'set-when', id: 'n-child-1', when: 'prop.show' }])
+    chain.anchor('b')
+    const ops = chain.diff('a', 'b')
+    expect(ops).toContainEqual({ op: 'set-when', id: 'n-child-1', when: 'prop.show' })
+
+    chain.anchor('c')
+    chain.apply(M('unwhen'), [{ op: 'set-when', id: 'n-child-1', when: null }])
+    chain.anchor('d')
+    expect(chain.diff('c', 'd')).toContainEqual({ op: 'set-when', id: 'n-child-1', when: null })
+  })
+
   it('no-op batch (identical anchors) produces empty diff', () => {
     const chain = createChain(baseDocument(), AUTHOR)
     chain.anchor('a')
@@ -140,5 +168,18 @@ describe('chain diff — section-changed for non-tree sections', () => {
     chain.anchor('b')
     const ops = chain.diff('a', 'b')
     expect(ops).toContainEqual({ op: 'section-changed', section: 'matrix', name: 'default::mobile' })
+  })
+
+  it("reports 'meta' section-changed for title and specVersion (contract amendment 2026-07-31)", () => {
+    const chain = createChain(baseDocument(), AUTHOR)
+    chain.anchor('a')
+    chain.apply(M('title'), [{ op: 'replace-document', doc: { ...chain.doc(), title: 'New Title' } }])
+    chain.anchor('b')
+    expect(chain.diff('a', 'b')).toContainEqual({ op: 'section-changed', section: 'meta', name: 'title' })
+
+    chain.anchor('c')
+    chain.apply(M('specVersion'), [{ op: 'replace-document', doc: { ...chain.doc(), specVersion: '0.2.0' } }])
+    chain.anchor('d')
+    expect(chain.diff('c', 'd')).toContainEqual({ op: 'section-changed', section: 'meta', name: 'specVersion' })
   })
 })

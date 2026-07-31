@@ -44,16 +44,16 @@
  *   - No remove-param/remove-lookup/remove-state exists — undoing a
  *     first-time set-param/set-lookup/set-state has no typed inverse and
  *     falls back to a whole-document replace-document undo (model.ts).
- *   - SemanticOp has no set-style-ref/set-when equivalent and no
- *     'title'/'specVersion' section — diff() cannot represent those changes
- *     (model.ts silently omits them rather than inventing a wrong shape).
- *   - loadChain(bytes) has no actor/opts parameter (unlike createChain), so
- *     the peer id for a loaded chain's FUTURE local edits is derived from a
- *     hash of the snapshot bytes. Two independently-loaded copies of the
- *     SAME saved chain would derive the SAME peer id; if both then make
- *     local edits before merging, that is a genuine peer-id collision. This
- *     is a contract gap (a `{actor?: string}` opts param on loadChain would
- *     close it), not something this module can work around unilaterally.
+ *   - (RESOLVED 2026-07-31, contract amendment) SemanticOp gained
+ *     set-style-ref/set-when variants and a 'meta' section-changed section
+ *     for title/specVersion — diff() now emits all of these (model.ts).
+ *   - (RESOLVED 2026-07-31, contract amendment) loadChain(bytes, opts?)
+ *     now takes an optional `{actor?: string}`, matching createChain. When
+ *     omitted, the peer id for the loaded chain's future local edits still
+ *     falls back to a hash of the snapshot bytes (documented below), which
+ *     remains collision-prone for two independent loads of the same bytes
+ *     that both edit locally before merging — callers that anticipate that
+ *     scenario should pass distinct actors explicitly.
  */
 
 import { LoroDoc, LoroMap } from 'loro-crdt'
@@ -105,8 +105,8 @@ export function createChain(doc: FdnDocument, meta: ChangeMeta, opts?: { actor?:
   return LoroChain.create(doc, meta, opts?.actor ?? meta.author)
 }
 
-export function loadChain(bytes: Uint8Array): FdnChain {
-  return LoroChain.load(bytes)
+export function loadChain(bytes: Uint8Array, opts?: { actor?: string }): FdnChain {
+  return LoroChain.load(bytes, opts?.actor)
 }
 
 class LoroChain implements FdnChain {
@@ -160,15 +160,21 @@ class LoroChain implements FdnChain {
     return chain
   }
 
-  static load(bytes: Uint8Array): LoroChain {
+  static load(bytes: Uint8Array, actor?: string): LoroChain {
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
     const anchorsLen = view.getUint32(0, true)
     const anchorsBytes = bytes.subarray(4, 4 + anchorsLen)
     const snapshotBytes = bytes.subarray(4 + anchorsLen)
     const entries = JSON.parse(new TextDecoder().decode(anchorsBytes)) as [string, Frontier][]
     const loro = LoroDoc.fromSnapshot(snapshotBytes)
-    const actor = `loaded:${createHash('sha256').update(snapshotBytes).digest('hex')}`
-    const chain = new LoroChain(actor, loro)
+    // Explicit actor (contract amendment 2026-07-31) always wins. Falling
+    // back to a hash of the snapshot bytes keeps behavior deterministic (no
+    // Date.now/Math.random) for callers that don't supply one, but remains
+    // collision-prone: two independent loadChain(sameBytes) calls with no
+    // actor derive the SAME peer id, which is only safe if at most one of
+    // them ever commits locally before any merge.
+    const resolvedActor = actor ?? `loaded:${createHash('sha256').update(snapshotBytes).digest('hex')}`
+    const chain = new LoroChain(resolvedActor, loro)
     chain.rebuildIndex()
     for (const [name, frontier] of entries) chain.anchors.set(name, frontier)
     return chain

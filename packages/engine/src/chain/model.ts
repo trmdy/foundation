@@ -189,6 +189,14 @@ function diffTree(a: FdnDocument, b: FdnDocument, out: SemanticOp[]): void {
     const beforeText = la.node.text
     const afterText = lb.node.text
     if (beforeText !== afterText) out.push({ op: 'set-text', id, text: afterText ?? '' })
+
+    const beforeStyleRef = la.node.styleRef ?? null
+    const afterStyleRef = lb.node.styleRef ?? null
+    if (beforeStyleRef !== afterStyleRef) out.push({ op: 'set-style-ref', id, styleRef: afterStyleRef })
+
+    const beforeWhen = la.node.when ?? null
+    const afterWhen = lb.node.when ?? null
+    if (beforeWhen !== afterWhen) out.push({ op: 'set-when', id, when: afterWhen })
   }
 }
 
@@ -231,15 +239,21 @@ function diffSections(a: FdnDocument, b: FdnDocument, out: SemanticOp[]): void {
   for (const name of matrixNames) {
     if (beforeMatrix.has(name) !== afterMatrix.has(name)) out.push({ op: 'section-changed', section: 'matrix', name })
   }
+
+  // 'meta' (contract amendment 2026-07-31): document-level scalars with no
+  // natural per-item name — use the field name itself as `name`.
+  if (a.specVersion !== b.specVersion) out.push({ op: 'section-changed', section: 'meta', name: 'specVersion' })
+  if (a.title !== b.title) out.push({ op: 'section-changed', section: 'meta', name: 'title' })
 }
 
 /**
  * Structural diff between two materialized FdnDocument snapshots, lifted to
- * SemanticOp[] (SPEC §6). Finding: SemanticOp has no equivalent of
- * set-style-ref/set-when (present on PatchOp) and no 'title'/'specVersion'
- * section — those changes are real but unrepresentable in this vocabulary,
- * so they are silently omitted from diff() output rather than shoehorned
- * into the wrong op shape.
+ * SemanticOp[] (SPEC §6). Emits set-style-ref/set-when for per-node changes
+ * and 'meta' section-changed (name: 'specVersion'|'title') for document-level
+ * scalars — both added to SemanticOp as a contract amendment (2026-07-31)
+ * responding to this module's own findings; previously these changes were
+ * silently unrepresentable and were dropped rather than shoehorned into the
+ * wrong op shape.
  */
 export function structuralDiff(a: FdnDocument, b: FdnDocument): SemanticOp[] {
   const out: SemanticOp[] = []

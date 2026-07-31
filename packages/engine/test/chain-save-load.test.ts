@@ -71,3 +71,67 @@ describe('chain save/load — full roundtrip', () => {
     expect(materialized.title).toBe(doc.title)
   })
 })
+
+describe('chain save/load — loadChain actor (contract amendment 2026-07-31)', () => {
+  it('two loads of the same snapshot with NO actor derive the same peer id, and silently fail to converge on merge', () => {
+    // This is the collision the module's original findings flagged: without
+    // an explicit actor, loadChain derives the peer id from a hash of the
+    // snapshot bytes, so two independent loads of the SAME bytes get the
+    // SAME peer id. Each then makes a local edit — both edits land at the
+    // identical (peer, counter) op id. When merged, each side sees the
+    // other's op as one it "already has" (same id) and drops it: the merge
+    // does not throw, it just silently fails to converge.
+    const original = createChain(baseDocument(), AUTHOR)
+    const bytes = original.save()
+
+    const loadA = loadChain(bytes)
+    const loadB = loadChain(bytes)
+    loadA.apply(M('edit from A'), [{ op: 'set-attr', id: 'n-child-2', key: 'from', value: 'A' }])
+    loadB.apply({ author: 'user:other', message: 'edit from B' }, [{ op: 'set-attr', id: 'n-child-2', key: 'from', value: 'B' }])
+
+    loadA.merge(loadB)
+    loadB.merge(loadA)
+
+    // proof of the collision: they do NOT converge, each only sees its own edit.
+    expect(loadA.doc().body[0]?.children[1]?.attrs.from).toBe('A')
+    expect(loadB.doc().body[0]?.children[1]?.attrs.from).toBe('B')
+    expect(loadA.doc()).not.toEqual(loadB.doc())
+  })
+
+  it('two loads of the same snapshot with DISTINCT explicit actors converge cleanly on merge', () => {
+    const original = createChain(baseDocument(), AUTHOR)
+    const bytes = original.save()
+
+    const loadC = loadChain(bytes, { actor: 'user:c' })
+    const loadD = loadChain(bytes, { actor: 'user:d' })
+    loadC.apply({ author: 'user:c', message: 'edit from C' }, [{ op: 'set-attr', id: 'n-child-2', key: 'from', value: 'C' }])
+    loadD.apply({ author: 'user:d', message: 'edit from D' }, [{ op: 'set-attr', id: 'n-child-2', key: 'from', value: 'D' }])
+
+    loadC.merge(loadD)
+    loadD.merge(loadC)
+
+    // converges: both peers land on the identical (canonically-equal) document.
+    expect(loadC.doc()).toEqual(loadD.doc())
+    expect(loadC.verify()).toEqual({ ok: true })
+    expect(loadD.verify()).toEqual({ ok: true })
+    // and both authors' envelopes are present in both logs.
+    expect(loadC.log().some((r) => r.author === 'user:c')).toBe(true)
+    expect(loadC.log().some((r) => r.author === 'user:d')).toBe(true)
+    expect(loadC.log()).toEqual(loadD.log())
+  })
+
+  it('an explicit actor on loadChain also lets the loaded chain merge cleanly with the chain it was saved from', () => {
+    const original = createChain(baseDocument(), AUTHOR)
+    const bytes = original.save()
+    const loaded = loadChain(bytes, { actor: 'user:loaded' })
+
+    original.apply(M('original continues'), [{ op: 'set-token', name: 'from-original', value: '1' }])
+    loaded.apply({ author: 'user:loaded', message: 'loaded continues' }, [{ op: 'set-token', name: 'from-loaded', value: '1' }])
+
+    original.merge(loaded)
+    loaded.merge(original)
+    expect(original.doc()).toEqual(loaded.doc())
+    expect(original.doc().tokens['from-original']).toBe('1')
+    expect(original.doc().tokens['from-loaded']).toBe('1')
+  })
+})
