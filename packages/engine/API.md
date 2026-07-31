@@ -79,6 +79,27 @@ serveDocument(filePath: string, opts?: { port?: number }):
   Promise<{ url: string; close: () => Promise<void> }>
 ```
 
+## Wave 3 signatures (Phase B)
+
+```ts
+// chain exchange (src/chain/) — blob-directory wire format (SPEC 13a)
+exportBlobs(chain: FdnChain, dir: string): Promise<{ written: number }>
+importBlobs(chain: FdnChain, dir: string):
+  Promise<{ imported: number; overlaps: OverlapReport }>
+mergeChains(a: Uint8Array, b: Uint8Array):
+  { merged: Uint8Array; overlaps: OverlapReport }
+interface OverlapReport { lines: ReportLine[] }  // code "concurrent-overlap"
+
+// document id: minted by CLI at creation (crypto.randomUUID), stored as
+// data-fdn-doc-id on fdn-doc + chain meta; parse/project roundtrip it verbatim.
+```
+
+New CLI commands: `chain push|pull|sync <file> <dir>` (blob exchange against a
+mailbox directory) · `chain merge <file> <theirs.chain>` (engine merge + overlap
+report + regenerate text) · `git-merge-driver` (three-arg git driver; install
+notes for .gitattributes) · `gateway install` (publish ~/.hive/gateways/
+foundation.json) · `mcp` (stdio MCP server exposing the verb set).
+
 ## CLI (packages/cli)
 
 Zero-dependency argv parsing, bin name `foundation`. Commands v0:
