@@ -11,16 +11,15 @@
  * Directory is `~/.hive/gateways` by default, overridable via
  * FOUNDATION_GATEWAY_DIR (test seam — matches the gatewayRegistry.ts helpers).
  */
-import { existsSync } from 'node:fs'
+
 import type { CliIO } from '../io.js'
 import { parseArgs } from '../argv.js'
 import {
   gatewayRegistryPath,
-  gatewaySocketPath,
-  pidIsLive,
   readGatewayRegistry,
   removeGatewayRegistry,
   resolveShimCommand,
+  shimIsSpawnable,
   writeGatewayRegistry,
   type GatewayRegistryEntry,
 } from '../mcp/gatewayRegistry.js'
@@ -40,25 +39,22 @@ function runInstall(io: CliIO): number {
   const entry: GatewayRegistryEntry = {
     name: 'foundation',
     protocol: 'mcp',
-    socketPath: gatewaySocketPath(),
     shim: { command: shim.command, args: ['mcp'] },
     env: {},
-    pid: process.pid,
     startedAt: new Date().toISOString(),
     gatewayRev: 1,
+    stateless: true,
   }
 
   writeGatewayRegistry(registryPath, entry)
   io.stdout(`wrote ${registryPath}`)
   io.stdout(JSON.stringify(entry, null, 2))
   io.stdout(
-    'note: foundation mcp is stateless (spawned fresh per bee over stdio, no daemon). Honeybee\'s gateway '
-    + 'registry treats liveness as `kill(pid, 0)` on this file\'s `pid`; that pid is this install command\'s own '
-    + 'process, which exits as soon as this command returns. The entry above will parse fine (and appear in `hive '
-    + 'gateways`) but will read as "dead" — and be excluded from honeybee\'s automatic per-bee MCP-config seeding '
-    + '— the moment this process exits. Run `foundation gateway status` to see current liveness. `foundation mcp` '
-    + 'itself is unaffected: point any harness\'s MCP config at the shim command/args above manually to use it '
-    + 'today.',
+    'stateless gateway registered: no daemon, no socket, no pid. Honeybee treats liveness as "the shim command '
+    + 'is executable" (requires honeybee with stateless-gateway support, branch feat/stateless-gateways); with '
+    + 'that in place, every freshly spawned bee gets foundation\'s MCP tools auto-seeded. Older honeybee versions '
+    + 'reject this entry as malformed (fail-closed) — point a harness\'s MCP config at the shim command/args '
+    + 'above manually there.',
   )
   return 0
 }
@@ -78,16 +74,14 @@ function runStatus(io: CliIO): number {
     return 1
   }
 
-  const live = pidIsLive(entry.pid)
-  const shimResolves = existsSync(entry.shim.command)
+  const spawnable = shimIsSpawnable(entry.shim.command)
 
   io.stdout(`registry: ${registryPath}`)
   io.stdout(JSON.stringify(entry, null, 2))
-  io.stdout(`pid ${entry.pid}: ${live ? 'live' : 'dead'}`)
-  if (!live) io.stdout('  (dead pid: honeybee will not auto-seed this entry into bee MCP configs while dead — see `foundation gateway install`\'s note)')
-  io.stdout(`shim command resolves on disk: ${shimResolves ? 'yes' : 'no'} (${entry.shim.command})`)
+  io.stdout(`stateless gateway — liveness = shim executable: ${spawnable ? 'live' : 'DEAD'} (${entry.shim.command})`)
+  if (!spawnable) io.stdout('  (shim missing or not executable: honeybee will not auto-seed this entry until it is)')
 
-  return live && shimResolves ? 0 : 1
+  return spawnable ? 0 : 1
 }
 
 export async function runGateway(args: string[], io: CliIO): Promise<number> {
