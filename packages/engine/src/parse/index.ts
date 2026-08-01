@@ -134,12 +134,25 @@ function directTextOf(el: ElementNode): string {
 // value coercion
 // ——————————————————————————————————————————————————————————————————————————
 
+/**
+ * Coerce a raw attribute string through a param/prop's declared type — shared
+ * by `<fdn-param default="…">` and `<fdn-state>` assignments (friction §2:
+ * these MUST agree, or a state can silently bind a string where bake expects
+ * a real boolean/number). Only the two literal spellings "true"/"false" are
+ * recognized booleans and only numeric text is a real number; anything else
+ * is left as the original string so validate can flag the mismatch (typeof
+ * won't match the declared type) instead of silently miscoercing it.
+ */
 function coerce(type: FdnParamType | undefined, raw: string): unknown {
   switch (type) {
     case 'boolean':
-      return raw === 'true'
-    case 'number':
-      return Number(raw)
+      if (raw === 'true') return true
+      if (raw === 'false') return false
+      return raw
+    case 'number': {
+      const n = Number(raw)
+      return Number.isNaN(n) ? raw : n
+    }
     default:
       return raw
   }
@@ -396,6 +409,32 @@ function convertElement(el: ElementNode, ctx: ConvertCtx): FdnNode | null {
   return node
 }
 
+/**
+ * friction §1: `<main>`/`<body>` are treated as pure wrappers — only their
+ * CHILDREN become the document body, so any `style`/`data-fdn-style` the
+ * wrapper itself carries (page padding, page background, …) is silently
+ * discarded. Honoring those styles is a bigger model change (the document
+ * model has no "root wrapper" node to carry them on — recorded as a follow-up
+ * rather than done here); until then, name what was lost so it's at least
+ * discoverable instead of a same-render-cycle-as-the-bee mystery.
+ */
+function reportRootWrapperStylesDropped(el: ElementNode, tag: string, lines: ReportLine[]): void {
+  const raw = attrsOf(el)
+  const lost: Record<string, string> = {}
+  if (raw.style) lost.style = raw.style
+  if (raw['data-fdn-style']) lost['data-fdn-style'] = raw['data-fdn-style']
+  if (Object.keys(lost).length === 0) return
+  const described = Object.entries(lost)
+    .map(([k, v]) => `${k}="${v}"`)
+    .join(' ')
+  lines.push({
+    code: 'root-wrapper-styles-dropped',
+    severity: 'warning',
+    message: `<${tag}> carries its own ${described} — only <${tag}>'s CHILDREN become the document body, so this was dropped, not honored. Honoring page-level wrapper styles is a bigger model change (recorded follow-up, not fixed here); for now, wrap the intended content in an inner element to carry these styles instead.`,
+    detail: { tag, ...lost },
+  })
+}
+
 function convertChildren(parent: Node, ctx: ConvertCtx): FdnNode[] {
   const out: FdnNode[] = []
   for (const c of childElements(parent)) {
@@ -512,15 +551,20 @@ function parseLookups(fdnDoc: ElementNode): FdnLookup[] {
 function parseStates(fdnDoc: ElementNode, params: FdnParam[]): FdnState[] {
   const wrapper = directChildrenByTag(fdnDoc, 'fdn-states')[0]
   if (!wrapper) return []
-  const paramNames = new Set(params.map((p) => p.name))
+  const paramByName = new Map(params.map((p) => [p.name, p]))
   return directChildrenByTag(wrapper, 'fdn-state').map((el) => {
     const a = attrsOf(el)
     const state: FdnState = { name: a.name ?? '', assignments: {} }
     if (a.viewport) state.viewport = a.viewport
     for (const [k, v] of Object.entries(a)) {
       if (k === 'name' || k === 'viewport') continue
-      if (!paramNames.has(k)) continue
-      state.assignments[k] = v
+      const param = paramByName.get(k)
+      if (!param) continue
+      // friction §2 (real bug): defaults go through `coerce(type, …)`, state
+      // assignments did not — a boolean param assigned "false" by a state
+      // bound the STRING "false", which isTruthy() treats as true. Route
+      // assignments through the identical coercion defaults already use.
+      state.assignments[k] = coerce(param.type, v)
     }
     return state
   })
@@ -668,8 +712,10 @@ export function parseDocument(html: string): { doc: FdnDocument; report: Normali
 
   let bodyNodes: FdnNode[] = []
   if (bodyEl) {
+    reportRootWrapperStylesDropped(bodyEl, 'body', lines)
     const main = directChildrenByTag(bodyEl, 'main')[0]
     if (main) {
+      reportRootWrapperStylesDropped(main, 'main', lines)
       bodyNodes = convertChildren(main, ctx)
     } else {
       const skip = new Set(['fdn-doc', 'fdn-styles', 'fdn-component', 'style', 'script', 'title', 'meta', 'link'])

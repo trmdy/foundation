@@ -14,7 +14,7 @@ import {
   OVERLAY_ONLY_POSITION_VALUES,
 } from '../grammar/schema.js'
 import { extractInterpolations, extractLookupRefs, extractRefs, findDisallowedConstructs, parseEachBinding } from '../grammar/expr.js'
-import type { FdnComponent, FdnDocument, FdnNamedStyle, FdnNode, ReportLine, ValidationResult } from '../types.js'
+import type { FdnComponent, FdnDocument, FdnNamedStyle, FdnNode, FdnParam, ReportLine, ValidationResult } from '../types.js'
 
 interface Scope {
   /** Names legal as a ref root in addition to the fixed `param`/`item` roots:
@@ -235,6 +235,27 @@ function checkEachSource(ctx: ValidateCtx, source: string, scope: Scope, nodeId:
 }
 
 // ——————————————————————————————————————————————————————————————————————————
+// state assignment type checks (friction §2 companion check: parse now
+// coerces a state's assignment through the param's declared type exactly
+// like defaults are coerced — coerce() only recognizes "true"/"false" and
+// numeric text; anything else survives as the original string, which is how
+// this check recognizes a value that didn't actually coerce)
+// ——————————————————————————————————————————————————————————————————————————
+
+function isAssignmentCoercible(param: FdnParam, value: unknown): boolean {
+  switch (param.type) {
+    case 'boolean':
+      return typeof value === 'boolean'
+    case 'number':
+      return typeof value === 'number' && !Number.isNaN(value)
+    case 'enum':
+      return typeof value === 'string' && (!param.values || param.values.includes(value))
+    default:
+      return true
+  }
+}
+
+// ——————————————————————————————————————————————————————————————————————————
 // identifier casing (prop/param names must survive HTML's attribute-name
 // lowercasing — a parser upstream of the engine, e.g. parse5, lowercases
 // `data-fdn-prop-activeTopicId` to `data-fdn-prop-activetopicid` before any
@@ -414,14 +435,26 @@ export function validateDocument(doc: FdnDocument): ValidationResult {
 
   for (const param of doc.params) checkLowercaseName(ctx, 'param', param.name, undefined)
 
+  const paramByName = new Map(doc.params.map((p) => [p.name, p]))
+
   for (const state of doc.states) {
-    for (const key of Object.keys(state.assignments)) {
-      if (!ctx.paramNames.has(key)) {
+    for (const [key, value] of Object.entries(state.assignments)) {
+      const param = paramByName.get(key)
+      if (!param) {
         push(ctx, {
           code: 'undeclared-ref',
           severity: 'error',
           message: `state "${state.name}" assigns undeclared param "${key}"`,
           detail: { state: state.name, param: key },
+        })
+        continue
+      }
+      if (!isAssignmentCoercible(param, value)) {
+        push(ctx, {
+          code: 'state-assignment-type-mismatch',
+          severity: 'error',
+          message: `state "${state.name}" assigns "${key}" a value not coercible to its declared type "${param.type}" (got ${JSON.stringify(value)}) — use a literal the param's type actually recognizes`,
+          detail: { state: state.name, param: key, type: param.type, value },
         })
       }
     }

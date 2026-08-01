@@ -21,6 +21,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { PNG } from 'pngjs'
 import {
   bakeDocument,
   createChain,
@@ -35,7 +36,8 @@ import type { ConformanceReport, FdnDocument, FdnNode, FdnViewport, ReportLine }
 // only exports a CLI entry point (runFreeze), not these two.
 import { freezeDocument, verifyFrozen } from 'foundation-engine/src/freeze/index.js'
 import { chainPathFor, writeChainInit } from '../commands/chain.js'
-import { skeletonDocument } from '../commands/new.js'
+import { skeletonDocument, skeletonDocumentEmpty } from '../commands/new.js'
+import { defaultAuthor } from '../identity.js'
 
 const require = createRequire(import.meta.url)
 
@@ -135,6 +137,25 @@ function dedupeLines(lines: ReportLine[]): ReportLine[] {
 function reportPayload(lines: ReportLine[]): { count: number; lines: ReportLine[] } {
   const deduped = dedupeLines(lines)
   return { count: deduped.length, lines: deduped }
+}
+
+/**
+ * friction §5: crop a rendered PNG to a node's layout box + padding, using
+ * pngjs (already a dependency — see packages/engine/src/diff/index.ts's
+ * visualDiff — no new dep needed). The box is clamped to the source image's
+ * bounds so an edge-flush node's padding doesn't read outside the canvas.
+ */
+function cropPngToBox(pngBytes: Uint8Array, box: { x: number; y: number; width: number; height: number }, padding: number): Uint8Array {
+  const src = PNG.sync.read(Buffer.from(pngBytes))
+  const x0 = Math.max(0, Math.floor(box.x - padding))
+  const y0 = Math.max(0, Math.floor(box.y - padding))
+  const x1 = Math.min(src.width, Math.ceil(box.x + box.width + padding))
+  const y1 = Math.min(src.height, Math.ceil(box.y + box.height + padding))
+  const width = Math.max(1, x1 - x0)
+  const height = Math.max(1, y1 - y0)
+  const dst = new PNG({ width, height })
+  PNG.bitblt(src, dst, x0, y0, width, height, 0, 0)
+  return PNG.sync.write(dst)
 }
 
 function countNodes(nodes: FdnNode[]): number {
@@ -291,7 +312,10 @@ async function toolIngest(args: Record<string, unknown>): Promise<ToolResult> {
       commitInfo = { status: 'skipped', reason: `no chain yet — call foundation_new or chain init to start tracking ${path}` }
     } else {
       try {
-        const author = 'agent:mcp'
+        // friction §6: same identity rules the CLI uses (agent:<HIVE_BEE> when
+        // set, else user:<name>@<host>) — a hardcoded 'agent:mcp' loses which
+        // bee actually made the change in the chain log.
+        const author = defaultAuthor()
         const chain = loadChain(readFileSync(chainPath), { actor: author })
         const currentCanonical = projectDocument(chain.doc())
         if (currentCanonical === canonical) {
@@ -338,6 +362,8 @@ async function toolRender(args: Record<string, unknown>): Promise<ToolResult> {
   const state = optionalString(args, 'state')
   const viewport = optionalString(args, 'viewport')
   const outDirArg = optionalString(args, 'outDir')
+  const includeLayout = optionalBoolean(args, 'includeLayout')
+  const nodeId = optionalString(args, 'node')
 
   const renderModule = await loadRenderModule()
   if (!renderModule) return fail('render module not available yet (foundation-engine/src/render is Wave 2)')
@@ -359,17 +385,53 @@ async function toolRender(args: Record<string, unknown>): Promise<ToolResult> {
     return fail(`render failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 
+  // friction §4: a 314-node board's full layout array is ~170KB of JSON —
+  // enough to blow the tool-result limit and get spilled to a file, burying
+  // the one thing actually needed (the PNG path). Default to paths + a
+  // one-line-per-cell summary; the full layout array is opt-in
+  // (`includeLayout: true`); it's written to disk either way (like the CLI
+  // render command already does with an outDir), so it's always reachable.
   const renders = cells.map((cell) => {
     const label = `${cell.state ?? 'default'}--${cell.viewport.name}`
-    const pngPath = join(outDir, `${label}.png`)
-    writeFileSync(pngPath, cell.png)
-    return {
+    const fullPngPath = join(outDir, `${label}.png`)
+    writeFileSync(fullPngPath, cell.png)
+    const layoutPath = join(outDir, `${label}.layout.json`)
+    writeFileSync(layoutPath, JSON.stringify(cell.layout, null, 2))
+
+    const conformance = reportPayload(cell.report.lines)
+    const errorCount = conformance.lines.filter((l) => l.severity === 'error').length
+    const warningCount = conformance.lines.filter((l) => l.severity === 'warning').length
+
+    const entry: Record<string, unknown> = {
       state: cell.state,
       viewport: cell.viewport,
-      pngPath,
-      layout: cell.layout,
-      conformance: reportPayload(cell.report.lines),
+      pngPath: fullPngPath,
+      bytes: cell.png.byteLength,
+      nodes: cell.layout.length,
+      errors: errorCount,
+      warnings: warningCount,
+      layoutPath,
     }
+
+    // friction §5: an optional node-scoped crop, so an agent checking
+    // fine-grained detail (is this dot 7px, does this ring read as hollow)
+    // doesn't need a shell round-trip through `sips` to get a legible image.
+    if (nodeId) {
+      const box = cell.layout.find((l) => l.id === nodeId)
+      if (!box) {
+        entry.cropError = `node "${nodeId}" not found in this cell's layout (it may be when-gated out of this state/viewport)`
+      } else {
+        const cropPath = join(outDir, `${label}.${nodeId}.crop.png`)
+        writeFileSync(cropPath, cropPngToBox(cell.png, box, 16))
+        entry.pngPath = cropPath
+        entry.croppedFor = nodeId
+        entry.croppedBox = box
+        entry.fullPngPath = fullPngPath
+      }
+    }
+
+    if (includeLayout) entry.layout = cell.layout
+    return entry
   })
 
   return ok({ path, outDir, renders })
@@ -504,13 +566,14 @@ async function toolFreeze(args: Record<string, unknown>): Promise<ToolResult> {
 async function toolNew(args: Record<string, unknown>): Promise<ToolResult> {
   const path = requireString(args, 'path')
   const title = optionalString(args, 'title') ?? titleFromPath(path)
+  const empty = optionalBoolean(args, 'empty')
   const filePath = path.endsWith('.fdn.html') ? path : `${path}.fdn.html`
 
   if (existsSync(filePath)) {
     return fail(`refusing to overwrite existing file: ${filePath}`)
   }
 
-  const doc = skeletonDocument(title)
+  const doc = empty ? skeletonDocumentEmpty(title) : skeletonDocument(title)
   const check = validateDocument(doc)
   if (!check.valid) {
     return fail(`internal error: generated skeleton failed validation: ${JSON.stringify(check.issues)}`)
@@ -521,14 +584,15 @@ async function toolNew(args: Record<string, unknown>): Promise<ToolResult> {
     return fail(`could not write ${filePath}: ${err instanceof Error ? err.message : String(err)}`)
   }
 
+  // friction §6: same identity rules the CLI uses, not a hardcoded 'agent:mcp'.
   let chain: { chainPath: string; head: { hash: string } } | null = null
-  const result = writeChainInit(filePath, doc, { author: 'agent:mcp', message: 'init' }, {
+  const result = writeChainInit(filePath, doc, { author: defaultAuthor(), message: 'init' }, {
     stdout: () => {},
     stderr: () => {},
   })
   if (result) chain = { chainPath: result.chainPath, head: { hash: result.head.hash } }
 
-  return ok({ path: filePath, title, chain })
+  return ok({ path: filePath, title, empty, chain })
 }
 
 // ——— tool registry ———
@@ -588,8 +652,12 @@ export const TOOLS: ToolDefinition[] = [
     name: 'foundation_render',
     description:
       'Render a document to PNG(s) via a real browser (one per state x viewport in the document\'s matrix, or the '
-      + 'requested state/viewport). Returns file paths and layout boxes, never image bytes inline — write to '
-      + '`outDir` (or an auto-created tmp dir) and inspect the PNG at the returned path.',
+      + 'requested state/viewport). Returns PNG paths plus a one-line-per-cell summary (state, viewport, bytes, '
+      + 'node count, error/warning counts) — never image bytes and never the full layout array inline (a big board '
+      + 'is enough JSON to blow the tool-result limit). Layout is always written to `<label>.layout.json` next to '
+      + 'the PNG; pass `includeLayout: true` to also get it inline. Pass `node: "<data-fdn-id>"` to additionally get '
+      + 'a PNG cropped to that node\'s layout box + 16px padding — much more legible than a full-page screenshot '
+      + 'for judging small details (dot size, ring hollowness, sprite readability).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -597,6 +665,8 @@ export const TOOLS: ToolDefinition[] = [
         state: { type: 'string', description: 'Named state to render' },
         viewport: { type: 'string', description: 'Named viewport to render' },
         outDir: { type: 'string', description: 'Directory to write PNGs and layout JSON into; a tmp dir is used if omitted' },
+        includeLayout: { type: 'boolean', description: 'Include the full per-node layout array inline in the result (default: paths only)' },
+        node: { type: 'string', description: 'A data-fdn-id — crop the returned PNG to that node\'s layout box + 16px padding' },
       },
       required: ['path'],
     },
@@ -657,12 +727,17 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: 'foundation_new',
-    description: `Scaffold a new, minimal, valid .fdn.html document (one param, one state, one component, a tokens block) and start its chain. ${SUBSET_NOTE}`,
+    description:
+      'Scaffold a new, minimal, valid .fdn.html document and start its chain. Default scaffold has one param, one '
+      + 'state, one demo Card component, and a tokens block with a placeholder warm accent token (real projects '
+      + `replace it) — you will delete the demo content on your first real edit. Pass \`empty: true\` for just the `
+      + `header (doc id) + tokens block + empty <main> — no demo content to delete. ${SUBSET_NOTE}`,
     inputSchema: {
       type: 'object',
       properties: {
         path: { type: 'string', description: 'Path (with or without the .fdn.html suffix) for the new document' },
         title: { type: 'string', description: 'Document title; derived from the path if omitted' },
+        empty: { type: 'boolean', description: 'Emit only the fdn-doc header + tokens block + empty main — no demo param/state/component content' },
       },
       required: ['path'],
     },

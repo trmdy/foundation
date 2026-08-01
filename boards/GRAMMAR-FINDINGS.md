@@ -103,6 +103,21 @@ instance content and the prop bindings now have two independent sources of truth
 `<fdn-fill slot="name">` (a slot-fill wrapper at the use site) is invented too — §3 names `fdn-slot`
 for the *definition* side only; nothing names the *instance*-side container for slotted content.
 
+> **Amendment (2026-08-01):** the dual-carry model this section argues for was **not** the direction
+> the engine ultimately took — SPEC Q10 (resolved 2026-07-31, "Projection semantics for parameterized
+> content") retired it in favor of a single canonical (template) form: the document stays symbolic
+> (`{{ prop.x }}`, unresolved `<fdn-use>` prop bindings), and a resolved, fully-literal tree is a
+> **derived bake artifact only**, never hand-written or dual-carried in the source file. Concretely,
+> `packages/engine/src/parse/index.ts` strips any resolved children an `<fdn-use>` is found carrying
+> and reports `resolved-instance-collapsed` — writing them by hand is pointless work the engine throws
+> away on the next ingest, not a second source of truth to keep in sync. An agent reading this section
+> for the "why" of the dual-form model should treat that rationale as historical (the tension it names
+> in the last paragraph is exactly why Q10 went the other way), not as the shape to build documents in
+> today. See SPEC.md's Q10 resolution for the authoritative statement.
+>
+> — recorded per docs/dogfood/tracks-pane-run.md friction §6 ("the findings doc now actively misleads
+> a new agent on this point").
+
 ### a.4 — Overlay: `<fdn-overlay data-fdn-role="..." data-fdn-dismiss="..." data-fdn-anchor="...">`
 
 ```html

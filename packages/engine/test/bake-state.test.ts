@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { bakeDocument } from '../src/bake/index.js'
+import { parseDocument } from '../src/parse/index.js'
 import type { FdnDocument, FdnNode } from '../src/types.js'
 
 function node(overrides: Partial<FdnNode> & Pick<FdnNode, 'id' | 'tag'>): FdnNode {
@@ -77,5 +78,55 @@ describe('bake: state resolution', () => {
     const result = bakeDocument(d, { state: 'nope' })
     expect(result.report.lines.some((l) => l.code === 'unknown-state')).toBe(true)
     expect(result.tree[0]?.text).toBe('Default')
+  })
+})
+
+describe('bake: state assignments are coerced through the param type (friction §2, real bug)', () => {
+  // Ingestion-to-bake integration: a hand-authored fdn-state assigns a
+  // boolean param the STRING "false" (that's all an HTML attribute can ever
+  // be). Before the fix, parseStates stored that raw string verbatim, bake
+  // copied it through unchanged, and isTruthy("false") === true — so
+  // when="param.proposalopen" rendered and when="!param.proposalopen" never
+  // did, silently and with zero validate/normalization report noise.
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"></head>
+<body>
+<fdn-doc hidden data-fdn-spec-version="0.0.1-draft">
+  <fdn-params>
+    <fdn-param name="proposalopen" type="boolean" default="true"></fdn-param>
+  </fdn-params>
+  <fdn-states>
+    <fdn-state name="at-rest" proposalopen="false"></fdn-state>
+  </fdn-states>
+</fdn-doc>
+<main>
+<div data-fdn-id="n10" when="param.proposalopen">pending card</div>
+<div data-fdn-id="n11" when="!param.proposalopen">empty state</div>
+</main>
+</body>
+</html>
+`
+
+  it('parses a boolean state assignment into a real boolean, not the string "false"', () => {
+    const { doc: d } = parseDocument(html)
+    const state = d.states.find((s) => s.name === 'at-rest')
+    expect(state?.assignments.proposalopen).toBe(false)
+  })
+
+  it('bakes with when="param.x" dropped and when="!param.x" kept', () => {
+    const { doc: d } = parseDocument(html)
+    const result = bakeDocument(d, { state: 'at-rest' })
+    const ids = result.tree.map((n) => n.id)
+    expect(ids).not.toContain('n10')
+    expect(ids).toContain('n11')
+  })
+
+  it('the default (no state) still renders the "param.x" branch, since the default is true', () => {
+    const { doc: d } = parseDocument(html)
+    const result = bakeDocument(d)
+    const ids = result.tree.map((n) => n.id)
+    expect(ids).toContain('n10')
+    expect(ids).not.toContain('n11')
   })
 })

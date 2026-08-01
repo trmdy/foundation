@@ -145,10 +145,23 @@ describe('validateDocument: undeclared references', () => {
     expect(result.valid).toBe(true)
   })
 
-  it('flags an undeclared fdn-use component', () => {
+  it('flags an undeclared fdn-use component (friction §3, real bug)', () => {
     const d = doc({ body: [node({ id: 'n1', tag: 'fdn-use', attrs: { component: 'Ghost' } })] })
     const result = validateDocument(d)
-    expect(issueCodes(result)).toContain('undeclared-ref')
+    expect(result.valid).toBe(false)
+    const line = result.issues.find((i) => i.code === 'undeclared-ref' && i.detail && (i.detail as { component?: string }).component === 'Ghost')
+    expect(line).toBeDefined()
+    expect(line?.severity).toBe('error')
+    expect(line?.message).toContain('component="Ghost"')
+  })
+
+  it('accepts an fdn-use referencing a declared component (positive case for friction §3)', () => {
+    const d = doc({
+      components: [{ name: 'QueuedRow', props: [], slots: [], body: [] }],
+      body: [node({ id: 'n1', tag: 'fdn-use', attrs: { component: 'QueuedRow' } })],
+    })
+    const result = validateDocument(d)
+    expect(result.valid).toBe(true)
   })
 
   it('flags param.X interpolation against an undeclared param', () => {
@@ -271,12 +284,38 @@ describe('validateDocument: undeclared references', () => {
   })
 
   it('accepts a state assignment to a declared param', () => {
+    // NOTE: assignments carry the param-typed value here (as parseStates now
+    // produces post friction-§2 fix — coerce() through the declared type,
+    // exactly like defaults), not the raw attribute string.
     const d = doc({
       params: [{ name: 'dialogopen', type: 'boolean' }],
-      states: [{ name: 's1', assignments: { dialogopen: 'true' } }],
+      states: [{ name: 's1', assignments: { dialogopen: true } }],
     })
     const result = validateDocument(d)
     expect(result.valid).toBe(true)
+  })
+
+  it('flags a state assignment whose value did not coerce to the param type (friction §2)', () => {
+    // A raw string surviving in an assignment slot for a boolean/number/enum
+    // param means coerce() couldn't recognize it (e.g. neither "true" nor
+    // "false" for a boolean) — bake would then treat it via isTruthy(), which
+    // is exactly the silent-wrong-render bug the bee hit.
+    const d = doc({
+      params: [{ name: 'dialogopen', type: 'boolean' }],
+      states: [{ name: 's1', assignments: { dialogopen: 'yes' } }],
+    })
+    const result = validateDocument(d)
+    expect(result.valid).toBe(false)
+    expect(issueCodes(result)).toContain('state-assignment-type-mismatch')
+  })
+
+  it('flags a state assignment to an enum param with a value outside the declared values', () => {
+    const d = doc({
+      params: [{ name: 'mode', type: 'enum', values: ['a', 'b'] }],
+      states: [{ name: 's1', assignments: { mode: 'ghost' } }],
+    })
+    const result = validateDocument(d)
+    expect(issueCodes(result)).toContain('state-assignment-type-mismatch')
   })
 
   it('flags a matrix cell referencing an undeclared state or viewport', () => {

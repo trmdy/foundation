@@ -25,12 +25,22 @@ function leafNode(partial: Partial<FdnNode> & Pick<FdnNode, 'id' | 'tag'>): FdnN
   return { attrs: {}, style: {}, styleStates: {}, children: [], ...partial }
 }
 
+// friction §7: the scaffold's one token used to be `#3366CC` — a cool blue,
+// in a toolchain whose only real consumer (the boards/ fixtures) is a
+// warm-accent design system, so it got deleted on every real project's first
+// edit anyway. #B8860B (dark goldenrod) is a warm placeholder instead — still
+// a placeholder, still meant to be replaced: a real project should declare
+// its own `--color-accent` (and the rest of its palette) in the tokens
+// block, this is only here so the skeleton document has SOME token to
+// demonstrate `var(--color-accent)` usage with.
+const SCAFFOLD_ACCENT_TOKEN = '#B8860B'
+
 /** Exported for tests: the skeleton document a given title produces. */
 export function skeletonDocument(title: string): FdnDocument {
   return {
     specVersion: '0.0.1-draft',
     title,
-    tokens: { 'color-accent': '#3366CC' },
+    tokens: { 'color-accent': SCAFFOLD_ACCENT_TOKEN },
     params: [{ name: 'title', type: 'string', default: title }],
     data: [],
     lookups: [],
@@ -74,6 +84,30 @@ export function skeletonDocument(title: string): FdnDocument {
   }
 }
 
+/**
+ * friction §7 (`--empty` / MCP `empty: true`): just the header + tokens block
+ * + an empty `<main>` — no demo param/state/component that gets deleted on
+ * the project's first real edit anyway. Still gets the chain-init that makes
+ * `skeletonDocument` worth keeping (per the friction log: "its actual value
+ * was starting the chain").
+ */
+export function skeletonDocumentEmpty(title: string): FdnDocument {
+  return {
+    specVersion: '0.0.1-draft',
+    title,
+    tokens: { 'color-accent': SCAFFOLD_ACCENT_TOKEN },
+    params: [],
+    data: [],
+    lookups: [],
+    states: [],
+    viewports: [],
+    matrix: [],
+    namedStyles: [],
+    components: [],
+    body: [],
+  }
+}
+
 function toFilePath(name: string): string {
   return name.endsWith('.fdn.html') ? name : `${name}.fdn.html`
 }
@@ -91,7 +125,7 @@ export async function runNew(args: string[], io: CliIO): Promise<number> {
   const { positionals, flags } = parseArgs(args)
   const name = positionals[0]
   if (!name) {
-    io.stderr('usage: foundation new <name>')
+    io.stderr('usage: foundation new <name> [--empty] [--no-chain] [--author A] [--message M]')
     return 2
   }
 
@@ -101,7 +135,9 @@ export async function runNew(args: string[], io: CliIO): Promise<number> {
     return 2
   }
 
-  const doc = skeletonDocument(titleFromName(name))
+  // friction §7: --empty skips the demo param/state/Card component — just
+  // the header + tokens block + empty <main>, no delete-everything step.
+  const doc = flags.empty ? skeletonDocumentEmpty(titleFromName(name)) : skeletonDocument(titleFromName(name))
   const check = validateDocument(doc)
   if (!check.valid) {
     io.stderr('internal error: the generated skeleton failed validation:')

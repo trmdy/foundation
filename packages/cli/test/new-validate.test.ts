@@ -66,4 +66,36 @@ describe('foundation new -> validate roundtrip', () => {
     expect(code).toBe(2)
     expect(io.err.some((l) => l.includes('usage'))).toBe(true)
   })
+
+  it('the default scaffold accent token is a warm value, not the old cool blue (friction §7)', async () => {
+    const target = join(dir, 'warm-board')
+    await runNew([target], captureIo())
+    const text = readFileSync(`${target}.fdn.html`, 'utf8')
+    expect(text).toContain('--color-accent: #B8860B')
+    expect(text).not.toContain('#3366CC')
+  })
+
+  it('--empty scaffolds just the header + tokens block + empty main — no demo content (friction §7)', async () => {
+    const target = join(dir, 'empty-board')
+    const io = captureIo()
+
+    const newCode = await runNew([target, '--empty'], io)
+    expect(newCode).toBe(0)
+
+    const text = readFileSync(`${target}.fdn.html`, 'utf8')
+    expect(text).toContain('<fdn-doc ')
+    expect(text).toContain(':root {')
+    expect(text).not.toContain('<fdn-param ')
+    expect(text).not.toContain('<fdn-state ')
+    expect(text).not.toContain('<fdn-component ')
+
+    const validateIo = captureIo()
+    expect(await runValidate([`${target}.fdn.html`], validateIo)).toBe(0)
+
+    const inspectIo = captureIo()
+    expect(await runInspect([`${target}.fdn.html`], inspectIo)).toBe(0)
+    expect(inspectIo.out.some((l) => l === 'params: 0')).toBe(true)
+    expect(inspectIo.out.some((l) => l === 'states: 0')).toBe(true)
+    expect(inspectIo.out.some((l) => l === 'components: 0')).toBe(true)
+  })
 })

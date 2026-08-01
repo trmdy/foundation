@@ -6,6 +6,10 @@
   "bin": { "foundation": "src/main.ts" },
   "dependencies": {
     "foundation-engine": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.30.0"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
   }
 }

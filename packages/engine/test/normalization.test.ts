@@ -182,6 +182,36 @@ describe('normalization v0: drops with report lines', () => {
   })
 })
 
+describe('normalization v0: root-wrapper styles dropped (friction §1)', () => {
+  it('reports root-wrapper-styles-dropped when <main> carries style', () => {
+    const html =
+      '<!DOCTYPE html><html><head></head><body><main style="padding:32px;row-gap:44px"><div>x</div></main></body></html>'
+    const { doc, report } = parseDocument(html)
+    // the children still come through untouched — only the wrapper's own
+    // style is lost, and that loss is now named rather than silent.
+    expect(doc.body.map((n) => n.tag)).toEqual(['div'])
+    const line = report.lines.find((l) => l.code === 'root-wrapper-styles-dropped' && l.detail && (l.detail as { tag?: string }).tag === 'main')
+    expect(line).toBeDefined()
+    expect(line?.severity).toBe('warning')
+    expect(line?.message).toContain('padding:32px;row-gap:44px')
+    expect(line?.detail).toMatchObject({ tag: 'main', style: 'padding:32px;row-gap:44px' })
+  })
+
+  it('reports root-wrapper-styles-dropped when <body> carries style/data-fdn-style', () => {
+    const html =
+      '<!DOCTYPE html><html><head></head><body style="background:var(--color-bg)" data-fdn-style="page"><main><div>x</div></main></body></html>'
+    const { report } = parseDocument(html)
+    const line = report.lines.find((l) => l.code === 'root-wrapper-styles-dropped' && l.detail && (l.detail as { tag?: string }).tag === 'body')
+    expect(line).toBeDefined()
+    expect(line?.detail).toMatchObject({ tag: 'body', style: 'background:var(--color-bg)', 'data-fdn-style': 'page' })
+  })
+
+  it('does not report root-wrapper-styles-dropped when main/body carry no style', () => {
+    const { report } = parseDocument(wrap('<div>x</div>'))
+    expect(reportCodes(report.lines)).not.toContain('root-wrapper-styles-dropped')
+  })
+})
+
 describe('normalization v0: node identity (data-fdn-id minting)', () => {
   it('mints ids for elements lacking data-fdn-id, in document order', () => {
     const { doc } = parseDocument(wrap('<div><span>a</span><span>b</span></div>'))
