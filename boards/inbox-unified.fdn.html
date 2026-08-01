@@ -53,14 +53,14 @@
 </style>
 </head>
 <body>
-  <fdn-doc hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="Inbox (unified)">
+  <fdn-doc data-fdn-doc-id="601facd4-929b-4ff5-9a5d-67c5a992a577" hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="Inbox (unified)">
     <fdn-params>
-      <fdn-param name="selectedItemId" type="enum" values="pay-webhooks,checkout-guest-cart,checkout-a11y,forum-adapter,grok-fleet-3,hem-approve,docs-sweep" default="checkout-guest-cart" description="which inbox row is focused; drives QueueRow selected styling and which record the detail pane renders"></fdn-param>
-      <fdn-param name="detailMode" type="enum" values="review,failure,waiting" default="review" description="which detail template the right pane / narrow-detail column renders for the selected item"></fdn-param>
+      <fdn-param name="selecteditemid" type="enum" values="pay-webhooks,checkout-guest-cart,checkout-a11y,forum-adapter,grok-fleet-3,hem-approve,docs-sweep" default="checkout-guest-cart" description="which inbox row is focused; drives QueueRow selected styling and which record the detail pane renders"></fdn-param>
+      <fdn-param name="detailmode" type="enum" values="review,failure,waiting" default="review" description="which detail template the right pane / narrow-detail column renders for the selected item"></fdn-param>
       <fdn-param name="viewport" type="enum" values="wide,narrow" default="wide" description="wide = master-detail; narrow (docked split < ~640px) = single collapsing column, see board 4"></fdn-param>
-      <fdn-param name="narrowScope" type="enum" values="queue,detail" default="queue" description="narrow viewport only — which single column is currently pushed forward"></fdn-param>
-      <fdn-param name="inboxEmpty" type="boolean" default="false" description="true only for the inbox-zero celebratory state (board 3)"></fdn-param>
-      <fdn-param name="whatToTestExpanded" type="boolean" default="true" description="narrow board only — the checklist drawer under the wireframe defaults collapsed on narrow, expanded on wide"></fdn-param>
+      <fdn-param name="narrowscope" type="enum" values="queue,detail" default="queue" description="narrow viewport only — which single column is currently pushed forward"></fdn-param>
+      <fdn-param name="inboxempty" type="boolean" default="false" description="true only for the inbox-zero celebratory state (board 3)"></fdn-param>
+      <fdn-param name="whattotestexpanded" type="boolean" default="true" description="narrow board only — the checklist drawer under the wireframe defaults collapsed on narrow, expanded on wide"></fdn-param>
     </fdn-params>
     <fdn-data name="inboxItems">
       <fdn-item id="pay-webhooks" age="1h44" dimmed="false" glyph="agent" note="tmux host died mid-write — revive" outside="false" state="failed" title="pay-webhooks"></fdn-item>
@@ -721,7 +721,7 @@
               <span data-fdn-id="n275" data-fdn-style="wire-block" style="height:44px;width:100%"></span>
             </div>
           </div>
-          <div data-fdn-id="n276" when="param.whatToTestExpanded == 'false'" style="align-items:center;background:var(--color-surface-alt);border:1px solid var(--color-border-faint);border-bottom-left-radius:7px;border-bottom-right-radius:7px;border-top-left-radius:7px;border-top-right-radius:7px;column-gap:8px;cursor:pointer;display:flex;flex:none;height:34px;margin-bottom:0;margin-left:12px;margin-right:12px;margin-top:8px;padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:8px">
+          <div data-fdn-id="n276" when="param.whattotestexpanded == 'false'" style="align-items:center;background:var(--color-surface-alt);border:1px solid var(--color-border-faint);border-bottom-left-radius:7px;border-bottom-right-radius:7px;border-top-left-radius:7px;border-top-right-radius:7px;column-gap:8px;cursor:pointer;display:flex;flex:none;height:34px;margin-bottom:0;margin-left:12px;margin-right:12px;margin-top:8px;padding-bottom:0;padding-left:10px;padding-right:10px;padding-top:0;row-gap:8px">
             <span data-fdn-id="n277" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:10px;font-style:normal;font-variant:normal;font-weight:600;letter-spacing:.1em">
               WHAT TO TEST
             </span>

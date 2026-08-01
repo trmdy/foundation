@@ -36,12 +36,12 @@
 </style>
 </head>
 <body>
-  <fdn-doc hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="System — Help Center">
+  <fdn-doc data-fdn-doc-id="22df2d30-63d0-4abf-9ad4-1c30bd1767c0" hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="System — Help Center">
     <fdn-params>
-      <fdn-param name="entryContext" type="enum" values="agent-run,changes,fleet,none" default="agent-run" description="focusedPaneId -> pane kind, per source board 2: which pane the ? was pressed in; drives which 'THIS PANE' section is pinned/tagged and scrolled-to"></fdn-param>
-      <fdn-param name="dialogOpen" type="boolean" default="true"></fdn-param>
-      <fdn-param name="searchQuery" type="string" default="" description="empty = sectioned catalog view; non-empty = board 3's flat ranked list"></fdn-param>
-      <fdn-param name="rowBindingState" type="enum" values="default,multi,override,disabled,recording,conflict" default="default" description="board 4's row-grammar catalog — one row per binding lifecycle state"></fdn-param>
+      <fdn-param name="entrycontext" type="enum" values="agent-run,changes,fleet,none" default="agent-run" description="focusedPaneId -> pane kind, per source board 2: which pane the ? was pressed in; drives which 'THIS PANE' section is pinned/tagged and scrolled-to"></fdn-param>
+      <fdn-param name="dialogopen" type="boolean" default="true"></fdn-param>
+      <fdn-param name="searchquery" type="string" default="" description="empty = sectioned catalog view; non-empty = board 3's flat ranked list"></fdn-param>
+      <fdn-param name="rowbindingstate" type="enum" values="default,multi,override,disabled,recording,conflict" default="default" description="board 4's row-grammar catalog — one row per binding lifecycle state"></fdn-param>
     </fdn-params>
     <fdn-data name="guideTopics">
       <fdn-item id="getting-started" label="Getting started"></fdn-item>
@@ -251,7 +251,7 @@
               </div>
               <div data-fdn-id="n53" style="display:flex;flex:1;min-height:0">
                 <div data-fdn-id="n54" style="flex:1;min-width:0;overflow:hidden;padding-bottom:0;padding-left:12px;padding-right:10px;padding-top:2px">
-                  <div data-fdn-id="n55" when="param.entryContext == 'agent-run'">
+                  <div data-fdn-id="n55" when="param.entrycontext == 'agent-run'">
                     <fdn-use data-fdn-id="n56" component="SectionHead" data-fdn-prop-emphasis="active" data-fdn-prop-text="THIS PANE · AGENT RUN" data-fdn-prop-trailing="· opened from drone-07"></fdn-use>
                     <div data-fdn-id="n57" style="border:1px solid var(--color-border-subtle);border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);margin-bottom:2px;margin-left:8px;margin-right:8px;margin-top:0;padding-bottom:4px;padding-left:2px;padding-right:2px;padding-top:4px">
                       <fdn-use data-fdn-id="n58" component="ShortcutRow" data-fdn-prop-keygroups="{{ s.keys }}" data-fdn-prop-label="{{ s.label }}" data-fdn-prop-note="{{ s.note }}" each="s in data.thisPaneShortcuts"></fdn-use>
@@ -423,7 +423,7 @@
       <div data-fdn-id="n145" style="background:var(--color-surface);border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-2xl);border-bottom-right-radius:var(--radius-2xl);border-top-left-radius:var(--radius-2xl);border-top-right-radius:var(--radius-2xl);box-shadow:var(--shadow-card-lg);display:flex;flex-direction:column;height:560px;overflow:hidden;width:900px">
         <div data-fdn-id="n146" style="align-items:center;column-gap:12px;display:flex;flex:none;padding-bottom:10px;padding-left:20px;padding-right:20px;padding-top:14px;row-gap:12px">
           <div data-fdn-id="n147" style="align-items:center;border:1px solid #DAD5CC;border-bottom-left-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg);border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg);column-gap:9px;display:flex;flex:1;height:34px;padding-bottom:0;padding-left:12px;padding-right:12px;padding-top:0;row-gap:9px">
-            <span data-fdn-id="n148" data-fdn-bind="param.searchQuery" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:13.5px;font-style:normal;font-variant:normal;font-weight:400">
+            <span data-fdn-id="n148" data-fdn-bind="param.searchquery" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:13.5px;font-style:normal;font-variant:normal;font-weight:400">
               <span data-fdn-id="n149">
                 split
               </span>

@@ -41,13 +41,13 @@
 </style>
 </head>
 <body>
-  <fdn-doc hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="Overlay evidence round 2 — menu, tooltip, popover, dialog">
+  <fdn-doc data-fdn-doc-id="60b09d80-9e3b-40c2-bacb-1363b54c59d8" hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="Overlay evidence round 2 — menu, tooltip, popover, dialog">
     <fdn-params>
-      <fdn-param name="contextMenuOpen" type="boolean" default="true" description="board 1: a context menu drawn open, anchored to a fleet row's trigger, positioned so both axes must flip to stay inside the frame"></fdn-param>
-      <fdn-param name="tooltipVisible" type="boolean" default="true" description="board 2: a tooltip drawn visible, as if mid-hover over a truncated title — see findings (f) for why this param alone cannot express the trigger"></fdn-param>
-      <fdn-param name="popoverOpen" type="boolean" default="true" description="board 3: a select/dropdown popover drawn open below its trigger button"></fdn-param>
-      <fdn-param name="selectedRepoId" type="enum" values="apiary,hive,pollinate,foundation,valhall-tools,honeycomb,drone-runtime,nectar,kontrol-site,scratch" default="foundation" description="board 3: which row in the scrollable list carries the selected check"></fdn-param>
-      <fdn-param name="confirmDialogOpen" type="boolean" default="true" description="board 4: a small confirm dialog, the contrast case reusing board 1's dialog+scrim pattern from system-help-center.fdn.html"></fdn-param>
+      <fdn-param name="contextmenuopen" type="boolean" default="true" description="board 1: a context menu drawn open, anchored to a fleet row's trigger, positioned so both axes must flip to stay inside the frame"></fdn-param>
+      <fdn-param name="tooltipvisible" type="boolean" default="true" description="board 2: a tooltip drawn visible, as if mid-hover over a truncated title — see findings (f) for why this param alone cannot express the trigger"></fdn-param>
+      <fdn-param name="popoveropen" type="boolean" default="true" description="board 3: a select/dropdown popover drawn open below its trigger button"></fdn-param>
+      <fdn-param name="selectedrepoid" type="enum" values="apiary,hive,pollinate,foundation,valhall-tools,honeycomb,drone-runtime,nectar,kontrol-site,scratch" default="foundation" description="board 3: which row in the scrollable list carries the selected check"></fdn-param>
+      <fdn-param name="confirmdialogopen" type="boolean" default="true" description="board 4: a small confirm dialog, the contrast case reusing board 1's dialog+scrim pattern from system-help-center.fdn.html"></fdn-param>
     </fdn-params>
     <fdn-data name="fleetRows">
       <fdn-item id="pay-webhooks" meta="4m · local" state="running" title="pay-webhooks"></fdn-item>
