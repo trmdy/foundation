@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Apiary — Tracks pane</title>
+<style>
+  :root {
+    --art-bee-body: #D2982F;
+    --art-bee-dark: #6E4F1C;
+    --art-wing: #DCD6C8;
+    --color-accent: #B8842E;
+    --color-bg: #F5F4F1;
+    --color-border: #E7E5E0;
+    --color-border-faint: #F0EDE7;
+    --color-border-input: #E2E0DB;
+    --color-divider: #ECEAE5;
+    --color-hover: #F6F5F2;
+    --color-selected-bg: #EEEDE9;
+    --color-status-blocked: #B0512E;
+    --color-status-done: #9B978F;
+    --color-status-merged: #8B7BB8;
+    --color-status-review: #BD6B3C;
+    --color-status-running: #2F8738;
+    --color-status-waiting: #D4A72C;
+    --color-surface: #FFFFFF;
+    --color-surface-alt: #FAFAF8;
+    --color-surface-sunken: #F7F6F3;
+    --color-tab-active: #FAFAF8;
+    --color-text-disabled: #B5B1A9;
+    --color-text-faint: #A8A59E;
+    --color-text-ghost: #C4BFB6;
+    --color-text-muted: #8A877F;
+    --color-text-primary: #2E2B27;
+    --color-text-secondary: #4A463F;
+    --color-text-tertiary: #6B6862;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+    --font-sans: -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-size-2xs: 9.5px;
+    --font-size-base: 12px;
+    --font-size-lg: 14.5px;
+    --font-size-md: 13px;
+    --font-size-sm: 11px;
+    --font-size-xl: 15px;
+    --font-size-xs: 10.5px;
+    --font-weight-medium: 500;
+    --font-weight-regular: 400;
+    --font-weight-semibold: 600;
+    --radius-lg: 8px;
+    --radius-md: 6px;
+    --radius-sm: 4px;
+    --radius-xl: 12px;
+    --shadow-pane: 0 2px 8px rgba(0,0,0,.06);
+  }
+</style>
+</head>
+<body>
+  <fdn-doc hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="Apiary — Tracks pane">
+    <fdn-params>
+      <fdn-param name="selectedtrack" type="enum" values="review-and-ship,pr-triage,spec-round,board-draw,flaky-hunt,dep-bump,nectar-preview" default="review-and-ship" description="which track definition the rail has focused; drives TrackRow selection and which definition the detail column renders"></fdn-param>
+      <fdn-param name="attachedfilter" type="enum" values="all,attached,idle" default="all" description="which slice of the definition list the in-pane tab row is showing"></fdn-param>
+      <fdn-param name="spinefocus" type="enum" values="n1,n2,n3,n3a,n3b,n4,n4d,n5,n6" default="n3b" description="the spine node the selected track's furthest-along attachment is sitting on; drawn as the current node"></fdn-param>
+      <fdn-param name="proposalstate" type="enum" values="pending,none" default="pending" description="whether a sidecar agent has a track_propose edit awaiting the human's accept/refine/discard — at most one pending per track"></fdn-param>
+    </fdn-params>
+    <fdn-data name="tracks">
+      <fdn-item id="review-and-ship" blocked="0" exceptions="1" idle="false" lastactivity="12m" name="review-and-ship" queued="2" review="1" running="2" shape="6 items · 1 branch · 9 nodes" version="v3" waiting="0"></fdn-item>
+      <fdn-item id="pr-triage" blocked="0" exceptions="0" idle="false" lastactivity="3m" name="pr-triage" queued="0" review="0" running="1" shape="4 items · 6 nodes" version="v7" waiting="0"></fdn-item>
+      <fdn-item id="spec-round" blocked="0" exceptions="0" idle="false" lastactivity="41m" name="spec-round" queued="1" review="1" running="0" shape="5 items · 1 review gate" version="v2" waiting="0"></fdn-item>
+      <fdn-item id="board-draw" blocked="0" exceptions="0" idle="false" lastactivity="6m" name="board-draw" queued="0" review="0" running="1" shape="7 items · 1 branch · 10 nodes" version="v1" waiting="0"></fdn-item>
+      <fdn-item id="flaky-hunt" blocked="1" exceptions="2" idle="false" lastactivity="1h04" name="flaky-hunt" queued="0" review="0" running="0" shape="5 items · 8 nodes" version="v4" waiting="0"></fdn-item>
+      <fdn-item id="dep-bump" blocked="0" exceptions="0" idle="true" lastactivity="2d" name="dep-bump" queued="0" review="0" running="0" shape="3 items" version="v2" waiting="0"></fdn-item>
+      <fdn-item id="nectar-preview" blocked="0" exceptions="0" idle="true" lastactivity="5d" name="nectar-preview" queued="0" review="0" running="0" shape="4 items · 1 deploy" version="v1" waiting="0"></fdn-item>
+    </fdn-data>
+    <fdn-data name="spinerows">
+      <fdn-item id="n1" arm="" depth="0" detail="every changed file, plus the packet it hangs off" lane="" name="Read the diff" state="done" type="action"></fdn-item>
+      <fdn-item id="n2" arm="" depth="0" detail="max 3 · claude · one lens each" lane="" name="Fan out reviewers" state="done" type="orchestrate"></fdn-item>
+      <fdn-item id="n3" arm="" depth="0" detail="both lanes must land before the gate" lane="" name="Parallel" state="done" type="branch"></fdn-item>
+      <fdn-item id="n3a" arm="" depth="1" detail="pnpm -w typecheck &amp;&amp; lint" lane="A" name="Typecheck &amp; lint" state="done" type="action"></fdn-item>
+      <fdn-item id="n3b" arm="" depth="1" detail="pnpm test — 352 tests" lane="B" name="Run the suite" state="pending" type="action"></fdn-item>
+      <fdn-item id="n4" arm="" depth="0" detail="a human verdict on the packet" lane="" name="Verdict gate" state="pending" type="review"></fdn-item>
+      <fdn-item id="n4d" arm="DENIED" depth="1" detail="then back to the gate" lane="" name="Fix findings" state="pending" type="action"></fdn-item>
+      <fdn-item id="n5" arm="" depth="0" detail="nectar · label review" lane="" name="Publish preview" state="pending" type="deploy"></fdn-item>
+      <fdn-item id="n6" arm="" depth="0" detail="blocking — the agent stops here" lane="" name="Ship it?" state="pending" type="ask"></fdn-item>
+    </fdn-data>
+    <fdn-data name="attached">
+      <fdn-item id="drone-12" age="12m" at="Run the suite" exceptions="1" harness="claude · opus 4.8" name="drone-12" note="skipped Typecheck &amp; lint — ran the suite first" position="5" state="running" total="9"></fdn-item>
+      <fdn-item id="wren-2" age="3m" at="Fan out reviewers" exceptions="0" harness="claude · sonnet 5" name="wren-2" note="" position="2" state="running" total="9"></fdn-item>
+      <fdn-item id="scout-4" age="41m" at="Verdict gate" exceptions="0" harness="codex" name="scout-4" note="waiting on a human verdict" position="6" state="review" total="9"></fdn-item>
+    </fdn-data>
+    <fdn-data name="exceptions">
+      <fdn-item id="x1" age="9m" at="Typecheck &amp; lint" bee="drone-12" what="ran the suite first, then came back — lint was still installing"></fdn-item>
+    </fdn-data>
+    <fdn-data name="queued">
+      <fdn-item id="bumble-7" behind="pr-triage" name="bumble-7" position="1"></fdn-item>
+      <fdn-item id="mite-3" behind="spec-round" name="mite-3" position="2"></fdn-item>
+    </fdn-data>
+    <fdn-data name="proposal">
+      <fdn-item id="p1" detail="nectar · label review — after the gate, before the ask" mark="+" name="Publish preview" type="deploy"></fdn-item>
+      <fdn-item id="p2" detail="denied arm gains → Fix findings" mark="~" name="Verdict gate" type="review"></fdn-item>
+      <fdn-item id="p3" detail="superseded by the preview" mark="−" name="Manual smoke test" type="action"></fdn-item>
+    </fdn-data>
+    <fdn-lookups>
+      <fdn-lookup name="statuscolor">
+        <fdn-entry key="blocked" value="var(--color-status-blocked)"></fdn-entry>
+        <fdn-entry key="done" value="var(--color-status-done)"></fdn-entry>
+        <fdn-entry key="merged" value="var(--color-status-merged)"></fdn-entry>
+        <fdn-entry key="review" value="var(--color-status-review)"></fdn-entry>
+        <fdn-entry key="running" value="var(--color-status-running)"></fdn-entry>
+        <fdn-entry key="waiting" value="var(--color-status-waiting)"></fdn-entry>
+      </fdn-lookup>
+      <fdn-lookup name="nodetypelabel">
+        <fdn-entry key="action" value="ACTION"></fdn-entry>
+        <fdn-entry key="ask" value="ASK"></fdn-entry>
+        <fdn-entry key="branch" value="BRANCH"></fdn-entry>
+        <fdn-entry key="deploy" value="DEPLOY"></fdn-entry>
+        <fdn-entry key="orchestrate" value="ORCHESTRATE"></fdn-entry>
+        <fdn-entry key="review" value="REVIEW"></fdn-entry>
+      </fdn-lookup>
+      <fdn-lookup name="diffcolor">
+        <fdn-entry key="+" value="var(--color-status-running)"></fdn-entry>
+        <fdn-entry key="~" value="var(--color-text-muted)"></fdn-entry>
+        <fdn-entry key="−" value="var(--color-status-blocked)"></fdn-entry>
+      </fdn-lookup>
+    </fdn-lookups>
+    <fdn-states>
+      <fdn-state name="at-rest" attachedfilter="all" proposalstate="none" selectedtrack="review-and-ship" spinefocus="n3b"></fdn-state>
+      <fdn-state name="track-selected" attachedfilter="attached" proposalstate="none" selectedtrack="review-and-ship" spinefocus="n3b"></fdn-state>
+      <fdn-state name="proposal-pending" attachedfilter="attached" proposalstate="pending" selectedtrack="review-and-ship" spinefocus="n3b"></fdn-state>
+    </fdn-states>
+    <fdn-matrix>
+      <fdn-viewport name="board" width="1480" height="900"></fdn-viewport>
+      <fdn-cell state="at-rest" viewport="board"></fdn-cell>
+      <fdn-cell state="track-selected" viewport="board"></fdn-cell>
+      <fdn-cell state="proposal-pending" viewport="board"></fdn-cell>
+    </fdn-matrix>
+  </fdn-doc>
+  <fdn-styles hidden>
+    <fdn-style name="pane" background="var(--color-surface)" border-bottom-left-radius="var(--radius-lg)" border-bottom-right-radius="var(--radius-lg)" border-top-left-radius="var(--radius-lg)" border-top-right-radius="var(--radius-lg)" box-shadow="var(--shadow-pane)" display="flex" flex-direction="column" overflow="hidden"></fdn-style>
+    <fdn-style name="pane-header" align-items="center" border-bottom="1px solid var(--color-divider)" column-gap="9px" display="flex" flex="none" height="40px" padding-bottom="0" padding-left="16px" padding-right="10px" padding-top="0"></fdn-style>
+    <fdn-style name="list-row" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" column-gap="3px" cursor="pointer" display="flex" flex-direction="column" padding-bottom="8px" padding-left="9px" padding-right="9px" padding-top="7px" row-gap="3px" style-hover="background:var(--color-hover)"></fdn-style>
+    <fdn-style name="row-line1" align-items="center" column-gap="7px" display="flex" min-width="0"></fdn-style>
+    <fdn-style name="row-line2" align-items="center" column-gap="8px" display="flex" min-width="0" padding-left="21px"></fdn-style>
+    <fdn-style name="section-label" color="var(--color-text-faint)" font-family="var(--font-sans)" font-size="10px" font-weight="var(--font-weight-semibold)" letter-spacing=".12em"></fdn-style>
+    <fdn-style name="meta-mono" color="var(--color-text-faint)" font-family="var(--font-mono)" font-size="var(--font-size-xs)" font-weight="var(--font-weight-regular)"></fdn-style>
+    <fdn-style name="tab-pill" align-items="center" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" column-gap="6px" cursor="pointer" display="flex" font-family="var(--font-sans)" font-size="var(--font-size-base)" font-weight="var(--font-weight-medium)" padding-bottom="3px" padding-left="9px" padding-right="9px" padding-top="3px" style-hover="background:var(--color-hover)"></fdn-style>
+    <fdn-style name="pill-btn" align-items="center" border="1px solid var(--color-border-input)" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" color="var(--color-text-tertiary)" column-gap="6px" cursor="pointer" display="flex" flex="none" font-family="var(--font-sans)" font-size="var(--font-size-base)" font-weight="var(--font-weight-medium)" height="28px" padding-bottom="0" padding-left="12px" padding-right="12px" padding-top="0" style-hover="background:var(--color-hover)"></fdn-style>
+    <fdn-style name="pill-btn-accent" align-items="center" background="var(--color-accent)" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" color="#FFFFFF" column-gap="6px" cursor="pointer" display="flex" flex="none" font-family="var(--font-sans)" font-size="var(--font-size-base)" font-weight="var(--font-weight-medium)" height="28px" padding-bottom="0" padding-left="13px" padding-right="13px" padding-top="0" style-hover="background:#A87826"></fdn-style>
+    <fdn-style name="page" background="var(--color-bg)" display="flex" flex-direction="column" margin-bottom="-8px" margin-left="-8px" margin-right="-8px" margin-top="-8px" padding-bottom="48px" padding-left="32px" padding-right="32px" padding-top="40px" row-gap="46px"></fdn-style>
+    <fdn-style name="card-block" background="var(--color-surface-alt)" border="1px solid var(--color-border-faint)" border-bottom-left-radius="var(--radius-lg)" border-bottom-right-radius="var(--radius-lg)" border-top-left-radius="var(--radius-lg)" border-top-right-radius="var(--radius-lg)" display="flex" flex-direction="column" padding-bottom="13px" padding-left="14px" padding-right="14px" padding-top="12px"></fdn-style>
+    <fdn-style name="spine-row" align-items="flex-start" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" column-gap="9px" display="flex" padding-bottom="6px" padding-left="8px" padding-right="8px" padding-top="5px" style-hover="background:var(--color-hover)"></fdn-style>
+    <fdn-style name="type-label" color="var(--color-text-faint)" flex="none" font-family="var(--font-mono)" font-size="var(--font-size-2xs)" font-weight="var(--font-weight-medium)" letter-spacing=".1em" width="72px"></fdn-style>
+    <fdn-style name="pane-footer" align-items="center" border-top="1px solid var(--color-divider)" color="var(--color-text-ghost)" column-gap="10px" display="flex" flex="none" font-family="var(--font-mono)" font-size="10px" height="30px" padding-bottom="0" padding-left="16px" padding-right="16px" padding-top="0"></fdn-style>
+  </fdn-styles>
+  <fdn-component name="ActionButton" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="hint" type="string"></fdn-prop>
+      <fdn-prop name="variant" type="enum" default="default"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n37" when="prop.variant == 'default'" data-fdn-style="pill-btn">
+      <span data-fdn-id="n38">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n39" when="prop.hint" style="color:var(--color-text-disabled);font-family:var(--font-mono);font-size:var(--font-size-2xs)">
+        {{ prop.hint }}
+      </span>
+    </span>
+    <span data-fdn-id="n40" when="prop.variant == 'accent'" data-fdn-style="pill-btn-accent">
+      <span data-fdn-id="n41">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n42" when="prop.hint" style="color:rgba(255,255,255,.62);font-family:var(--font-mono);font-size:var(--font-size-2xs)">
+        {{ prop.hint }}
+      </span>
+    </span>
+  </fdn-component>
+  <fdn-component name="AttachedBee" hidden>
+    <fdn-props>
+      <fdn-prop name="name" type="string" required="true"></fdn-prop>
+      <fdn-prop name="harness" type="string" required="true"></fdn-prop>
+      <fdn-prop name="at" type="string" required="true"></fdn-prop>
+      <fdn-prop name="position" type="string" required="true"></fdn-prop>
+      <fdn-prop name="total" type="string" required="true"></fdn-prop>
+      <fdn-prop name="state" type="enum" required="true"></fdn-prop>
+      <fdn-prop name="age" type="string" required="true"></fdn-prop>
+      <fdn-prop name="exceptions" type="string" default="0"></fdn-prop>
+      <fdn-prop name="note" type="string"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n110" style="border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);display:flex;flex-direction:column;padding-bottom:7px;padding-left:8px;padding-right:8px;padding-top:6px;row-gap:3px" style-hover="background:var(--color-hover)">
+      <div data-fdn-id="n111" style="align-items:center;column-gap:7px;display:flex">
+        <fdn-use data-fdn-id="n112" component="StatusDot" data-fdn-prop-state="{{ prop.state }}"></fdn-use>
+        <span data-fdn-id="n113" style="color:var(--color-text-primary);flex:none;font-family:var(--font-mono);font-size:var(--font-size-base);font-weight:var(--font-weight-medium)">
+          {{ prop.name }}
+        </span>
+        <span data-fdn-id="n114" style="color:var(--color-text-faint);flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs)">
+          {{ prop.harness }}
+        </span>
+        <span data-fdn-id="n115" style="flex:1"></span>
+        <span data-fdn-id="n116" style="color:{{ statuscolor[prop.state] }};flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs);font-weight:var(--font-weight-medium)">
+          {{ prop.state }}
+        </span>
+        <span data-fdn-id="n117" data-fdn-style="meta-mono" style="flex:none">
+          {{ prop.age }}
+        </span>
+      </div>
+      <div data-fdn-id="n118" style="align-items:center;column-gap:6px;display:flex;padding-left:14px">
+        <span data-fdn-id="n119" style="color:var(--color-text-ghost);flex:none;font-family:var(--font-sans);font-size:11.5px">
+          at
+        </span>
+        <span data-fdn-id="n120" style="color:var(--color-text-secondary);flex:none;font-family:var(--font-sans);font-size:11.5px">
+          {{ prop.at }}
+        </span>
+        <span data-fdn-id="n121" style="color:var(--color-text-disabled);flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs)">
+          {{ prop.position }}/{{ prop.total }}
+        </span>
+      </div>
+      <div data-fdn-id="n122" when="prop.note" style="align-items:center;column-gap:6px;display:flex;padding-left:14px">
+        <span data-fdn-id="n123" when="prop.exceptions != '0'" style="border:1.5px solid var(--color-status-blocked);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:6px;width:6px"></span>
+        <span data-fdn-id="n124" style="color:{{ prop.exceptions != '0' ? 'var(--color-status-blocked)' : 'var(--color-text-faint)' }};font-family:var(--font-sans);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ prop.note }}
+        </span>
+      </div>
+    </div>
+  </fdn-component>
+  <fdn-component name="BoardCaption" hidden>
+    <fdn-props>
+      <fdn-prop name="index" type="string" required="true"></fdn-prop>
+      <fdn-prop name="title" type="string" required="true"></fdn-prop>
+      <fdn-prop name="body" type="string" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n66" style="display:flex;flex-direction:column;margin-bottom:14px;row-gap:6px">
+      <div data-fdn-id="n67" style="align-items:baseline;column-gap:10px;display:flex">
+        <span data-fdn-id="n68" style="color:var(--color-text-disabled);font-family:var(--font-mono);font-size:var(--font-size-xs);font-weight:var(--font-weight-medium);letter-spacing:.08em">
+          {{ prop.index }}
+        </span>
+        <span data-fdn-id="n69" data-fdn-style="section-label" style="color:var(--color-text-tertiary)">
+          {{ prop.title }}
+        </span>
+      </div>
+      <div data-fdn-id="n70" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:12.5px;line-height:1.5;max-width:660px">
+        {{ prop.body }}
+      </div>
+    </div>
+  </fdn-component>
+  <fdn-component name="DiffRow" hidden>
+    <fdn-props>
+      <fdn-prop name="mark" type="string" required="true"></fdn-prop>
+      <fdn-prop name="type" type="enum" required="true"></fdn-prop>
+      <fdn-prop name="name" type="string" required="true"></fdn-prop>
+      <fdn-prop name="detail" type="string"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n131" style="align-items:baseline;column-gap:8px;display:flex;padding-bottom:3px;padding-left:0;padding-right:0;padding-top:3px">
+      <span data-fdn-id="n132" style="color:{{ diffcolor[prop.mark] }};flex:none;font-family:var(--font-mono);font-size:var(--font-size-base);font-weight:var(--font-weight-semibold);text-align:center;width:9px">
+        {{ prop.mark }}
+      </span>
+      <span data-fdn-id="n133" data-fdn-style="type-label" style="width:56px">
+        {{ nodetypelabel[prop.type] }}
+      </span>
+      <span data-fdn-id="n134" style="color:var(--color-text-primary);flex:none;font-family:var(--font-sans);font-size:12px;font-weight:var(--font-weight-medium)">
+        {{ prop.name }}
+      </span>
+      <span data-fdn-id="n135" when="prop.detail" style="color:var(--color-text-faint);flex:1;font-family:var(--font-sans);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ prop.detail }}
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="ExceptionMark" hidden>
+    <fdn-props>
+      <fdn-prop name="count" type="string" required="true"></fdn-prop>
+      <fdn-prop name="label" type="string" default=""></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n30" style="align-items:center;column-gap:5px;display:flex;flex:none">
+      <span data-fdn-id="n31" style="border:1.5px solid var(--color-status-blocked);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:7px;width:7px"></span>
+      <span data-fdn-id="n32" style="color:var(--color-status-blocked);font-family:var(--font-mono);font-size:var(--font-size-xs);font-weight:var(--font-weight-medium)">
+        {{ prop.count }}
+      </span>
+      <span data-fdn-id="n33" style="color:var(--color-status-blocked);font-family:var(--font-mono);font-size:var(--font-size-xs);font-weight:var(--font-weight-medium)">
+        {{ prop.count == '1' ? 'exception' : 'exceptions' }}
+      </span>
+    </span>
+  </fdn-component>
+  <fdn-component name="ExceptionRow" hidden>
+    <fdn-props>
+      <fdn-prop name="bee" type="string" required="true"></fdn-prop>
+      <fdn-prop name="at" type="string" required="true"></fdn-prop>
+      <fdn-prop name="what" type="string" required="true"></fdn-prop>
+      <fdn-prop name="age" type="string" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n363" style="align-items:baseline;border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:8px;display:flex;padding-bottom:6px;padding-left:8px;padding-right:8px;padding-top:5px" style-hover="background:var(--color-hover)">
+      <span data-fdn-id="n364" style="border:1.5px solid var(--color-status-blocked);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:7px;width:7px"></span>
+      <span data-fdn-id="n365" style="color:var(--color-text-tertiary);flex:none;font-family:var(--font-mono);font-size:11.5px">
+        {{ prop.bee }}
+      </span>
+      <span data-fdn-id="n366" style="color:var(--color-text-ghost);flex:none;font-family:var(--font-sans);font-size:11.5px">
+        deviated at
+      </span>
+      <span data-fdn-id="n367" style="color:var(--color-text-secondary);flex:none;font-family:var(--font-sans);font-size:11.5px;font-weight:var(--font-weight-medium)">
+        {{ prop.at }}
+      </span>
+      <span data-fdn-id="n368" style="color:var(--color-text-faint);flex:1;font-family:var(--font-sans);font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ prop.what }}
+      </span>
+      <span data-fdn-id="n369" data-fdn-style="meta-mono" style="flex:none">
+        {{ prop.age }}
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="Icon" hidden>
+    <fdn-props>
+      <fdn-prop name="name" type="enum" required="true"></fdn-prop>
+      <fdn-prop name="size" type="number" default="14"></fdn-prop>
+      <fdn-prop name="color" type="token" default="var(--color-text-muted)"></fdn-prop>
+    </fdn-props>
+    <svg data-fdn-id="n1" fill="none" height="{{ prop.size }}" viewBox="0 0 16 16" width="{{ prop.size }}" style="color:{{ prop.color }};flex:none">
+      <g data-fdn-id="n2" when="prop.name == 'track'">
+        <path data-fdn-id="n3" d="M3.6 3.2v9.6" stroke="currentColor" stroke-linecap="round" stroke-width="1.2"></path>
+        <path data-fdn-id="n4" d="M3.6 4.4h8.6M3.6 8h6.2M3.6 11.6h8.6" stroke="currentColor" stroke-linecap="round" stroke-width="1.2"></path>
+      </g>
+      <path data-fdn-id="n5" d="M3 8h7M8.2 5.2L11 8l-2.8 2.8M12.6 4.4v7.2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.25" when="prop.name == 'action'"></path>
+      <g data-fdn-id="n6" when="prop.name == 'orchestrate'">
+        <path data-fdn-id="n7" d="M3.4 8h2.4M5.8 8l3 -3.6M5.8 8h3M5.8 8l3 3.6" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2"></path>
+        <circle data-fdn-id="n8" cx="11" cy="4.4" fill="currentColor" r="1.5"></circle>
+        <circle data-fdn-id="n9" cx="11" cy="8" fill="currentColor" r="1.5"></circle>
+        <circle data-fdn-id="n10" cx="11" cy="11.6" fill="currentColor" r="1.5"></circle>
+      </g>
+      <path data-fdn-id="n11" d="M8 2.6l5.4 5.4L8 13.4 2.6 8z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.25" when="prop.name == 'review'"></path>
+      <g data-fdn-id="n12" when="prop.name == 'ask'">
+        <path data-fdn-id="n13" d="M5.9 6.1a2.1 2.1 0 113.1 1.9c-.6.4-1 .8-1 1.6" stroke="currentColor" stroke-linecap="round" stroke-width="1.25"></path>
+        <circle data-fdn-id="n14" cx="8" cy="12" fill="currentColor" r=".9"></circle>
+      </g>
+      <path data-fdn-id="n15" d="M8 10.6V3.4M5.4 6L8 3.4 10.6 6M3 11.4v1.8h10v-1.8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.25" when="prop.name == 'deploy'"></path>
+      <path data-fdn-id="n16" d="M3.2 8h1.6a2 2 0 002-2V4.2M3.2 8h1.6a2 2 0 012 2v1.8M8.4 4.2h4.4M8.4 11.8h4.4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.25" when="prop.name == 'branch'"></path>
+      <path data-fdn-id="n17" d="M8 1.7l5.1 2.95v5.9L8 13.5 2.9 10.55v-5.9z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.25" when="prop.name == 'bee'"></path>
+      <g data-fdn-id="n18" when="prop.name == 'more'">
+        <circle data-fdn-id="n19" cx="3.6" cy="8" fill="currentColor" r="1.15"></circle>
+        <circle data-fdn-id="n20" cx="8" cy="8" fill="currentColor" r="1.15"></circle>
+        <circle data-fdn-id="n21" cx="12.4" cy="8" fill="currentColor" r="1.15"></circle>
+      </g>
+      <path data-fdn-id="n22" d="M8 3.4v9.2M3.4 8h9.2" stroke="currentColor" stroke-linecap="round" stroke-width="1.4" when="prop.name == 'plus'"></path>
+      <path data-fdn-id="n23" d="M3.2 8.4l3.1 3L12.8 4.8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" when="prop.name == 'check'"></path>
+      <path data-fdn-id="n24" d="M6.4 3.6L10.8 8l-4.4 4.4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.3" when="prop.name == 'chevron'"></path>
+    </svg>
+  </fdn-component>
+  <fdn-component name="PixelBee" hidden>
+    <div data-fdn-id="n303" style="display:flex;flex:none;flex-direction:column">
+      <div data-fdn-id="n304" style="display:flex;height:5px">
+        <span data-fdn-id="n305" style="width:15px"></span>
+        <span data-fdn-id="n306" style="background:var(--art-wing);width:10px"></span>
+        <span data-fdn-id="n307" style="width:10px"></span>
+        <span data-fdn-id="n308" style="background:var(--art-wing);width:10px"></span>
+        <span data-fdn-id="n309" style="width:15px"></span>
+      </div>
+      <div data-fdn-id="n310" style="display:flex;height:5px">
+        <span data-fdn-id="n311" style="width:10px"></span>
+        <span data-fdn-id="n312" style="background:var(--art-wing);width:15px"></span>
+        <span data-fdn-id="n313" style="width:10px"></span>
+        <span data-fdn-id="n314" style="background:var(--art-wing);width:15px"></span>
+        <span data-fdn-id="n315" style="width:10px"></span>
+      </div>
+      <div data-fdn-id="n316" style="display:flex;height:5px">
+        <span data-fdn-id="n317" style="width:5px"></span>
+        <span data-fdn-id="n318" style="background:var(--art-bee-dark);width:15px"></span>
+        <span data-fdn-id="n319" style="background:var(--art-bee-body);width:10px"></span>
+        <span data-fdn-id="n320" style="background:var(--art-bee-dark);width:10px"></span>
+        <span data-fdn-id="n321" style="background:var(--art-bee-body);width:15px"></span>
+        <span data-fdn-id="n322" style="width:5px"></span>
+      </div>
+      <div data-fdn-id="n323" style="display:flex;height:5px">
+        <span data-fdn-id="n324" style="background:var(--art-bee-dark);width:10px"></span>
+        <span data-fdn-id="n325" style="background:var(--art-wing);width:5px"></span>
+        <span data-fdn-id="n326" style="background:var(--art-bee-dark);width:5px"></span>
+        <span data-fdn-id="n327" style="background:var(--art-bee-body);width:10px"></span>
+        <span data-fdn-id="n328" style="background:var(--art-bee-dark);width:10px"></span>
+        <span data-fdn-id="n329" style="background:var(--art-bee-body);width:15px"></span>
+        <span data-fdn-id="n330" style="width:5px"></span>
+      </div>
+      <div data-fdn-id="n331" style="display:flex;height:5px">
+        <span data-fdn-id="n332" style="background:var(--art-bee-dark);width:20px"></span>
+        <span data-fdn-id="n333" style="background:var(--art-bee-body);width:10px"></span>
+        <span data-fdn-id="n334" style="background:var(--art-bee-dark);width:10px"></span>
+        <span data-fdn-id="n335" style="background:var(--art-bee-body);width:15px"></span>
+        <span data-fdn-id="n336" style="width:5px"></span>
+      </div>
+      <div data-fdn-id="n337" style="display:flex;height:5px">
+        <span data-fdn-id="n338" style="width:5px"></span>
+        <span data-fdn-id="n339" style="background:var(--art-bee-dark);width:15px"></span>
+        <span data-fdn-id="n340" style="background:var(--art-bee-body);width:10px"></span>
+        <span data-fdn-id="n341" style="background:var(--art-bee-dark);width:10px"></span>
+        <span data-fdn-id="n342" style="background:var(--art-bee-body);width:10px"></span>
+        <span data-fdn-id="n343" style="width:10px"></span>
+      </div>
+      <div data-fdn-id="n344" style="display:flex;height:5px">
+        <span data-fdn-id="n345" style="width:10px"></span>
+        <span data-fdn-id="n346" style="background:var(--art-bee-dark);width:10px"></span>
+        <span data-fdn-id="n347" style="background:var(--art-bee-body);width:10px"></span>
+        <span data-fdn-id="n348" style="background:var(--art-bee-dark);width:10px"></span>
+        <span data-fdn-id="n349" style="background:var(--art-bee-body);width:5px"></span>
+        <span data-fdn-id="n350" style="width:15px"></span>
+      </div>
+      <div data-fdn-id="n351" style="display:flex;height:5px">
+        <span data-fdn-id="n352" style="width:15px"></span>
+        <span data-fdn-id="n353" style="background:var(--art-bee-dark);width:5px"></span>
+        <span data-fdn-id="n354" style="width:10px"></span>
+        <span data-fdn-id="n355" style="background:var(--art-bee-dark);width:5px"></span>
+        <span data-fdn-id="n356" style="width:25px"></span>
+      </div>
+    </div>
+  </fdn-component>
+  <fdn-component name="QueuedRow" hidden>
+    <fdn-props>
+      <fdn-prop name="position" type="string" required="true"></fdn-prop>
+      <fdn-prop name="name" type="string" required="true"></fdn-prop>
+      <fdn-prop name="behind" type="string" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n357" style="align-items:center;border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:7px;display:flex;padding-bottom:5px;padding-left:8px;padding-right:8px;padding-top:4px" style-hover="background:var(--color-hover)">
+      <span data-fdn-id="n358" style="color:var(--color-text-disabled);flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs)">
+        {{ prop.position }}
+      </span>
+      <fdn-use data-fdn-id="n359" component="Icon" data-fdn-prop-color="var(--color-text-ghost)" data-fdn-prop-name="bee" data-fdn-prop-size="11"></fdn-use>
+      <span data-fdn-id="n360" style="color:var(--color-text-tertiary);flex:none;font-family:var(--font-mono);font-size:11.5px">
+        {{ prop.name }}
+      </span>
+      <span data-fdn-id="n361" style="color:var(--color-text-ghost);flex:none;font-family:var(--font-sans);font-size:11.5px">
+        behind
+      </span>
+      <span data-fdn-id="n362" style="color:var(--color-text-muted);flex:none;font-family:var(--font-mono);font-size:11.5px">
+        {{ prop.behind }}
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="SectionLabel" hidden>
+    <fdn-props>
+      <fdn-prop name="text" type="string" required="true"></fdn-prop>
+      <fdn-prop name="trailing" type="string"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n34" style="align-items:baseline;column-gap:8px;display:flex;margin-bottom:7px">
+      <span data-fdn-id="n35" data-fdn-style="section-label">
+        {{ prop.text }}
+      </span>
+      <span data-fdn-id="n36" when="prop.trailing" data-fdn-style="meta-mono" style="color:var(--color-text-disabled);margin-left:auto">
+        {{ prop.trailing }}
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="SpineNode" hidden>
+    <fdn-props>
+      <fdn-prop name="type" type="enum" required="true"></fdn-prop>
+      <fdn-prop name="name" type="string" required="true"></fdn-prop>
+      <fdn-prop name="detail" type="string"></fdn-prop>
+      <fdn-prop name="depth" type="string" default="0"></fdn-prop>
+      <fdn-prop name="lane" type="string"></fdn-prop>
+      <fdn-prop name="arm" type="string"></fdn-prop>
+      <fdn-prop name="state" type="enum" default="pending"></fdn-prop>
+      <fdn-prop name="current" type="boolean" default="false"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n98" data-fdn-style="spine-row" style="background:{{ prop.current ? 'var(--color-selected-bg)' : 'transparent' }};margin-left:{{ prop.depth == '1' ? '30px' : '0' }}">
+      <span data-fdn-id="n99" when="prop.state == 'done'" style="align-items:center;background:var(--color-status-done);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;display:flex;flex:none;height:15px;justify-content:center;margin-top:1px;width:15px">
+        <fdn-use data-fdn-id="n100" component="Icon" data-fdn-prop-color="var(--color-surface)" data-fdn-prop-name="check" data-fdn-prop-size="8"></fdn-use>
+      </span>
+      <span data-fdn-id="n101" when="prop.current &amp;&amp; prop.state != 'done'" style="align-items:center;border:1.5px solid var(--color-status-running);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;display:flex;flex:none;height:15px;justify-content:center;margin-top:1px;width:15px">
+        <span data-fdn-id="n102" style="background:var(--color-status-running);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;height:6px;width:6px"></span>
+      </span>
+      <span data-fdn-id="n103" when="!prop.current &amp;&amp; prop.state != 'done'" style="border:1px solid var(--color-border-input);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:15px;margin-top:1px;width:15px"></span>
+      <fdn-use data-fdn-id="n104" component="Icon" data-fdn-prop-color="{{ prop.state == 'done' ? 'var(--color-text-ghost)' : 'var(--color-text-muted)' }}" data-fdn-prop-name="{{ prop.type }}" data-fdn-prop-size="13"></fdn-use>
+      <span data-fdn-id="n105" data-fdn-style="type-label" style="margin-top:2px">
+        {{ nodetypelabel[prop.type] }}
+      </span>
+      <span data-fdn-id="n106" style="color:{{ prop.state == 'done' ? 'var(--color-text-muted)' : 'var(--color-text-primary)' }};flex:none;font-family:var(--font-sans);font-size:12.5px;font-weight:var(--font-weight-medium)">
+        {{ prop.name }}
+      </span>
+      <span data-fdn-id="n107" when="prop.lane" style="border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-sm);border-bottom-right-radius:var(--radius-sm);border-top-left-radius:var(--radius-sm);border-top-right-radius:var(--radius-sm);color:var(--color-text-faint);flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs);letter-spacing:.06em;padding-bottom:0;padding-left:5px;padding-right:5px;padding-top:0">
+        LANE {{ prop.lane }}
+      </span>
+      <span data-fdn-id="n108" when="prop.arm" style="border:1px solid rgba(176,81,46,.35);border-bottom-left-radius:var(--radius-sm);border-bottom-right-radius:var(--radius-sm);border-top-left-radius:var(--radius-sm);border-top-right-radius:var(--radius-sm);color:var(--color-status-blocked);flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs);letter-spacing:.06em;padding-bottom:0;padding-left:5px;padding-right:5px;padding-top:0">
+        {{ prop.arm }}
+      </span>
+      <span data-fdn-id="n109" when="prop.detail" style="color:var(--color-text-faint);flex:1;font-family:var(--font-sans);font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ prop.detail }}
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="StatusCount" hidden>
+    <fdn-props>
+      <fdn-prop name="state" type="enum" required="true"></fdn-prop>
+      <fdn-prop name="count" type="string" required="true"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n26" style="align-items:center;column-gap:5px;display:flex;flex:none">
+      <fdn-use data-fdn-id="n27" component="StatusDot" data-fdn-prop-state="{{ prop.state }}"></fdn-use>
+      <span data-fdn-id="n28" style="color:{{ statuscolor[prop.state] }};font-family:var(--font-mono);font-size:var(--font-size-xs);font-weight:var(--font-weight-medium)">
+        {{ prop.count }}
+      </span>
+      <span data-fdn-id="n29" style="color:{{ statuscolor[prop.state] }};font-family:var(--font-mono);font-size:var(--font-size-xs);font-weight:var(--font-weight-medium)">
+        {{ prop.state }}
+      </span>
+    </span>
+  </fdn-component>
+  <fdn-component name="StatusDot" hidden>
+    <fdn-props>
+      <fdn-prop name="state" type="enum" required="true"></fdn-prop>
+      <fdn-prop name="size" type="string" default="7px"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n25" style="background:{{ statuscolor[prop.state] }};border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:{{ prop.size }};width:{{ prop.size }}"></span>
+  </fdn-component>
+  <fdn-component name="TabPill" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="count" type="string" required="true"></fdn-prop>
+      <fdn-prop name="active" type="boolean" default="false"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n43" data-fdn-style="tab-pill" style="background:{{ prop.active ? 'var(--color-tab-active)' : 'transparent' }};border:1px solid {{ prop.active ? 'var(--color-divider)' : 'transparent' }};color:{{ prop.active ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}">
+      <span data-fdn-id="n44">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n45" style="color:{{ prop.active ? 'var(--color-text-faint)' : 'var(--color-text-disabled)' }};font-family:var(--font-mono);font-size:var(--font-size-sm)">
+        {{ prop.count }}
+      </span>
+    </span>
+  </fdn-component>
+  <fdn-component name="TrackRow" hidden>
+    <fdn-props>
+      <fdn-prop name="name" type="string" required="true"></fdn-prop>
+      <fdn-prop name="version" type="string" required="true"></fdn-prop>
+      <fdn-prop name="shape" type="string" required="true"></fdn-prop>
+      <fdn-prop name="lastactivity" type="string" required="true"></fdn-prop>
+      <fdn-prop name="running" type="string" default="0"></fdn-prop>
+      <fdn-prop name="waiting" type="string" default="0"></fdn-prop>
+      <fdn-prop name="review" type="string" default="0"></fdn-prop>
+      <fdn-prop name="blocked" type="string" default="0"></fdn-prop>
+      <fdn-prop name="queued" type="string" default="0"></fdn-prop>
+      <fdn-prop name="exceptions" type="string" default="0"></fdn-prop>
+      <fdn-prop name="idle" type="boolean" default="false"></fdn-prop>
+      <fdn-prop name="selected" type="boolean" default="false"></fdn-prop>
+      <fdn-prop name="compact" type="boolean" default="false"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n46" data-fdn-style="list-row" style="background:{{ prop.selected ? 'var(--color-selected-bg)' : 'transparent' }}">
+      <div data-fdn-id="n47" data-fdn-style="row-line1">
+        <fdn-use data-fdn-id="n48" component="Icon" data-fdn-prop-color="{{ prop.idle ? 'var(--color-text-ghost)' : 'var(--color-text-muted)' }}" data-fdn-prop-name="track"></fdn-use>
+        <span data-fdn-id="n49" style="color:{{ prop.idle ? 'var(--color-text-muted)' : 'var(--color-text-primary)' }};flex:none;font-family:var(--font-sans);font-size:var(--font-size-md);font-weight:{{ prop.selected ? '600' : '500' }};max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ prop.name }}
+        </span>
+        <span data-fdn-id="n50" data-fdn-style="meta-mono" style="color:var(--color-text-disabled);flex:none">
+          {{ prop.version }}
+        </span>
+        <span data-fdn-id="n51" style="flex:1"></span>
+        <span data-fdn-id="n52" data-fdn-style="meta-mono" style="flex:none">
+          {{ prop.lastactivity }}
+        </span>
+      </div>
+      <div data-fdn-id="n53" data-fdn-style="row-line2">
+        <fdn-use data-fdn-id="n54" component="StatusCount" data-fdn-prop-count="{{ prop.running }}" data-fdn-prop-state="running" when="prop.running != '0'"></fdn-use>
+        <fdn-use data-fdn-id="n55" component="StatusCount" data-fdn-prop-count="{{ prop.review }}" data-fdn-prop-state="review" when="prop.review != '0'"></fdn-use>
+        <fdn-use data-fdn-id="n56" component="StatusCount" data-fdn-prop-count="{{ prop.waiting }}" data-fdn-prop-state="waiting" when="prop.waiting != '0'"></fdn-use>
+        <fdn-use data-fdn-id="n57" component="StatusCount" data-fdn-prop-count="{{ prop.blocked }}" data-fdn-prop-state="blocked" when="prop.blocked != '0'"></fdn-use>
+        <span data-fdn-id="n58" when="prop.idle" style="color:var(--color-text-disabled);flex:none;font-family:var(--font-mono);font-size:var(--font-size-xs)">
+          no attachments
+        </span>
+        <span data-fdn-id="n59" style="flex:1"></span>
+        <span data-fdn-id="n60" when="!prop.compact" style="color:var(--color-text-disabled);flex:none;font-family:var(--font-mono);font-size:var(--font-size-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ prop.shape }}
+        </span>
+        <span data-fdn-id="n61" when="prop.queued != '0' &amp;&amp; !prop.compact" style="align-items:center;column-gap:5px;display:flex;flex:none">
+          <span data-fdn-id="n62" style="color:var(--color-text-ghost)">
+            ·
+          </span>
+          <span data-fdn-id="n63" style="color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--font-size-xs)">
+            {{ prop.queued }}
+          </span>
+          <span data-fdn-id="n64" style="color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--font-size-xs)">
+            queued
+          </span>
+        </span>
+        <fdn-use data-fdn-id="n65" component="ExceptionMark" data-fdn-prop-count="{{ prop.exceptions }}" when="prop.exceptions != '0'"></fdn-use>
+      </div>
+    </div>
+  </fdn-component>
+  <fdn-component name="TracksPane" hidden>
+    <fdn-props>
+      <fdn-prop name="mode" type="enum" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n71" when="prop.mode == 'rest'" data-fdn-style="pane" style="height:468px;width:724px">
+      <div data-fdn-id="n72" data-fdn-style="pane-header">
+        <span data-fdn-id="n73" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:var(--font-size-xl);font-weight:var(--font-weight-semibold)">
+          Tracks
+        </span>
+        <span data-fdn-id="n74" data-fdn-style="meta-mono">
+          7 defined · 5 attached · 3 queued
+        </span>
+        <span data-fdn-id="n75" style="margin-left:auto">
+          <fdn-use data-fdn-id="n76" component="Icon" data-fdn-prop-name="more" data-fdn-prop-size="16"></fdn-use>
+        </span>
+      </div>
+      <div data-fdn-id="n77" style="align-items:center;column-gap:2px;display:flex;flex:none;padding-bottom:6px;padding-left:10px;padding-right:10px;padding-top:8px">
+        <fdn-use data-fdn-id="n78" component="TabPill" data-fdn-prop-active="{{ param.attachedfilter == 'all' }}" data-fdn-prop-count="7" data-fdn-prop-label="All"></fdn-use>
+        <fdn-use data-fdn-id="n79" component="TabPill" data-fdn-prop-active="{{ param.attachedfilter == 'attached' }}" data-fdn-prop-count="5" data-fdn-prop-label="Attached"></fdn-use>
+        <fdn-use data-fdn-id="n80" component="TabPill" data-fdn-prop-active="{{ param.attachedfilter == 'idle' }}" data-fdn-prop-count="2" data-fdn-prop-label="Idle"></fdn-use>
+        <span data-fdn-id="n81" style="flex:1"></span>
+        <fdn-use data-fdn-id="n82" component="ActionButton" data-fdn-prop-hint="n" data-fdn-prop-label="Define track" data-fdn-prop-variant="accent"></fdn-use>
+      </div>
+      <div data-fdn-id="n83" style="flex:1;min-height:0;overflow:hidden;padding-bottom:12px;padding-left:8px;padding-right:8px;padding-top:2px">
+        <fdn-use data-fdn-id="n84" component="TrackRow" data-fdn-prop-blocked="{{ track.blocked }}" data-fdn-prop-exceptions="{{ track.exceptions }}" data-fdn-prop-idle="{{ track.idle }}" data-fdn-prop-lastactivity="{{ track.lastactivity }}" data-fdn-prop-name="{{ track.name }}" data-fdn-prop-queued="{{ track.queued }}" data-fdn-prop-review="{{ track.review }}" data-fdn-prop-running="{{ track.running }}" data-fdn-prop-selected="false" data-fdn-prop-shape="{{ track.shape }}" data-fdn-prop-version="{{ track.version }}" data-fdn-prop-waiting="{{ track.waiting }}" each="track in data.tracks"></fdn-use>
+      </div>
+      <div data-fdn-id="n85" data-fdn-style="pane-footer">
+        <span data-fdn-id="n86">
+          ↵ open
+        </span>
+        <span data-fdn-id="n87">
+          a attach
+        </span>
+        <span data-fdn-id="n88">
+          q queue behind
+        </span>
+        <span data-fdn-id="n89">
+          n define
+        </span>
+        <span data-fdn-id="n90" style="margin-left:auto">
+          hive track · schema v2
+        </span>
+      </div>
+    </div>
+    <div data-fdn-id="n136" when="prop.mode == 'selected'" data-fdn-style="pane" style="width:1416px">
+      <div data-fdn-id="n137" data-fdn-style="pane-header">
+        <span data-fdn-id="n138" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:var(--font-size-xl);font-weight:var(--font-weight-semibold)">
+          Tracks
+        </span>
+        <span data-fdn-id="n139" data-fdn-style="meta-mono">
+          7 defined · 5 attached · 3 queued
+        </span>
+        <span data-fdn-id="n140" style="margin-left:auto">
+          <fdn-use data-fdn-id="n141" component="Icon" data-fdn-prop-name="more" data-fdn-prop-size="16"></fdn-use>
+        </span>
+      </div>
+      <div data-fdn-id="n142" style="display:flex;flex:1;min-height:0">
+        <div data-fdn-id="n143" style="border-right:1px solid var(--color-divider);display:flex;flex:none;flex-direction:column;min-height:0;width:316px">
+          <div data-fdn-id="n144" style="align-items:center;column-gap:2px;display:flex;flex:none;padding-bottom:4px;padding-left:10px;padding-right:10px;padding-top:8px">
+            <fdn-use data-fdn-id="n145" component="TabPill" data-fdn-prop-active="{{ param.attachedfilter == 'all' }}" data-fdn-prop-count="7" data-fdn-prop-label="All"></fdn-use>
+            <fdn-use data-fdn-id="n146" component="TabPill" data-fdn-prop-active="{{ param.attachedfilter == 'attached' }}" data-fdn-prop-count="5" data-fdn-prop-label="Attached"></fdn-use>
+            <fdn-use data-fdn-id="n147" component="TabPill" data-fdn-prop-active="{{ param.attachedfilter == 'idle' }}" data-fdn-prop-count="2" data-fdn-prop-label="Idle"></fdn-use>
+          </div>
+          <div data-fdn-id="n148" style="flex:1;min-height:0;overflow:hidden;padding-bottom:12px;padding-left:8px;padding-right:8px;padding-top:2px">
+            <fdn-use data-fdn-id="n149" component="TrackRow" data-fdn-prop-blocked="{{ track.blocked }}" data-fdn-prop-compact="true" data-fdn-prop-exceptions="{{ track.exceptions }}" data-fdn-prop-idle="{{ track.idle }}" data-fdn-prop-lastactivity="{{ track.lastactivity }}" data-fdn-prop-name="{{ track.name }}" data-fdn-prop-queued="{{ track.queued }}" data-fdn-prop-review="{{ track.review }}" data-fdn-prop-running="{{ track.running }}" data-fdn-prop-selected="{{ track.id == param.selectedtrack }}" data-fdn-prop-shape="{{ track.shape }}" data-fdn-prop-version="{{ track.version }}" data-fdn-prop-waiting="{{ track.waiting }}" each="track in data.tracks"></fdn-use>
+          </div>
+        </div>
+        <div data-fdn-id="n150" style="display:flex;flex:1;flex-direction:column;min-height:0;min-width:0">
+          <div data-fdn-id="n151" style="align-items:center;border-bottom:1px solid var(--color-divider);column-gap:9px;display:flex;flex:none;height:44px;padding-bottom:0;padding-left:16px;padding-right:14px;padding-top:0">
+            <fdn-use data-fdn-id="n152" component="Icon" data-fdn-prop-color="var(--color-text-tertiary)" data-fdn-prop-name="track" data-fdn-prop-size="15"></fdn-use>
+            <span data-fdn-id="n153" style="color:var(--color-text-primary);flex:none;font-family:var(--font-sans);font-size:var(--font-size-lg);font-weight:var(--font-weight-semibold)">
+              {{ param.selectedtrack }}
+            </span>
+            <span data-fdn-id="n154" style="border:1px solid var(--color-border);border-bottom-left-radius:var(--radius-sm);border-bottom-right-radius:var(--radius-sm);border-top-left-radius:var(--radius-sm);border-top-right-radius:var(--radius-sm);color:var(--color-text-tertiary);flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs);padding-bottom:1px;padding-left:5px;padding-right:5px;padding-top:1px">
+              v3
+            </span>
+            <span data-fdn-id="n155" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              the standing shape for a change that ends in a human verdict and a preview
+            </span>
+            <span data-fdn-id="n156" style="align-items:center;column-gap:10px;display:flex;flex:none;margin-left:auto">
+              <fdn-use data-fdn-id="n157" component="ActionButton" data-fdn-prop-hint="a" data-fdn-prop-label="Attach a bee" data-fdn-prop-variant="default"></fdn-use>
+              <fdn-use data-fdn-id="n158" component="ActionButton" data-fdn-prop-hint="e" data-fdn-prop-label="Edit spine" data-fdn-prop-variant="default"></fdn-use>
+              <fdn-use data-fdn-id="n159" component="Icon" data-fdn-prop-name="more" data-fdn-prop-size="16"></fdn-use>
+            </span>
+          </div>
+          <div data-fdn-id="n160" style="display:flex;flex:1;min-height:0">
+            <div data-fdn-id="n161" style="display:flex;flex:1;flex-direction:column;min-width:0;padding-bottom:14px;padding-left:14px;padding-right:12px;padding-top:13px">
+              <fdn-use data-fdn-id="n162" component="SectionLabel" data-fdn-prop-text="SPINE" data-fdn-prop-trailing="6 items · 1 branch · 9 nodes"></fdn-use>
+              <fdn-use data-fdn-id="n163" component="SpineNode" data-fdn-prop-arm="{{ row.arm }}" data-fdn-prop-current="{{ row.id == param.spinefocus }}" data-fdn-prop-depth="{{ row.depth }}" data-fdn-prop-detail="{{ row.detail }}" data-fdn-prop-lane="{{ row.lane }}" data-fdn-prop-name="{{ row.name }}" data-fdn-prop-state="{{ row.state }}" data-fdn-prop-type="{{ row.type }}" each="row in data.spinerows"></fdn-use>
+              <div data-fdn-id="n370" style="margin-top:20px">
+                <fdn-use data-fdn-id="n371" component="SectionLabel" data-fdn-prop-text="EXCEPTIONS" data-fdn-prop-trailing="recorded, not punished · 1"></fdn-use>
+                <fdn-use data-fdn-id="n372" component="ExceptionRow" data-fdn-prop-age="{{ x.age }}" data-fdn-prop-at="{{ x.at }}" data-fdn-prop-bee="{{ x.bee }}" data-fdn-prop-what="{{ x.what }}" each="x in data.exceptions"></fdn-use>
+              </div>
+              <div data-fdn-id="n164" style="align-items:center;border-top:1px solid var(--color-border-faint);column-gap:8px;display:flex;margin-top:auto;padding-top:10px">
+                <span data-fdn-id="n165" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:11.5px;line-height:1.5">
+                  Steps are the agent's own to mark. Deviating is allowed — it lands as an exception on the attachment, never a failure on the definition.
+                </span>
+              </div>
+            </div>
+            <div data-fdn-id="n166" style="border-left:1px solid var(--color-divider);display:flex;flex:none;flex-direction:column;padding-bottom:14px;padding-left:14px;padding-right:14px;padding-top:13px;row-gap:18px;width:404px">
+              <div data-fdn-id="n167" style="display:flex;flex-direction:column">
+                <fdn-use data-fdn-id="n168" component="SectionLabel" data-fdn-prop-text="ATTACHED" data-fdn-prop-trailing="3 bees"></fdn-use>
+                <fdn-use data-fdn-id="n169" component="AttachedBee" data-fdn-prop-age="{{ bee.age }}" data-fdn-prop-at="{{ bee.at }}" data-fdn-prop-exceptions="{{ bee.exceptions }}" data-fdn-prop-harness="{{ bee.harness }}" data-fdn-prop-name="{{ bee.name }}" data-fdn-prop-note="{{ bee.note }}" data-fdn-prop-position="{{ bee.position }}" data-fdn-prop-state="{{ bee.state }}" data-fdn-prop-total="{{ bee.total }}" each="bee in data.attached"></fdn-use>
+              </div>
+              <div data-fdn-id="n170" style="display:flex;flex-direction:column">
+                <fdn-use data-fdn-id="n171" component="SectionLabel" data-fdn-prop-text="QUEUED" data-fdn-prop-trailing="fifo · 2"></fdn-use>
+                <fdn-use data-fdn-id="n172" component="QueuedRow" data-fdn-prop-behind="{{ q.behind }}" data-fdn-prop-name="{{ q.name }}" data-fdn-prop-position="{{ q.position }}" each="q in data.queued"></fdn-use>
+              </div>
+              <div data-fdn-id="n173" when="param.proposalstate == 'pending'" data-fdn-style="card-block">
+                <fdn-use data-fdn-id="n174" component="SectionLabel" data-fdn-prop-text="PROPOSED EDIT" data-fdn-prop-trailing="sidecar-1 · 2m"></fdn-use>
+                <span data-fdn-id="n175" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12px;line-height:1.5;margin-bottom:8px">
+                  The suite passes but nothing publishes a preview for the human — add the deploy the review desk expects.
+                </span>
+                <fdn-use data-fdn-id="n176" component="DiffRow" data-fdn-prop-detail="{{ d.detail }}" data-fdn-prop-mark="{{ d.mark }}" data-fdn-prop-name="{{ d.name }}" data-fdn-prop-type="{{ d.type }}" each="d in data.proposal"></fdn-use>
+                <div data-fdn-id="n177" style="align-items:center;column-gap:8px;display:flex;margin-top:11px">
+                  <span data-fdn-id="n178" style="color:var(--color-text-ghost);flex:1;font-family:var(--font-mono);font-size:var(--font-size-2xs)">
+                    v3 → v4 · one pending at a time
+                  </span>
+                  <fdn-use data-fdn-id="n179" component="ActionButton" data-fdn-prop-label="discard" data-fdn-prop-variant="default"></fdn-use>
+                  <fdn-use data-fdn-id="n180" component="ActionButton" data-fdn-prop-hint="⌘↵" data-fdn-prop-label="accept" data-fdn-prop-variant="accent"></fdn-use>
+                </div>
+              </div>
+              <div data-fdn-id="n181" when="param.proposalstate == 'none'" style="align-items:center;column-gap:7px;display:flex">
+                <span data-fdn-id="n182" style="border:1px dashed var(--color-border-input);border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:9px;width:9px"></span>
+                <span data-fdn-id="n183" style="color:var(--color-text-disabled);font-family:var(--font-mono);font-size:var(--font-size-xs)">
+                  no pending proposal
+                </span>
+              </div>
+            </div>
+          </div>
+          <div data-fdn-id="n184" data-fdn-style="pane-footer">
+            <span data-fdn-id="n185">
+              a attach
+            </span>
+            <span data-fdn-id="n186">
+              q queue behind
+            </span>
+            <span data-fdn-id="n187">
+              e edit spine
+            </span>
+            <span data-fdn-id="n188">
+              x exceptions
+            </span>
+            <span data-fdn-id="n189" style="margin-left:auto">
+              defined 4d ago · 3 versions · promoted on edit
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-fdn-id="n265" when="prop.mode == 'empty'" data-fdn-style="pane" style="height:468px;width:724px">
+      <div data-fdn-id="n266" data-fdn-style="pane-header">
+        <span data-fdn-id="n267" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:var(--font-size-xl);font-weight:var(--font-weight-semibold)">
+          Tracks
+        </span>
+        <span data-fdn-id="n268" data-fdn-style="meta-mono">
+          none defined
+        </span>
+        <span data-fdn-id="n269" style="margin-left:auto">
+          <fdn-use data-fdn-id="n270" component="Icon" data-fdn-prop-name="more" data-fdn-prop-size="16"></fdn-use>
+        </span>
+      </div>
+      <div data-fdn-id="n271" style="align-items:center;display:flex;flex:1;flex-direction:column;justify-content:center;padding-bottom:0;padding-left:40px;padding-right:40px;padding-top:0;row-gap:16px">
+        <fdn-use data-fdn-id="n272" component="PixelBee"></fdn-use>
+        <span data-fdn-id="n273" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:var(--font-size-xl);font-weight:var(--font-weight-semibold);margin-top:4px">
+          No tracks yet
+        </span>
+        <span data-fdn-id="n274" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:var(--font-size-md);line-height:1.6;max-width:420px;text-align:center">
+          A track is an expected sequence of steps you clip onto one agent. Attaching it injects a standing prompt, so the agent keeps the steps updated as it works — and any deviation lands as a visible exception rather than a failure.
+        </span>
+        <span data-fdn-id="n275" style="margin-top:4px">
+          <fdn-use data-fdn-id="n276" component="ActionButton" data-fdn-prop-hint="n" data-fdn-prop-label="Define a track" data-fdn-prop-variant="accent"></fdn-use>
+        </span>
+        <span data-fdn-id="n277" style="color:var(--color-text-ghost);font-family:var(--font-mono);font-size:var(--font-size-xs);line-height:1.6;max-width:420px;text-align:center">
+          or ask a sidecar agent to draft one — it arrives as a proposal you accept, refine, or discard
+        </span>
+      </div>
+      <div data-fdn-id="n278" data-fdn-style="pane-footer">
+        <span data-fdn-id="n279">
+          n define
+        </span>
+        <span data-fdn-id="n280" style="margin-left:auto">
+          hive track define · schema v2
+        </span>
+      </div>
+    </div>
+  </fdn-component>
+  <main>
+    <div data-fdn-id="n190" data-fdn-style="page">
+      <header data-fdn-id="n91" style="display:flex;flex-direction:column;row-gap:8px">
+        <h1 data-fdn-id="n92" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:19px;font-weight:var(--font-weight-semibold);margin-bottom:0;margin-left:0;margin-right:0;margin-top:0">
+          Apiary — Tracks pane
+        </h1>
+        <div data-fdn-id="n93" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:13px;line-height:1.55;max-width:760px">
+          A track is an expected sequence of steps clipped onto one agent. The pane is where tracks are defined, watched, and edited — the list is definitions, the state on each row is the live attachments underneath them.
+        </div>
+        <div data-fdn-id="n94" data-fdn-style="meta-mono" style="color:var(--color-text-disabled)">
+          exploration · MACHINES_AND_TRACKS.md · design-brief.md §2 §4 §9
+        </div>
+      </header>
+      <section data-fdn-id="n95" style="display:flex;flex-direction:column">
+        <fdn-use data-fdn-id="n96" component="BoardCaption" data-fdn-prop-body="Definitions, not runs. Each row carries the shape of the spine on the right and the live state of everything attached to it on the left — status is always dots plus label from the shared palette, never a pill, never honey. Honey is spent once, on Define track." data-fdn-prop-index="BOARD 1" data-fdn-prop-title="TRACKS AT REST"></fdn-use>
+        <div data-fdn-id="n191" style="align-items:flex-start;column-gap:32px;display:flex">
+          <fdn-use data-fdn-id="n97" component="TracksPane" data-fdn-prop-mode="rest"></fdn-use>
+          <aside data-fdn-id="n192" style="display:flex;flex:1;flex-direction:column;min-width:0;padding-top:4px;row-gap:18px">
+            <div data-fdn-id="n193">
+              <fdn-use data-fdn-id="n194" component="SectionLabel" data-fdn-prop-text="WHAT A ROW SAYS"></fdn-use>
+              <div data-fdn-id="n195" style="column-gap:28px;display:grid;grid-template-columns:1fr 1fr;row-gap:16px">
+                <div data-fdn-id="n196" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n197" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);letter-spacing:.08em">
+                    LEFT — THE LIVE STATE
+                  </span>
+                  <span data-fdn-id="n198" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                    A definition has no state of its own. The dots are its attachments: one dot + label per state present, straight from the shared palette. No attachments reads plainly as “no attachments”, not as a sixth colour.
+                  </span>
+                </div>
+                <div data-fdn-id="n199" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n200" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);letter-spacing:.08em">
+                    RIGHT — THE SHAPE
+                  </span>
+                  <span data-fdn-id="n201" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                    Items are the spine you authored; nodes count the branch lanes and review arms underneath. It is the one number that tells you how big an edit you are about to open.
+                  </span>
+                </div>
+                <div data-fdn-id="n202" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n203" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);letter-spacing:.08em">
+                    QUEUED
+                  </span>
+                  <span data-fdn-id="n204" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                    Queue depth is not a property of the track — it counts bees that have this track waiting FIFO behind whatever they are attached to right now.
+                  </span>
+                </div>
+                <div data-fdn-id="n205" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n206" style="color:var(--color-status-blocked);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);letter-spacing:.08em">
+                    EXCEPTIONS
+                  </span>
+                  <span data-fdn-id="n207" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                    A hollow brick ring, never a filled dot — deviation is visible, not punished, and it is deliberately not part of the status palette because it is not a state to be in.
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div data-fdn-id="n208" style="border-top:1px solid var(--color-border);display:flex;flex-direction:column;padding-top:14px;row-gap:5px">
+              <span data-fdn-id="n209" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                One honey moment per pane: the filled Define track. Every selection, tab and count here is neutral gray.
+              </span>
+            </div>
+          </aside>
+        </div>
+      </section>
+      <section data-fdn-id="n210" style="display:flex;flex-direction:column">
+        <fdn-use data-fdn-id="n211" component="BoardCaption" data-fdn-prop-body="Selecting a track opens the thing itself: the typed spine on the left, and everything hanging off it on the right — who is attached and how far along, who is queued behind, and the one pending edit a sidecar agent has proposed. Honey moves to accept, because that is now the single decision this pane is asking for." data-fdn-prop-index="BOARD 2" data-fdn-prop-title="ONE TRACK SELECTED"></fdn-use>
+        <fdn-use data-fdn-id="n212" component="TracksPane" data-fdn-prop-mode="selected"></fdn-use>
+      </section>
+      <section data-fdn-id="n281" style="display:flex;flex-direction:column">
+        <fdn-use data-fdn-id="n282" component="BoardCaption" data-fdn-prop-body="Nothing defined yet. The pane says what a track is in one sentence, spends its one honey moment on the only thing worth doing here, and offers the second, quieter path — the same proposal loop from board 2, run before the first track exists. One small pixel-art moment, per the personality budget; never wallpaper." data-fdn-prop-index="BOARD 3" data-fdn-prop-title="EMPTY — NO TRACKS DEFINED"></fdn-use>
+        <div data-fdn-id="n283" style="align-items:flex-start;column-gap:32px;display:flex">
+          <fdn-use data-fdn-id="n284" component="TracksPane" data-fdn-prop-mode="empty"></fdn-use>
+          <aside data-fdn-id="n285" style="display:flex;flex:1;flex-direction:column;min-width:0;padding-top:4px;row-gap:18px">
+            <div data-fdn-id="n286">
+              <fdn-use data-fdn-id="n287" component="SectionLabel" data-fdn-prop-text="WHY THIS EMPTY STATE IS NOT A GALLERY"></fdn-use>
+              <div data-fdn-id="n288" style="column-gap:28px;display:grid;grid-template-columns:1fr 1fr;row-gap:16px">
+                <div data-fdn-id="n289" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n290" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);letter-spacing:.08em">
+                    NO BLUEPRINT LAYER
+                  </span>
+                  <span data-fdn-id="n291" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                    A starter-template grid is the obvious empty state and the wrong one: a template layer is an explicit non-goal. So the affordance is the real verb — define one — and the fallback is an agent drafting a real definition you then judge.
+                  </span>
+                </div>
+                <div data-fdn-id="n292" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n293" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);letter-spacing:.08em">
+                    TRACK ≠ MACHINE
+                  </span>
+                  <span data-fdn-id="n294" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                    A machine is a canvas with triggers built in, holding many jobs, alive for years. A track is the small thing: one agent, one expected sequence. Tracks work on agents inside machines, but neither feature needs the other.
+                  </span>
+                </div>
+                <div data-fdn-id="n295" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n296" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);letter-spacing:.08em">
+                    WHERE IT ACTUALLY LIVES
+                  </span>
+                  <span data-fdn-id="n297" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                    The track is a real object in Honeybee. This pane is a view onto hive track define / attach / status — the footer says so quietly rather than pretending the pane owns the data.
+                  </span>
+                </div>
+                <div data-fdn-id="n298" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n299" style="color:var(--color-text-tertiary);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);letter-spacing:.08em">
+                    ONE PIXEL MOMENT
+                  </span>
+                  <span data-fdn-id="n300" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                    Art tokens are declared separately from chrome tokens on purpose: the bee may be vivid, the UI palette stays restrained, and the two never bleed into each other.
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div data-fdn-id="n301" style="border-top:1px solid var(--color-border);display:flex;flex-direction:column;padding-top:14px;row-gap:5px">
+              <span data-fdn-id="n302" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                Three panes, three honey moments, one each: Define track · accept · Define a track. Never two at once.
+              </span>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
