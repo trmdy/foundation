@@ -38,6 +38,7 @@ import { freezeDocument, verifyFrozen } from 'foundation-engine/src/freeze/index
 import { chainPathFor, writeChainInit } from '../commands/chain.js'
 import { skeletonDocument, skeletonDocumentEmpty } from '../commands/new.js'
 import { defaultAuthor } from '../identity.js'
+import { chainLabel, documentStatus, manifestPathFor, readManifest, statusLabel } from '../project.js'
 
 const require = createRequire(import.meta.url)
 
@@ -548,8 +549,12 @@ async function toolFreeze(args: Record<string, unknown>): Promise<ToolResult> {
     }
   }
 
+  // friction §6 / loose end: same identity rules the CLI uses (agent:<HIVE_BEE>
+  // when set, else user:<name>@<host>) — a hardcoded 'agent:mcp' loses which
+  // bee actually froze the document, same class of bug foundation_new's chain
+  // init and foundation_ingest's commit path were already fixed for above.
   const frozen = freezeDocument(doc, {
-    author: 'agent:mcp',
+    author: defaultAuthor(),
     ...(message !== undefined ? { message } : {}),
     chainHead,
     engineVersion: engineVersion(),
@@ -593,6 +598,38 @@ async function toolNew(args: Record<string, unknown>): Promise<ToolResult> {
   if (result) chain = { chainPath: result.chainPath, head: { hash: result.head.hash } }
 
   return ok({ path: filePath, title, empty, chain })
+}
+
+/**
+ * `foundation_project` — read a `foundation.json` manifest (SPEC 13a-iii)
+ * and report per-document status. Read-only in MCP for v0 (only `action:
+ * "list"` is accepted): writing a manifest (init/add/scan) stays CLI-only
+ * (`foundation project init|add|list|scan`) until there's a concrete need
+ * for an agent to mutate the project index over the wire.
+ */
+async function toolProject(args: Record<string, unknown>): Promise<ToolResult> {
+  const dir = optionalString(args, 'dir') ?? '.'
+  const action = optionalString(args, 'action') ?? 'list'
+  if (action !== 'list') {
+    return fail(`foundation_project: unsupported action "${action}" — only "list" is available in v0 (read-only; use the CLI's \`foundation project\` verbs to write a manifest)`)
+  }
+
+  const manifest = readManifest(dir)
+  if (!manifest) {
+    return fail(`no ${manifestPathFor(dir)} — run \`foundation project init ${dir}\` first (CLI-only for v0)`)
+  }
+
+  const documents = manifest.documents.map((entry) => {
+    const status = documentStatus(dir, entry)
+    return { ...status, status: statusLabel(status), chain: chainLabel(status) }
+  })
+
+  return ok({
+    dir,
+    manifestPath: manifestPathFor(dir),
+    manifest: { schema: manifest.schema, id: manifest.id, name: manifest.name },
+    documents,
+  })
 }
 
 // ——— tool registry ———
@@ -742,6 +779,23 @@ export const TOOLS: ToolDefinition[] = [
       required: ['path'],
     },
     handler: toolNew,
+  },
+  {
+    name: 'foundation_project',
+    description:
+      'Read a project\'s foundation.json manifest (SPEC 13a-iii: the document index for a directory — the '
+      + 'filesystem stays the database, the manifest is the index). Returns the manifest plus, per document, its '
+      + 'validate status ("ok" or "N issue(s)") and chain head (or "no chain"). Read-only in MCP for v0 — only '
+      + '`action: "list"` is supported; writing a manifest (init/add/scan) is CLI-only: '
+      + '`foundation project init|add|list|scan`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dir: { type: 'string', description: 'Directory containing foundation.json (default: current working directory)' },
+        action: { type: 'string', description: 'Only "list" is supported in v0' },
+      },
+    },
+    handler: toolProject,
   },
 ]
 

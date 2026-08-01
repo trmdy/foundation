@@ -64,6 +64,7 @@ describe('foundation mcp (real stdio child process)', () => {
         'foundation_ingest',
         'foundation_inspect',
         'foundation_new',
+        'foundation_project',
         'foundation_read',
         'foundation_render',
         'foundation_validate',
@@ -326,5 +327,102 @@ describe('foundation mcp: author identity (friction §6)', () => {
       await transport.close()
       rmSync(dir, { recursive: true, force: true })
     }
+  }, 15000)
+
+  it('foundation_freeze freezes with agent:<HIVE_BEE> when the env var is set (loose end: was hardcoded agent:mcp)', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'fdn-mcp-identity-freeze-'))
+    const target = join(dir, 'widget')
+    const dest = join(dir, 'widget.frozen.fdn.html')
+
+    const { client: beeClient, transport } = await connectClient({ HIVE_BEE: 'test-bee-99' })
+    try {
+      const created = await beeClient.callTool({ name: 'foundation_new', arguments: { path: target } })
+      expect(created.isError).not.toBe(true)
+      const filePath = (created.structuredContent as Record<string, unknown>).path as string
+
+      const frozen = await beeClient.callTool({ name: 'foundation_freeze', arguments: { path: filePath, out: dest } })
+      expect(frozen.isError).not.toBe(true)
+      const structured = frozen.structuredContent as Record<string, unknown>
+      expect(structured.frozen).toBe(true)
+      const header = structured.header as Record<string, unknown>
+      expect(header.frozenBy).toBe('agent:test-bee-99')
+      expect(header.frozenBy).not.toBe('agent:mcp')
+    } finally {
+      await beeClient.close()
+      await transport.close()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }, 15000)
+})
+
+describe('foundation_project (read-only manifest listing)', () => {
+  let client: Client
+  let transport: StdioClientTransport
+
+  beforeEach(async () => {
+    const connected = await connectClient()
+    client = connected.client
+    transport = connected.transport
+  }, 30000)
+
+  afterEach(async () => {
+    await client.close()
+    await transport.close()
+  })
+
+  it('lists a manifest\'s documents with validate status and chain head', async () => {
+    const { mkdtempSync, rmSync, writeFileSync, readFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'fdn-mcp-project-'))
+    const target = join(dir, 'widget')
+
+    const created = await client.callTool({ name: 'foundation_new', arguments: { path: target } })
+    const filePath = (created.structuredContent as Record<string, unknown>).path as string
+    const relPath = filePath.split('/').pop() as string
+
+    const manifest = {
+      schema: 1,
+      id: 'manifest-under-test',
+      name: 'mcp-project-test',
+      documents: [{ path: relPath, docId: readFileSync(filePath, 'utf8').match(/data-fdn-doc-id="([^"]*)"/)?.[1] }],
+    }
+    writeFileSync(join(dir, 'foundation.json'), JSON.stringify(manifest, null, 2), 'utf8')
+
+    const result = await client.callTool({ name: 'foundation_project', arguments: { dir, action: 'list' } })
+    expect(result.isError).not.toBe(true)
+    const structured = result.structuredContent as Record<string, unknown>
+    expect((structured.manifest as Record<string, unknown>).name).toBe('mcp-project-test')
+    const documents = structured.documents as Array<Record<string, unknown>>
+    expect(documents).toHaveLength(1)
+    expect(documents[0]?.path).toBe(relPath)
+    expect(documents[0]?.status).toBe('ok')
+    expect(documents[0]?.chain).toBe('chain ' + (documents[0]?.chainHead as string).slice(0, 12))
+
+    rmSync(dir, { recursive: true, force: true })
+  }, 15000)
+
+  it('returns a structured error when no manifest exists at dir (does not throw)', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'fdn-mcp-project-missing-'))
+
+    const result = await client.callTool({ name: 'foundation_project', arguments: { dir } })
+    expect(result.isError).toBe(true)
+
+    rmSync(dir, { recursive: true, force: true })
+  }, 15000)
+
+  it('rejects any action other than "list" (read-only in MCP for v0)', async () => {
+    const { mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'fdn-mcp-project-writeonly-'))
+    writeFileSync(join(dir, 'foundation.json'), JSON.stringify({ schema: 1, id: 'x', name: 'x', documents: [] }), 'utf8')
+
+    const result = await client.callTool({ name: 'foundation_project', arguments: { dir, action: 'add' } })
+    expect(result.isError).toBe(true)
+
+    rmSync(dir, { recursive: true, force: true })
   }, 15000)
 })

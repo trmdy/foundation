@@ -23,6 +23,7 @@ import { runFreeze } from './commands/freeze.js'
 import { runMcp } from './commands/mcp.js'
 import { runGateway } from './commands/gateway.js'
 import { runGitMergeDriver } from './commands/git-merge-driver.js'
+import { runProject } from './commands/project.js'
 import type { CliIO } from './io.js'
 
 const COMMANDS: Record<string, (args: string[], io: CliIO) => Promise<number>> = {
@@ -39,6 +40,7 @@ const COMMANDS: Record<string, (args: string[], io: CliIO) => Promise<number>> =
   mcp: runMcp,
   gateway: runGateway,
   'git-merge-driver': runGitMergeDriver,
+  project: runProject,
 }
 
 const USAGE = `foundation — a design-document engine CLI
@@ -69,6 +71,10 @@ commands:
   chain merge <file> <theirs.chain>          merge chains, regenerate <file> text, print overlap report
   freeze <file> -o <dest> [--author A] [-m msg]   crystallize a lock-headered frozen file
   freeze --verify <frozenfile>               check a frozen file's lock header + pedigree
+  project init [dir] [--name N]              write a fresh foundation.json manifest
+  project add <file>                         register <file> in ./foundation.json (by docId)
+  project list [dir]                         list a manifest's documents + validate/chain status
+  project scan [dir]                         discover *.fdn.html under dir not yet registered, add them
   mcp                                        run a stdio MCP server exposing Foundation's verbs
   gateway install|uninstall|status           publish/withdraw the operator-gateway registry entry
   git-merge-driver <ancestor> <ours> <theirs>   git merge driver (see docs/GIT-INTEGRATION.md)

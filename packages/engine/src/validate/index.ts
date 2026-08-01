@@ -334,6 +334,13 @@ function walkNode(ctx: ValidateCtx, node: FdnNode, scope: Scope, inOverlay: bool
     })
   }
 
+  // Investigated as a possible gap (docs/dogfood/tracks-pane-run.md friction
+  // §3): this check lives inside walkNode(), the SAME function walkComponent()
+  // uses to traverse component.body — so it already applies to an fdn-use
+  // nested anywhere inside a component's own template, not just doc.body.
+  // There is no separate main-tree-only path (see validate.test.ts's
+  // "loose-end investigation" cases). The bee's original "0 issues" report
+  // predates this check's introduction, not a coverage hole in it.
   if (node.tag === 'fdn-use' && node.attrs.component && !ctx.componentNames.has(node.attrs.component)) {
     push(ctx, {
       code: 'undeclared-ref',

@@ -164,6 +164,71 @@ describe('validateDocument: undeclared references', () => {
     expect(result.valid).toBe(true)
   })
 
+  // Loose-end investigation (docs/dogfood/tracks-pane-run.md friction §3):
+  // hypothesis was "fdn-use INSIDE another component's template body is
+  // unchecked" — i.e. walkComponent()'s traversal of component.body might
+  // not reach the same undeclared-fdn-use check walkNode() applies to
+  // doc.body. It does not hold: walkComponent() calls the SAME walkNode()
+  // used for doc.body, which recurses into every child (including fdn-use
+  // nodes nested inside a component's own template, and nodes reached via
+  // an each-bound fdn-use inside that template) — there is only one code
+  // path for this check, not a main-tree-only one. These two cases
+  // (undeclared ref as a direct child of a component body, and nested two
+  // levels deep under a wrapping div + each binding, closest to the real
+  // QueuedRow repro) both correctly fail validation today.
+  //
+  // The real explanation for the bee's "0 issues" report is ordering, not a
+  // coverage gap: this whole undeclared-fdn-use-component check (the one
+  // covering BOTH doc.body and component bodies, since it's one function)
+  // was added in the same "Dogfood fix round" commit that followed the
+  // dogfood run friction §3 came from — it did not exist yet when the bee
+  // ran validate against the QueuedRow deletion. There is no template-body
+  // gap to close; the check the bee asked for was shipped, and it already
+  // covers component template bodies because it was never main-tree-scoped
+  // to begin with.
+  it('flags an undeclared fdn-use component nested directly inside another component\'s body (loose-end investigation: already covered)', () => {
+    const d = doc({
+      components: [
+        {
+          name: 'DetailPane',
+          props: [],
+          slots: [],
+          body: [node({ id: 'ghost-use', tag: 'fdn-use', attrs: { component: 'Ghost' } })],
+        },
+      ],
+    })
+    const result = validateDocument(d)
+    expect(result.valid).toBe(false)
+    const line = result.issues.find((i) => i.code === 'undeclared-ref' && i.detail && (i.detail as { component?: string }).component === 'Ghost')
+    expect(line).toBeDefined()
+    expect(line?.nodeId).toBe('ghost-use')
+  })
+
+  it('flags an undeclared fdn-use component nested (wrapping div + each binding) inside a component body — closest shape to the real QueuedRow repro (loose-end investigation: already covered)', () => {
+    const d = doc({
+      data: [{ name: 'queued', items: [{ id: 'x', label: 'X' }] }],
+      components: [
+        {
+          name: 'DetailPane',
+          props: [],
+          slots: [],
+          body: [
+            node({
+              id: 'wrap',
+              tag: 'div',
+              children: [node({ id: 'row', tag: 'fdn-use', each: 'q in data.queued', attrs: { component: 'QueuedRow' } })],
+            }),
+          ],
+        },
+      ],
+    })
+    const result = validateDocument(d)
+    expect(result.valid).toBe(false)
+    const line = result.issues.find((i) => i.code === 'undeclared-ref' && i.detail && (i.detail as { component?: string }).component === 'QueuedRow')
+    expect(line).toBeDefined()
+    expect(line?.nodeId).toBe('row')
+  })
+
   it('flags param.X interpolation against an undeclared param', () => {
     const d = doc({ body: [node({ id: 'n1', tag: 'div', text: '{{ param.missing }}' })] })
     const result = validateDocument(d)
