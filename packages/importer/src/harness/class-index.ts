@@ -18,21 +18,34 @@
  * classes" instruction in spirit (no filesystem synthetic file needed — the
  * design system's AST API takes the candidate strings directly).
  *
- * classIndex KEYING (contract finding): API.md types classIndex as
- * `Record<string, ClassIndexEntry>` without saying what the key is. This
- * module keys by the class token with any resolvable state-variant prefix
- * (or unsupported prefix) STRIPPED — e.g. both "bg-primary" and
- * "hover:bg-primary" contribute to the SAME entry ("bg-primary"), the first
- * into `.base`, the second into `.states.hover`. This matches the
- * convention already adopted by the concurrently-built Stage 2
- * (packages/importer/src/types.ts, "CONTRACT FINDING (classIndex keying)"),
- * confirmed by cross-checking that file mid-build — Stage 2 is the actual
- * consumer of this shape, so this module conforms to it rather than
- * re-litigating a genuinely underspecified point in API.md. The "stripped"
- * name is computed via tailwind's own `printCandidate({ ...c, variants: [] })`,
- * not string-splitting on ':' (arbitrary-variant tokens like `[&>svg]:size-4`
- * contain colons that aren't variant separators, so tailwind's own candidate
- * parser is the only robust way to find the split point).
+ * classIndex KEYING (contract finding, REVISED — dogfood cycle 3 friction §2):
+ * API.md types classIndex as `Record<string, ClassIndexEntry>` without saying
+ * what the key is. This module keys by the class token with any resolvable
+ * state-variant prefix (or unsupported prefix) STRIPPED — e.g. both
+ * "bg-primary" and "hover:bg-primary" contribute to the SAME entry
+ * ("bg-primary"), the first into `.base`, the second into `.states.hover`.
+ * This matches the convention already adopted by the concurrently-built
+ * Stage 2 (packages/importer/src/types.ts, "CONTRACT FINDING (classIndex
+ * keying)") — Stage 2 (project/style.ts) is the actual consumer of this
+ * shape, so this module conforms to it.
+ *
+ * The "stripped" name was originally computed via tailwind's own
+ * `printCandidate({ ...c, variants: [] })`. THAT WAS A BUG: printCandidate
+ * NORMALIZES on print — `bg-[var(--color-surface-sunken)]` prints back as
+ * `bg-(color:--color-surface-sunken)` — so the key stopped matching the
+ * literal token style.ts's naive last-colon split produces for the SAME
+ * html's `class=""` attribute. Every var()-referencing arbitrary value
+ * missed the classIndex lookup, was reported `import-unprojectable-css`,
+ * and force-sealed the component (found dogfooding a real component against
+ * document CSS-var tokens — see docs/dogfood/usage-dashboard-run.md §2).
+ * Literal arbitrary values (`bg-[#B8842E]`) happened to round-trip
+ * unchanged, which is why the bug hid behind "sometimes works". Fixed by
+ * keying with `naiveBaseName` (below) UNCONDITIONALLY — the exact same
+ * last-colon split project/style.ts's `parseClassToken` performs on the
+ * observed html token — so the two sides can never disagree on the string.
+ * `printCandidate` is no longer called for keying at all; if a future need
+ * arises for Tailwind's canonical candidate text (e.g. dedup/debug output),
+ * it must stay strictly internal and never feed the classIndex key.
  */
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -66,10 +79,13 @@ function collectClassTokens(htmls: string[]): string[] {
   return [...tokens].sort()
 }
 
-/** Matches project/style.ts's `parseClassToken` (last-colon split) exactly,
- *  so a class tailwind's own parser doesn't recognize still keys under the
- *  same name Stage 2 will look up (base:{} then reads as "unresolved" via
- *  its own report path, rather than silently missing the key). */
+/** THE classIndex key, for every token — Tailwind-recognized or not. Matches
+ *  project/style.ts's `parseClassToken` (last-colon split) exactly, so
+ *  index[base] and style.ts's own lookup can never disagree: both derive
+ *  `base` from the observed html text the same naive way, with no
+ *  normalization step in between. (Previously used only as a fallback for
+ *  classes Tailwind's own parser doesn't recognize; now used unconditionally
+ *  — see the module doc's KEYING note for why.) */
 function naiveBaseName(token: string): string {
   const i = token.lastIndexOf(':')
   return i === -1 ? token : token.slice(i + 1)
@@ -148,7 +164,20 @@ export async function buildClassIndex(htmls: string[]): Promise<ClassIndex> {
     }
     const candidate = candidates[0] as (typeof candidates)[number]
     const variants = candidate.variants as unknown as Variant[]
-    const baseName = design.printCandidate({ ...candidate, variants: [] })
+    // KEYING FIX (dogfood cycle 3, friction §2): the key MUST be the raw
+    // token's own base text (naiveBaseName — the same last-colon split
+    // project/style.ts's parseClassToken uses), never Tailwind's
+    // `printCandidate` round-trip. printCandidate NORMALIZES arbitrary
+    // values that reference a CSS var — `bg-[var(--x)]` prints back as
+    // `bg-(color:--x)` — so a key built from it no longer equals the
+    // literal class token style.ts looks up when resolving the SAME html's
+    // `class=""` attribute. Declarations are still resolved via Tailwind's
+    // real candidate/variant parsing (astLists[i] below); only the KEY
+    // reverts to the observed text, so index[base] and style.ts's
+    // classIndex[base] are guaranteed to agree for every token, including
+    // literal values (which happened to round-trip fine) and var()
+    // references (which didn't).
+    const baseName = naiveBaseName(token)
 
     const declarations: Record<string, string> = {}
     flattenDeclarations(astLists[i] ?? [], declarations)

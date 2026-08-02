@@ -53,6 +53,28 @@ describe('buildClassIndex (unit, synthetic html)', () => {
     expect(index).toEqual({})
   })
 
+  it('regression (dogfood cycle 3, friction §2): keys a var()-referencing arbitrary value by the LITERAL token, not printCandidate\'s normalized form', async () => {
+    // bg-[var(--custom)] used to key under printCandidate's normalized
+    // "bg-(color:--custom)" — a string that never appears in any html — so
+    // project/style.ts's lookup by the literal token always missed. Same
+    // bug, same fix, for the v4 shorthand form.
+    const index = await buildClassIndex(['<div class="bg-[var(--custom)]"></div>'])
+    expect(index['bg-[var(--custom)]']).toBeDefined()
+    expect(index['bg-[var(--custom)]']?.base['background-color']).toBe('var(--custom)')
+    expect(index['bg-(color:--custom)']).toBeUndefined()
+  })
+
+  it('regression: keys the v4 shorthand var() form (bg-(--custom)) by its own literal token too', async () => {
+    const index = await buildClassIndex(['<div class="bg-(--custom)"></div>'])
+    expect(index['bg-(--custom)']).toBeDefined()
+    expect(index['bg-(--custom)']?.base['background-color']).toBe('var(--custom)')
+  })
+
+  it('regression: a hover-variant var() arbitrary value keys states under the literal base token', async () => {
+    const index = await buildClassIndex(['<div class="hover:bg-[var(--custom-hover)]"></div>'])
+    expect(index['bg-[var(--custom-hover)]']?.states?.hover?.['background-color']).toBe('var(--custom-hover)')
+  })
+
   it('produces deterministically sorted keys', async () => {
     const index = await buildClassIndex(['<div class="text-sm px-4 bg-red-500 rounded-md"></div>'])
     expect(Object.keys(index)).toEqual(['bg-red-500', 'px-4', 'rounded-md', 'text-sm'])

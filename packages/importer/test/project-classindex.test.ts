@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { buildClassIndex } from '../src/harness/class-index.js'
 import { projectArtifact } from '../src/project/index.js'
 import { artifact, classIndex, prop } from './fixtures.js'
 
@@ -82,6 +83,31 @@ describe('projectArtifact: Tailwind class resolution', () => {
     const result = projectArtifact(a)
     expect(result.mode).toBe('native')
     expect(result.report.some((r) => r.code === 'import-unsupported-variant')).toBe(true)
+  })
+
+  it('regression (dogfood cycle 3, friction §2): bg-[var(--custom)] projects NATIVE, classIndex built via the real Tailwind compiler', async () => {
+    // End-to-end reproduction of the bee's stuck loop: real buildClassIndex
+    // output (not a hand-built fixture) fed straight into projectArtifact
+    // against the SAME html it was compiled from. Before the fix, the
+    // printCandidate-normalized key never matched the literal token in the
+    // html, so this class always missed classIndex, forced sealed, and
+    // dropped the declaration from the sealed capsule's css too (friction §3).
+    const html = '<div class="bg-[var(--custom)]">x</div>'
+    const index = await buildClassIndex([html])
+    const a = artifact({ name: 'UsageMeter', samples: [{ props: {}, html }], classIndex: index })
+    const result = projectArtifact(a)
+    expect(result.mode).toBe('native')
+    expect(result.report.some((r) => r.code === 'import-unprojectable-css')).toBe(false)
+    expect(result.component.body[0]?.style['background-color']).toBe('var(--custom)')
+  })
+
+  it('regression: the v4 shorthand form bg-(--custom) also projects NATIVE with the declaration resolved', async () => {
+    const html = '<div class="bg-(--custom)">x</div>'
+    const index = await buildClassIndex([html])
+    const a = artifact({ name: 'UsageMeter', samples: [{ props: {}, html }], classIndex: index })
+    const result = projectArtifact(a)
+    expect(result.mode).toBe('native')
+    expect(result.component.body[0]?.style['background-color']).toBe('var(--custom)')
   })
 
   it('an entirely unknown class forces sealed and reports import-unprojectable-css', () => {

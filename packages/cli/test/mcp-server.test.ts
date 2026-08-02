@@ -358,6 +358,84 @@ describe('foundation mcp: author identity (friction §6)', () => {
   }, 15000)
 })
 
+describe('foundation mcp: document identity survives new -> ingest -> project add (dogfood cycle 3, friction §6)', () => {
+  // The bee's repro: foundation_new minted an id, the first MCP
+  // foundation_ingest silently deleted it (parse -> project -> write with no
+  // re-stamp — data-fdn-doc-id lives only in the file TEXT, outside
+  // FdnDocument entirely, so a plain parse/project round-trip drops it), and
+  // `foundation project add` then refused the document outright with "no
+  // document id found". Bug had two parts, both fixed in mcp/tools.ts:
+  // foundation_new never minted an id over MCP at all (unlike the CLI's
+  // `foundation new`), and foundation_ingest dropped whatever id was already
+  // there. This test drives the real stdio MCP server for both steps, then
+  // calls the CLI's own `project add` in-process to prove the id it kept is
+  // actually usable — the whole point of it existing.
+  let client: Client
+  let transport: StdioClientTransport
+
+  beforeEach(async () => {
+    const connected = await connectClient()
+    client = connected.client
+    transport = connected.transport
+  }, 30000)
+
+  afterEach(async () => {
+    await client.close()
+    await transport.close()
+  })
+
+  it('new (doc id present) -> ingest with content (doc id preserved) -> project add succeeds', async () => {
+    const { mkdtempSync, rmSync, readFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { captureIo } = await import('../src/io.js')
+    const { runProject } = await import('../src/commands/project.js')
+    const dir = mkdtempSync(join(tmpdir(), 'fdn-mcp-docid-'))
+    const target = join(dir, 'widget')
+    const cwd = process.cwd()
+
+    try {
+      const created = await client.callTool({ name: 'foundation_new', arguments: { path: target } })
+      expect(created.isError).not.toBe(true)
+      const filePath = (created.structuredContent as Record<string, unknown>).path as string
+
+      const beforeText = readFileSync(filePath, 'utf8')
+      const originalDocId = /data-fdn-doc-id="([^"]*)"/.exec(beforeText)?.[1]
+      expect(originalDocId, 'foundation_new must mint and stamp a doc id, same as the CLI').toBeTruthy()
+
+      // "ingest with content" — a real hand/agent-edit round-trip, the exact
+      // shape the friction log's repro used ("Pass content to write new/
+      // edited text first, then ingest it in one call").
+      const edited = beforeText.replace('Hello, Foundation', 'Hello, Bees')
+      const ingested = await client.callTool({ name: 'foundation_ingest', arguments: { path: filePath, content: edited } })
+      expect(ingested.isError).not.toBe(true)
+
+      const afterText = readFileSync(filePath, 'utf8')
+      const afterDocId = /data-fdn-doc-id="([^"]*)"/.exec(afterText)?.[1]
+      expect(afterDocId, 'foundation_ingest must not strip data-fdn-doc-id').toBe(originalDocId)
+      expect(afterText).toContain('Hello, Bees')
+
+      // project add succeeds: the id ingest preserved is a real, addressable
+      // document id, not just text that happens to still be there.
+      process.chdir(dir)
+      const initCode = await runProject(['init', dir], captureIo())
+      expect(initCode).toBe(0)
+      const io = captureIo()
+      const addCode = await runProject(['add', 'widget.fdn.html'], io)
+      expect(addCode).toBe(0)
+      expect(io.err).toEqual([])
+
+      const manifest = JSON.parse(readFileSync(join(dir, 'foundation.json'), 'utf8')) as {
+        documents: Array<{ path: string; docId: string }>
+      }
+      expect(manifest.documents).toHaveLength(1)
+      expect(manifest.documents[0]?.docId).toBe(originalDocId)
+    } finally {
+      process.chdir(cwd)
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }, 15000)
+})
+
 describe('foundation_project (read-only manifest listing)', () => {
   let client: Client
   let transport: StdioClientTransport

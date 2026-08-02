@@ -17,6 +17,7 @@
  * Foundation before and is deciding whether/how to call a tool, not a human
  * reading API docs.
  */
+import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -36,6 +37,14 @@ import type { ConformanceReport, FdnComponent, FdnDocument, FdnNode, FdnViewport
 // only exports a CLI entry point (runFreeze), not these two.
 import { freezeDocument, verifyFrozen } from 'foundation-engine/src/freeze/index.js'
 import { chainPathFor, writeChainInit } from '../commands/chain.js'
+// Bug fix (dogfood cycle 3, friction §6): the document id lives outside
+// FdnDocument entirely (see docid.ts's module doc) — parseDocument/
+// projectDocument never see it, so any parse->project round-trip silently
+// drops data-fdn-doc-id unless the caller re-stamps it by hand.
+// commands/ingest.ts (the CLI's `foundation ingest`) already does this;
+// toolIngest below shares that same helper rather than re-deriving the
+// re-stamp logic, so the two write paths can never drift again.
+import { injectDocIdAttr, readDocIdAttr } from '../docid.js'
 // foundation_import shares the harvest/project/merge/renumber plumbing with
 // `foundation import` (CLI) rather than re-deriving it — same reuse pattern
 // as chainPathFor/writeChainInit above. loadImporterModule() is itself the
@@ -319,9 +328,16 @@ async function toolIngest(args: Record<string, unknown>): Promise<ToolResult> {
 
   const { doc, report } = parseDocument(read.source)
   const canonical = projectDocument(doc)
-  const rewritten = canonical !== read.source
+  // Bug fix (friction §6): re-stamp data-fdn-doc-id off the ORIGINAL source
+  // onto the freshly-projected text, exactly as commands/ingest.ts's CLI
+  // path does — parse(project(doc)) is a fixpoint for FdnDocument, but
+  // data-fdn-doc-id isn't part of FdnDocument, so without this every MCP
+  // ingest silently deleted the document's identity.
+  const docId = readDocIdAttr(read.source)
+  const canonicalWithDocId = docId ? injectDocIdAttr(canonical, docId) : canonical
+  const rewritten = canonicalWithDocId !== read.source
   try {
-    writeFileSync(path, canonical, 'utf8')
+    writeFileSync(path, canonicalWithDocId, 'utf8')
   } catch (err) {
     return fail(`could not write ${path}: ${err instanceof Error ? err.message : String(err)}`)
   }
@@ -604,21 +620,36 @@ async function toolNew(args: Record<string, unknown>): Promise<ToolResult> {
   if (!check.valid) {
     return fail(`internal error: generated skeleton failed validation: ${JSON.stringify(check.issues)}`)
   }
+  // Bug fix (dogfood cycle 3, friction §6): SPEC 13a-i requires the CLI/
+  // surface layer (never the randomness-free engine) to mint the document
+  // id and stamp it into the text — exactly what commands/new.ts's
+  // `foundation new` does. This MCP handler used to skip that step
+  // entirely, so an MCP-created document had no data-fdn-doc-id in its
+  // text AND no docId recorded in its chain (writeChainInit below was
+  // never given one either) — `foundation project add` then refused it
+  // outright with "no document id found". Mint + stamp here via the same
+  // docid.ts helper the CLI uses, and thread the same id into the chain's
+  // own init commit, matching `foundation new` exactly.
+  const docId = randomUUID()
+  const text = injectDocIdAttr(projectDocument(doc), docId)
   try {
-    writeFileSync(filePath, projectDocument(doc), 'utf8')
+    writeFileSync(filePath, text, 'utf8')
   } catch (err) {
     return fail(`could not write ${filePath}: ${err instanceof Error ? err.message : String(err)}`)
   }
 
   // friction §6: same identity rules the CLI uses, not a hardcoded 'agent:mcp'.
   let chain: { chainPath: string; head: { hash: string } } | null = null
-  const result = writeChainInit(filePath, doc, { author: defaultAuthor(), message: 'init' }, {
-    stdout: () => {},
-    stderr: () => {},
-  })
+  const result = writeChainInit(
+    filePath,
+    doc,
+    { author: defaultAuthor(), message: 'init' },
+    { stdout: () => {}, stderr: () => {} },
+    { docId },
+  )
   if (result) chain = { chainPath: result.chainPath, head: { hash: result.head.hash } }
 
-  return ok({ path: filePath, title, empty, chain })
+  return ok({ path: filePath, title, empty, chain, docId })
 }
 
 /**
@@ -692,9 +723,17 @@ async function toolImport(args: Record<string, unknown>): Promise<ToolResult> {
 
   const nextDoc: FdnDocument = { ...doc, components, lookups: lookupResult.lookups, tokens: tokenResult.tokens }
 
+  // Same class of bug as foundation_ingest (friction §6): commands/import.ts's
+  // CLI path re-stamps data-fdn-doc-id off the ORIGINAL target source before
+  // writing (its own "ordinary project -> re-stamp-doc-id -> write dance, see
+  // ingest.ts" comment) — this MCP handler must do the same, via the same
+  // docid.ts helpers, or every foundation_import through MCP silently strips
+  // the target document's identity too.
   const canonical = projectDocument(nextDoc)
+  const targetDocId = readDocIdAttr(read.source)
+  const canonicalWithDocId = targetDocId ? injectDocIdAttr(canonical, targetDocId) : canonical
   try {
-    writeFileSync(into, canonical, 'utf8')
+    writeFileSync(into, canonicalWithDocId, 'utf8')
   } catch (err) {
     return fail(`could not write ${into}: ${err instanceof Error ? err.message : String(err)}`)
   }

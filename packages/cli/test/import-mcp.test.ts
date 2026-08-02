@@ -112,6 +112,24 @@ describe('foundation_import (MCP tool)', () => {
     expect(result.content[0]?.text).toContain('BadgeLookup1')
   })
 
+  it('regression (dogfood cycle 3, friction §6): preserves the target document\'s data-fdn-doc-id, same as the CLI', async () => {
+    // Same underlying bug class as foundation_ingest: import's write path is
+    // also parse -> mutate -> project -> write, and data-fdn-doc-id lives
+    // only in the file text, outside FdnDocument. commands/import.ts's CLI
+    // path already re-stamps it (see its "ordinary project -> re-stamp-doc-
+    // id -> write dance" comment); this MCP handler must do the same.
+    const before = readFileSync(file, 'utf8')
+    const originalDocId = /data-fdn-doc-id="([^"]*)"/.exec(before)?.[1]
+    expect(originalDocId).toBeTruthy()
+
+    const result = await callTool('foundation_import', { source: fixture('badge.tsx'), into: file })
+    expect(result.isError).not.toBe(true)
+
+    const after = readFileSync(file, 'utf8')
+    const afterDocId = /data-fdn-doc-id="([^"]*)"/.exec(after)?.[1]
+    expect(afterDocId).toBe(originalDocId)
+  })
+
   describe('theme vars become document tokens (follow-up wave)', () => {
     it('badge.tsx import declares its Tailwind theme vars as doc.tokens', async () => {
       const result = await callTool('foundation_import', { source: fixture('badge.tsx'), into: file })
