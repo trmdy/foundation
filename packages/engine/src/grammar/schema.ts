@@ -167,7 +167,12 @@ export const FDN_ELEMENTS: Record<string, FdnElementRule> = {
   'fdn-style': { metadata: true, knownAttrs: ['name'], requiredAttrs: ['name'], allowsChildren: false },
 
   // components
-  'fdn-component': { metadata: true, knownAttrs: ['name'], requiredAttrs: ['name'], allowsChildren: true },
+  'fdn-component': {
+    metadata: true,
+    knownAttrs: ['name', 'data-fdn-import-source', 'data-fdn-import-sha256'],
+    requiredAttrs: ['name'],
+    allowsChildren: true,
+  },
   'fdn-props': { metadata: true, allowsChildren: true },
   'fdn-prop': {
     metadata: true,
@@ -175,6 +180,13 @@ export const FDN_ELEMENTS: Record<string, FdnElementRule> = {
     requiredAttrs: ['name', 'type'],
     allowsChildren: false,
   },
+  // sealed capsule body (SPEC D3/Q3, resolved): a component's body is EITHER
+  // native subset nodes OR this wrapper — never both. Consumed directly into
+  // FdnComponent.sealed by parse/index.ts (like fdn-props, never converted to
+  // an FdnNode), so allowsChildren here is documentation, not enforcement.
+  'fdn-sealed': { metadata: true, allowsChildren: true },
+  'fdn-sealed-html': { metadata: true, allowsChildren: false },
+  'fdn-sealed-css': { metadata: true, allowsChildren: false },
   'fdn-slot': { metadata: false, knownAttrs: ['name'], requiredAttrs: ['name'], allowsChildren: true },
   'fdn-use': { metadata: false, knownAttrs: ['component'], requiredAttrs: ['component'], allowsChildren: true },
   'fdn-fill': { metadata: false, knownAttrs: ['slot'], requiredAttrs: ['slot'], allowsChildren: true },

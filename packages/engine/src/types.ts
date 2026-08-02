@@ -77,6 +77,10 @@ export interface FdnNamedStyle {
 export interface FdnProp {
   name: string
   type: FdnParamType
+  /** For enum props: the allowed values (mirrors FdnParam.values — added for
+   *  the Wave 4 importer, whose enum domains must live in the schema, not be
+   *  reverse-engineered from render samples). */
+  values?: string[]
   required?: boolean
   default?: unknown
 }

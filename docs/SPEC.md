@@ -481,6 +481,15 @@ To fill: the fixtures.
     concurrent overlapping property writes as review signals. Envelopes are hashed
     but not yet signed — untrusted relays are a recorded future upgrade, and the
     envelope leaves room for signatures.
+14. **Boolean attribute presence** (importer Stage 2 discovery, 2026-08-02): the
+    grammar can interpolate attribute *values* and gate *nodes* (`when=`), but has
+    no way to make an attribute's *presence* conditional — HTML boolean attributes
+    (`disabled`, `checked`, `open`) are presence-based, so a component whose only
+    variant difference is `disabled` cannot project to a native template and
+    correctly seals today. Candidate: `attr-when-<name>="<cond>"` (attribute
+    emitted iff cond true), or a rule that an interpolated empty value omits
+    known-boolean attributes. Decide before the importer's v2 pass; the sealed
+    fallback is correct meanwhile.
 13. **Hover-triggered presence** (overlay evidence round 2, findings §f — genuinely
     new, distinct from resolved Q11): a tooltip's *visibility* is gated by another
     node's interaction state — hovering element A decides whether unrelated subtree B

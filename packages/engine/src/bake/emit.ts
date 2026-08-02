@@ -64,18 +64,31 @@ function renderNode(node: FdnNode, depth: number): string {
   return `${indent}${openTag}${escapeText(node.text as string)}${closeTag}`
 }
 
-export function emitHtml(doc: FdnDocument, tree: FdnNode[]): string {
+/**
+ * Sealed-capsule css, collected during the bake walk (bake/index.ts,
+ * bake/capsule.ts) — capsule class name -> its already-scoped css text.
+ * Merged into the SAME <style> block as the :root token block (API.md: "css
+ * collected into the baked document's style block", singular). Sorted by
+ * capsule class name for the same determinism guarantee as the token block.
+ */
+export function emitHtml(doc: FdnDocument, tree: FdnNode[], capsuleCss?: Map<string, string>): string {
   const lines: string[] = []
   lines.push('<!-- baked by foundation-engine — derived artifact, do not edit -->')
 
   const tokenNames = Object.keys(doc.tokens).sort()
-  if (tokenNames.length > 0) {
+  const capsuleNames = capsuleCss ? [...capsuleCss.keys()].sort() : []
+  if (tokenNames.length > 0 || capsuleNames.length > 0) {
     lines.push('<style>')
-    lines.push(':root {')
-    for (const name of tokenNames) {
-      lines.push(`  --${name}: ${doc.tokens[name]};`)
+    if (tokenNames.length > 0) {
+      lines.push(':root {')
+      for (const name of tokenNames) {
+        lines.push(`  --${name}: ${doc.tokens[name]};`)
+      }
+      lines.push('}')
     }
-    lines.push('}')
+    for (const name of capsuleNames) {
+      lines.push(capsuleCss?.get(name) as string)
+    }
     lines.push('</style>')
   }
 

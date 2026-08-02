@@ -621,31 +621,65 @@ function collectSlotNames(nodes: FdnNode[], out: Set<string>): void {
   }
 }
 
+/**
+ * `<fdn-sealed><fdn-sealed-html>…</fdn-sealed-html><fdn-sealed-css>…</fdn-sealed-css></fdn-sealed>`
+ * — the sealed-capsule canonical representation (SPEC D3/Q3, coordinated with
+ * project/index.ts's emitSealed). html/css are carried as ordinary (entity-escaped)
+ * text content, decoded automatically by parse5's tree construction — no CDATA
+ * trick needed since parse5 treats these as regular elements, not raw-text
+ * elements like <script>/<style>. Extraction uses directTextOf (NOT
+ * normalizeTextWhitespace) because sealed content must round-trip byte-for-byte:
+ * collapsing whitespace here would break the parse(project(doc)) fixpoint for
+ * any capsule whose html/css contains significant whitespace.
+ */
+function parseSealed(componentEl: ElementNode): { html: string; css: string } | undefined {
+  const wrapper = directChildrenByTag(componentEl, 'fdn-sealed')[0]
+  if (!wrapper) return undefined
+  const htmlEl = directChildrenByTag(wrapper, 'fdn-sealed-html')[0]
+  const cssEl = directChildrenByTag(wrapper, 'fdn-sealed-css')[0]
+  return {
+    html: htmlEl ? directTextOf(htmlEl) : '',
+    css: cssEl ? directTextOf(cssEl) : '',
+  }
+}
+
 function parseComponents(body: ElementNode, ctx: ConvertCtx): FdnComponent[] {
   return directChildrenByTag(body, 'fdn-component').map((el) => {
-    const name = attrsOf(el).name ?? ''
+    const a = attrsOf(el)
+    const name = a.name ?? ''
     const propsWrapper = directChildrenByTag(el, 'fdn-props')[0]
     const props: FdnProp[] = propsWrapper
       ? directChildrenByTag(propsWrapper, 'fdn-prop').map((propEl) => {
-          const a = attrsOf(propEl)
-          const type = (a.type as FdnParamType) ?? 'string'
-          const prop: FdnProp = { name: a.name ?? '', type }
-          if (a.required !== undefined) prop.required = a.required === 'true'
-          if (a.default !== undefined) prop.default = coerce(type, a.default)
+          const pa = attrsOf(propEl)
+          const type = (pa.type as FdnParamType) ?? 'string'
+          const prop: FdnProp = { name: pa.name ?? '', type }
+          if (pa.required !== undefined) prop.required = pa.required === 'true'
+          if (pa.default !== undefined) prop.default = coerce(type, pa.default)
           return prop
         })
       : []
 
+    const sealed = parseSealed(el)
+
     const bodyNodes: FdnNode[] = []
     for (const c of childElements(el)) {
-      if (c.tagName.toLowerCase() === 'fdn-props') continue
+      const ctag = c.tagName.toLowerCase()
+      if (ctag === 'fdn-props' || ctag === 'fdn-sealed') continue
       const node = convertElement(c, ctx)
       if (node) bodyNodes.push(node)
     }
     const slots = new Set<string>()
     collectSlotNames(bodyNodes, slots)
 
-    return { name, props, slots: [...slots], body: bodyNodes }
+    const component: FdnComponent = { name, props, slots: [...slots], body: bodyNodes }
+    if (sealed) component.sealed = sealed
+    if (a['data-fdn-import-source'] !== undefined || a['data-fdn-import-sha256'] !== undefined) {
+      component.provenance = {
+        source: a['data-fdn-import-source'] ?? '',
+        contentSha256: a['data-fdn-import-sha256'] ?? '',
+      }
+    }
+    return component
   })
 }
 

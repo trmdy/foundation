@@ -36,9 +36,11 @@ import type {
 } from '../types.js'
 import { evaluateWhen, interpolateString, resolveRef, stringifyValue, type ExprContext } from './expr.js'
 import { emitHtml } from './emit.js'
+import { capsuleClassName, parseSealedFragment, scopeCss } from './capsule.js'
 
 export { emitHtml } from './emit.js'
 export * from './expr.js'
+export { capsuleClassName, parseSealedFragment, scopeCss } from './capsule.js'
 
 const STATE_STYLE_KEYS: StateStyleKey[] = ['hover', 'focus', 'active', 'disabled']
 
@@ -49,6 +51,10 @@ interface BakeCtx extends ExprContext {
   reports: ReportLine[]
   tokenValueIndex: Map<string, string[]>
   referencedTokens: Set<string>
+  /** capsule class name -> scoped css text (bake/capsule.ts), shared by
+   *  reference across every ctx spread — same accumulation pattern as
+   *  `reports`/`referencedTokens` below. */
+  capsuleCss: Map<string, string>
 }
 
 function pushReport(ctx: BakeCtx, line: ReportLine): void {
@@ -102,6 +108,7 @@ export function bakeDocument(doc: FdnDocument, opts?: { state?: string }): { htm
     reports,
     tokenValueIndex,
     referencedTokens: new Set(),
+    capsuleCss: new Map(),
   }
 
   const tree = doc.body.flatMap((n) => bakeNode(n, ctx))
@@ -116,7 +123,7 @@ export function bakeDocument(doc: FdnDocument, opts?: { state?: string }): { htm
     }
   }
 
-  const html = emitHtml(doc, tree)
+  const html = emitHtml(doc, tree, ctx.capsuleCss)
 
   return { html, tree, state: stateName, report: { lines: dedupeReports(reports) } }
 }
@@ -504,6 +511,46 @@ function stringifyPropValue(value: unknown, type: FdnParamType): string {
   return stringifyValue(value)
 }
 
+/**
+ * Sealed capsule instantiation (SPEC D3/Q3, API.md Wave 4 "Bake" line):
+ * `<div class="fdn-capsule-<name>">` wrapping the parsed sealed html, plus
+ * its naive-prefixed css collected for the document's <style> block
+ * (bake/capsule.ts, wired through emitHtml via ctx.capsuleCss).
+ *
+ * Deliberately minimal, matching API.md's literal wrapper shape: unlike the
+ * native path, the fdn-use instance's own attrs/style/props are NOT merged
+ * onto the wrapper (unresolved `when`/`each` on the instance are still
+ * honored — those are evaluated by the generic bakeSingle dispatch before
+ * this function is ever reached). A sealed body has no template to bind
+ * props into, so props bound at the fdn-use site remain structurally legal
+ * (validate still type-checks them) but are inert at bake time — the capsule
+ * always renders its one fixed baseline. Recorded contract finding, not a
+ * bug: sealing trades prop-driven variation for opacity.
+ */
+function instantiateSealedComponent(
+  node: FdnNode,
+  componentName: string,
+  sealed: { html: string; css: string },
+  ctx: BakeCtx,
+): FdnNode[] {
+  const capsuleClass = capsuleClassName(componentName)
+  const roots = parseSealedFragment(sealed.html, `${node.id}~cap`)
+  if (sealed.css.trim() !== '' && !ctx.capsuleCss.has(capsuleClass)) {
+    ctx.capsuleCss.set(capsuleClass, scopeCss(sealed.css, capsuleClass))
+  }
+  return [
+    {
+      id: node.id,
+      tag: 'div',
+      attrs: { class: capsuleClass },
+      style: {},
+      styleStates: {},
+      text: undefined,
+      children: roots,
+    },
+  ]
+}
+
 function instantiateComponent(node: FdnNode, ctx: BakeCtx): FdnNode[] {
   const componentName = node.attrs['component']
   if (!componentName) {
@@ -524,6 +571,8 @@ function instantiateComponent(node: FdnNode, ctx: BakeCtx): FdnNode[] {
     })
     return []
   }
+
+  if (component.sealed) return instantiateSealedComponent(node, componentName, component.sealed, ctx)
 
   const { attrs: bakedAttrs } = resolveNodeStyle(node, ctx)
 

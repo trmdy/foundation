@@ -247,8 +247,48 @@ function emitFdnStyles(w: Writer, depth: number, doc: FdnDocument): void {
 // fdn-component definitions (alphabetical, per API.md)
 // ——————————————————————————————————————————————————————————————————————————
 
+/**
+ * Text-leaf metadata element: `<tag>escaped-content</tag>` — open tag, escaped
+ * content, close tag concatenated onto ONE pushed line with NO whitespace
+ * added around the content. This is deliberate, not a style choice: unlike
+ * ordinary node text (normalizeTextWhitespace collapses it on the way back
+ * in, so incidental pretty-printing whitespace never round-trips and never
+ * needs to), sealed html/css is extracted RAW (directTextOf, parse/index.ts's
+ * parseSealed) specifically to preserve significant whitespace. Putting the
+ * content on its own indented line — as emitElement's normal inner-callback
+ * pattern does for element children — would inject a leading/trailing
+ * newline+indent into the text NODE itself on reparse (HTML has no notion of
+ * "pretty-printing" whitespace inside a text node; every byte between `>` and
+ * `<` is content), silently breaking the parse/project fixpoint.
+ */
+function emitTextLeaf(w: Writer, depth: number, tag: string, text: string): void {
+  w.push(depth, `<${tag}>${escapeText(text)}</${tag}>`)
+}
+
+/**
+ * Sealed-capsule canonical representation (SPEC D3/Q3, coordinated with
+ * parse/index.ts's parseSealed): html/css survive as entity-escaped text
+ * content of dedicated leaf elements — no CDATA needed, since parse5 decodes
+ * ordinary entities on any element (not just raw-text elements like
+ * <script>/<style>). Kept on one line each (never re-indented line-by-line)
+ * because re-indenting arbitrary markup/CSS text would inject whitespace
+ * that a subsequent parse could not tell apart from content, breaking the
+ * project/parse fixpoint.
+ */
+function emitSealed(w: Writer, depth: number, sealed: { html: string; css: string }): void {
+  w.push(depth, '<fdn-sealed>')
+  emitTextLeaf(w, depth + 1, 'fdn-sealed-html', sealed.html)
+  emitTextLeaf(w, depth + 1, 'fdn-sealed-css', sealed.css)
+  w.push(depth, '</fdn-sealed>')
+}
+
 function emitComponent(w: Writer, depth: number, component: FdnComponent): void {
-  w.push(depth, `<fdn-component name="${escapeAttr(component.name)}" hidden>`)
+  const attrs: [string, string][] = [['name', component.name]]
+  if (component.provenance) {
+    attrs.push(['data-fdn-import-source', component.provenance.source])
+    attrs.push(['data-fdn-import-sha256', component.provenance.contentSha256])
+  }
+  w.push(depth, `<fdn-component ${attrPairs(attrs)} hidden>`)
   if (component.props.length > 0) {
     w.push(depth + 1, '<fdn-props>')
     for (const p of component.props) {
@@ -259,7 +299,11 @@ function emitComponent(w: Writer, depth: number, component: FdnComponent): void 
     }
     w.push(depth + 1, '</fdn-props>')
   }
-  for (const node of component.body) emitNode(w, depth + 1, node)
+  if (component.sealed) {
+    emitSealed(w, depth + 1, component.sealed)
+  } else {
+    for (const node of component.body) emitNode(w, depth + 1, node)
+  }
   w.push(depth, '</fdn-component>')
 }
 
