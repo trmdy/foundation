@@ -155,17 +155,25 @@ function reportBadge(report: ConformanceReport): string {
   return `<a href="/report" class="fdn-serve-errors">${errors} error${errors === 1 ? '' : 's'}</a>`
 }
 
-function wrapPage(filePath: string, doc: FdnDocument, bakedHtml: string, report: ConformanceReport, activeState: string | null): string {
+function wrapPage(
+  filePath: string,
+  doc: FdnDocument,
+  bakedHtml: string,
+  report: ConformanceReport,
+  activeState: string | null,
+  embed: boolean,
+): string {
   const name = basename(filePath)
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>${doc.title ? htmlEscape(doc.title) : htmlEscape(name)} — foundation serve</title>
-</head>
-<body>
-${bakedHtml}
-<div data-foundation-serve-strip style="position:fixed;bottom:12px;left:12px;right:12px;z-index:2147483647;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:8px 12px;background:#1e1e1e;color:#f2f2f2;font:12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.35);">
+  // `?embed=1` (apiary-surface-epic.md C3): the Foundation board pane already
+  // renders its own state tabs, validate badge, and chain/annotation rail —
+  // when it loads this page in its native WebContentsView it does not want a
+  // SECOND floating strip duplicating that chrome underneath its own. The
+  // strip (and its annotate-mode toggle button) is the only thing suppressed;
+  // live-reload and the pin overlay stay live either way, since the pane has
+  // no substitute for either yet.
+  const strip = embed
+    ? ''
+    : `<div data-foundation-serve-strip style="position:fixed;bottom:12px;left:12px;right:12px;z-index:2147483647;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:8px 12px;background:#1e1e1e;color:#f2f2f2;font:12px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.35);">
   <span class="fdn-serve-badge" style="opacity:.75;white-space:nowrap;">foundation serve — derived view, source: ${htmlEscape(name)}</span>
   <span style="display:flex;flex-wrap:wrap;gap:8px;">
       ${stateLinks(doc, activeState)}
@@ -174,7 +182,16 @@ ${bakedHtml}
   <a href="/source" style="color:#9ecbff;">source</a>
   <button type="button" data-fdn-annotate-toggle aria-pressed="false" style="border:1px solid #555;background:transparent;color:#f2f2f2;border-radius:4px;padding:2px 8px;font:inherit;cursor:pointer;">Annotate</button>
   ${reportBadge(report)}
-</div>
+</div>`
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${doc.title ? htmlEscape(doc.title) : htmlEscape(name)} — foundation serve</title>
+</head>
+<body>
+${bakedHtml}
+${strip}
 <style>
   [data-foundation-serve-strip] a.fdn-serve-link { color:#c9c9c9; text-decoration:none; padding:2px 6px; border-radius:4px; }
   [data-foundation-serve-strip] a.fdn-serve-link.is-active { color:#1e1e1e; background:#f2f2f2; }
@@ -319,11 +336,11 @@ export async function serveDocument(filePath: string, opts?: ServeOptions): Prom
     debounceTimer = setTimeout(broadcastReload, RELOAD_DEBOUNCE_MS)
   }
 
-  function handleGetRoot(req: IncomingMessage, res: ServerResponse, state: string | null): void {
+  function handleGetRoot(req: IncomingMessage, res: ServerResponse, state: string | null, embed: boolean): void {
     try {
       const { doc, html, report } = loadAndBake(filePath, state)
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(wrapPage(filePath, doc, html, report, state))
+      res.end(wrapPage(filePath, doc, html, report, state, embed))
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' })
       res.end(errorPage(err instanceof Error ? (err.stack ?? err.message) : String(err)))
@@ -510,7 +527,7 @@ export async function serveDocument(filePath: string, opts?: ServeOptions): Prom
 
     if (req.method === 'GET') {
       if (url.pathname === '/') {
-        handleGetRoot(req, res, state)
+        handleGetRoot(req, res, state, url.searchParams.get('embed') === '1')
         return
       }
       if (url.pathname === '/events') {
