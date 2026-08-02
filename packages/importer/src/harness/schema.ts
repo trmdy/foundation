@@ -236,9 +236,14 @@ function parseDestructureDefaults(body: string): Map<string, unknown> {
 
 export interface SchemaExtractionResult {
   propSchema: FdnProp[]
-  /** enum values by prop name — not carried in FdnProp (see finding in
-   *  README/report: FdnProp has no `values` field, unlike FdnParam), needed
-   *  internally to drive the sample matrix (harness/samples.ts). */
+  /** enum values by prop name, kept as its OWN return channel even though
+   *  (Stage 3 update) each enum FdnProp in propSchema now also carries its
+   *  own `values` — this map remains the shape samples.ts's sample-matrix
+   *  builder consumes directly (keyed lookup, not a linear scan of
+   *  propSchema), and it is the one populated for props excluded from
+   *  propSchema by an override (overrides always win — see below — so an
+   *  override that changes a prop's type off `enum` would otherwise strand
+   *  an orphaned domain nowhere). */
   enumValues: Map<string, string[]>
 }
 
@@ -263,6 +268,14 @@ export function extractPropSchema(
           props.set(propName, {
             name: propName,
             type: 'enum',
+            // Stage 1 enhancement (API.md Wave 4 item 4): populate values on
+            // the FdnProp itself, not just the internal enumValues map, so
+            // the schema returned to callers is self-describing (mirrors
+            // FdnParam.values — see the types.ts CONTRACT FINDING resolved
+            // for this wave). Stage 2 (project/fold.ts) still derives its
+            // own domain empirically from the sampled arms and never reads
+            // this field — it remains the arms-based fallback, kept as-is.
+            values,
             required: false,
             default: cva.defaults.get(propName),
           })
@@ -274,7 +287,13 @@ export function extractPropSchema(
           if (!overrideNames.has(field.name)) unclassified.push(field.name)
           continue
         }
-        props.set(field.name, { name: field.name, type, required: !field.optional })
+        const values = type === 'enum' ? enumValues.get(field.name) : undefined
+        props.set(field.name, {
+          name: field.name,
+          type,
+          required: !field.optional,
+          ...(values ? { values } : {}),
+        })
       }
     } else {
       unclassified.push(`(props type "${detected.propsTypeName}" not found as an "interface ${detected.propsTypeName} { ... }" declaration)`)

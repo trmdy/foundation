@@ -83,6 +83,15 @@ describe('extractPropSchema', () => {
 
     expect(enumValues.get('variant')).toEqual(['default', 'destructive', 'outline'])
     expect(enumValues.get('size')).toEqual(['default', 'sm', 'lg'])
+
+    // Stage 1 enhancement (API.md Wave 4 item 4): the enum FdnProp itself is
+    // now self-describing — `values` mirrors what enumValues carries, so a
+    // consumer reading propSchema alone (without the separate enumValues
+    // map) still knows the domain.
+    expect(byName.variant?.values).toEqual(['default', 'destructive', 'outline'])
+    expect(byName.size?.values).toEqual(['default', 'sm', 'lg'])
+    expect(byName.disabled?.values).toBeUndefined()
+    expect(byName.children?.values).toBeUndefined()
   })
 
   it('extracts a single-group cva enum from badge.tsx (no booleans)', () => {
@@ -93,6 +102,7 @@ describe('extractPropSchema', () => {
     expect(byName.variant).toMatchObject({ type: 'enum', default: 'default' })
     expect(propSchema.some((p) => p.type === 'boolean')).toBe(false)
     expect(enumValues.get('variant')).toEqual(['default', 'success', 'warning'])
+    expect(byName.variant?.values).toEqual(['default', 'success', 'warning'])
   })
 
   it('extracts a required string + boolean from card.tsx, and errors on the ReactNode children field', () => {
@@ -127,5 +137,29 @@ describe('extractPropSchema', () => {
     const detected = detectComponent(source, 'icon')
     const { propSchema } = extractPropSchema(source, detected)
     expect(propSchema).toEqual([{ name: 'label', type: 'string', required: false }])
+  })
+
+  it('populates values for a plain string-literal-union enum (not cva-derived)', () => {
+    // Stage 1 enhancement (API.md Wave 4 item 4), the OTHER enum-producing
+    // path besides cva groups: `classifyFieldType` already detected a
+    // string-literal union as `type: 'enum'` and recorded it into the
+    // enumValues map (for the sample matrix); this asserts the returned
+    // FdnProp carries the same domain on its own `values` field too.
+    const source = `
+      export interface ToastProps {
+        tone: 'info' | 'success' | 'danger'
+        message: string
+      }
+      export function Toast({ tone, message }: ToastProps) {
+        return <div>{message}</div>
+      }
+    `
+    const detected = detectComponent(source, 'toast')
+    const { propSchema, enumValues } = extractPropSchema(source, detected)
+    const byName = Object.fromEntries(propSchema.map((p) => [p.name, p]))
+    expect(byName.tone).toMatchObject({ type: 'enum', required: true })
+    expect(byName.tone?.values).toEqual(['info', 'success', 'danger'])
+    expect(enumValues.get('tone')).toEqual(['info', 'success', 'danger'])
+    expect(byName.message?.values).toBeUndefined()
   })
 })

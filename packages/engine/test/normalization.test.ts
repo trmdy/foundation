@@ -132,6 +132,46 @@ describe('normalization v0: shorthand expansion', () => {
     const { doc } = parseDocument(wrap('<div style="width:316.5px;z-index:9999"></div>'))
     expect(doc.body[0]?.style).toEqual({ width: '316.5px', 'z-index': '9999' })
   })
+
+  // Regression (Wave 4 Stage 3 bug fix): tokenizeTopLevel used to split a
+  // shorthand value on EVERY top-level whitespace character with no
+  // paren-depth tracking, so a calc()-shaped value's internal whitespace
+  // (e.g. Tailwind v4's `border-radius: calc(infinity * 1px)`) split into
+  // bogus extra tokens and corrupted TRBL/radius expansion. Covered here in
+  // both a "shorthand position" (the whole declaration value is one calc()
+  // expression) and a "longhand position" (calc() is one of several
+  // space-separated values within a multi-value shorthand).
+  it('treats a calc() value as one atomic token in border-radius (shorthand position)', () => {
+    const { doc } = parseDocument(wrap('<div style="border-radius:calc(infinity * 1px)"></div>'))
+    expect(doc.body[0]?.style).toEqual({
+      'border-top-left-radius': 'calc(infinity * 1px)',
+      'border-top-right-radius': 'calc(infinity * 1px)',
+      'border-bottom-right-radius': 'calc(infinity * 1px)',
+      'border-bottom-left-radius': 'calc(infinity * 1px)',
+    })
+  })
+
+  it('treats a calc() value as one atomic token in padding (longhand position, mixed with a plain value)', () => {
+    const { doc } = parseDocument(wrap('<div style="padding:calc(infinity * 1px) 8px"></div>'))
+    expect(doc.body[0]?.style).toEqual({
+      'padding-top': 'calc(infinity * 1px)',
+      'padding-right': '8px',
+      'padding-bottom': 'calc(infinity * 1px)',
+      'padding-left': '8px',
+    })
+  })
+
+  it('does not corrupt a nested calc()-in-var() longhand slot inside a 4-value shorthand', () => {
+    const { doc } = parseDocument(
+      wrap('<div style="margin:1px calc(2px + var(--gap, 3px)) 4px 5px"></div>'),
+    )
+    expect(doc.body[0]?.style).toEqual({
+      'margin-top': '1px',
+      'margin-right': 'calc(2px + var(--gap, 3px))',
+      'margin-bottom': '4px',
+      'margin-left': '5px',
+    })
+  })
 })
 
 describe('normalization v0: drops with report lines', () => {

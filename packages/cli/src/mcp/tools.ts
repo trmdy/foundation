@@ -30,12 +30,28 @@ import {
   projectDocument,
   validateDocument,
 } from 'foundation-engine'
-import type { ConformanceReport, FdnDocument, FdnNode, FdnViewport, ReportLine } from 'foundation-engine'
+import type { ConformanceReport, FdnComponent, FdnDocument, FdnNode, FdnViewport, ReportLine } from 'foundation-engine'
 // Deep import, not re-exported from the package root (same as commands/freeze.ts) —
 // mirrored here rather than imported from commands/freeze.ts because that file
 // only exports a CLI entry point (runFreeze), not these two.
 import { freezeDocument, verifyFrozen } from 'foundation-engine/src/freeze/index.js'
 import { chainPathFor, writeChainInit } from '../commands/chain.js'
+// foundation_import shares the harvest/project/merge/renumber plumbing with
+// `foundation import` (CLI) rather than re-deriving it — same reuse pattern
+// as chainPathFor/writeChainInit above. loadImporterModule() is itself the
+// lazy-load boundary (a computed `import()`, see commands/import.ts's module
+// doc): calling it is what pulls in esbuild/react/tailwindcss, so it must
+// only happen inside toolImport's handler, never at this file's top level.
+import {
+  docMaxMintedId,
+  formatStructuredError,
+  harnessErrorCode,
+  loadImporterModule,
+  mergeLookups,
+  remintComponentIds,
+  type ProjectResult,
+  type RenderArtifact,
+} from '../commands/import.js'
 import { skeletonDocument, skeletonDocumentEmpty } from '../commands/new.js'
 import { defaultAuthor } from '../identity.js'
 import { chainLabel, documentStatus, manifestPathFor, readManifest, statusLabel } from '../project.js'
@@ -88,8 +104,12 @@ function ok(structured: Record<string, unknown>): ToolResult {
   }
 }
 
-function fail(message: string): ToolResult {
-  return { content: [{ type: 'text', text: message }], isError: true }
+function fail(message: string, code?: string): ToolResult {
+  return {
+    content: [{ type: 'text', text: message }],
+    isError: true,
+    ...(code !== undefined ? { structuredContent: { code } } : {}),
+  }
 }
 
 class ToolInputError extends Error {}
@@ -601,6 +621,114 @@ async function toolNew(args: Record<string, unknown>): Promise<ToolResult> {
 }
 
 /**
+ * `foundation_import` — Wave 4 Stage 3: the agent-facing twin of `foundation
+ * import` (commands/import.ts owns the shared harvest/project/merge/renumber
+ * logic; this handler is I/O glue only — JSON result instead of stdout
+ * lines, `into` as the target-document arg name mirroring the CLI's --into).
+ *
+ * Description below is deliberately explicit about WHEN a component comes
+ * back sealed vs native (friction §7's lesson: an oversold tool description
+ * costs the calling agent a wasted retry/investigation cycle the first time
+ * reality doesn't match the blurb) — sealed is not a failure mode, it is
+ * the importer honestly reporting "this component's behavior depends on
+ * more than one prop at once (or its Tailwind couldn't be resolved
+ * statically), so it's vendored as opaque markup+css instead of a template
+ * we'd have to lie about."
+ */
+async function toolImport(args: Record<string, unknown>): Promise<ToolResult> {
+  const source = requireString(args, 'source')
+  const into = requireString(args, 'into')
+  const name = optionalString(args, 'name')
+  const sealed = optionalBoolean(args, 'sealed')
+  const propsArg = args['props']
+
+  let propsOverride: FdnComponent['props'] | undefined
+  if (propsArg !== undefined) {
+    if (!Array.isArray(propsArg)) return fail('foundation_import: "props" must be an array of FdnProp objects')
+    propsOverride = propsArg as FdnComponent['props']
+  }
+
+  const read = readSource(into)
+  if (!read.ok) return read.result
+
+  const importer = await loadImporterModule()
+
+  let artifact: RenderArtifact
+  try {
+    artifact = await importer.harvestComponent({
+      source,
+      ...(name !== undefined ? { name } : {}),
+      ...(propsOverride !== undefined ? { props: propsOverride } : {}),
+    })
+  } catch (err) {
+    return fail(`foundation_import: ${formatStructuredError('harvest', err)}`, harnessErrorCode(err))
+  }
+
+  let projected: ProjectResult
+  try {
+    projected = importer.projectArtifact(artifact, sealed ? { forceSealed: true } : undefined)
+  } catch (err) {
+    return fail(`foundation_import: ${formatStructuredError('project', err)}`, harnessErrorCode(err))
+  }
+
+  const { doc } = parseDocument(read.source)
+
+  const targetName = projected.component.name
+  const existingIndex = doc.components.findIndex((c) => c.name === targetName)
+  const maxId = docMaxMintedId(doc, targetName)
+  const component: FdnComponent = {
+    ...projected.component,
+    body: remintComponentIds(projected.component.body, { n: maxId }),
+  }
+
+  const lookupResult = mergeLookups(doc.lookups, projected.extraLookups)
+  if ('error' in lookupResult) return fail(`foundation_import: ${lookupResult.error}`)
+
+  const components =
+    existingIndex === -1 ? [...doc.components, component] : doc.components.map((c, i) => (i === existingIndex ? component : c))
+
+  const nextDoc: FdnDocument = { ...doc, components, lookups: lookupResult.lookups }
+
+  const canonical = projectDocument(nextDoc)
+  try {
+    writeFileSync(into, canonical, 'utf8')
+  } catch (err) {
+    return fail(`could not write ${into}: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  let commitInfo: Record<string, unknown> | null = null
+  const chainPath = chainPathFor(into)
+  if (existsSync(chainPath)) {
+    const author = defaultAuthor()
+    try {
+      const chain = loadChain(readFileSync(chainPath), { actor: author })
+      const currentCanonical = projectDocument(chain.doc())
+      if (currentCanonical === canonical) {
+        commitInfo = { status: 'no-op', reason: 'parsed document matches chain head; nothing to commit' }
+      } else {
+        const message = `import ${component.name} from ${source} (${projected.mode})`
+        const envelope = chain.apply({ author, message }, [{ op: 'replace-document', doc: nextDoc }])
+        writeFileSync(chainPath, chain.save())
+        commitInfo = { status: 'committed', hash: envelope.hash, message, chainPath }
+      }
+    } catch (err) {
+      return fail(`chain commit failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  return ok({
+    source,
+    into,
+    component: component.name,
+    action: existingIndex === -1 ? 'added' : 'replaced',
+    mode: projected.mode,
+    provenance: artifact.provenance,
+    report: reportPayload(projected.report as ReportLine[]),
+    commit: commitInfo,
+  })
+}
+
+/**
  * `foundation_project` — read a `foundation.json` manifest (SPEC 13a-iii)
  * and report per-document status. Read-only in MCP for v0 (only `action:
  * "list"` is accepted): writing a manifest (init/add/scan) stays CLI-only
@@ -779,6 +907,39 @@ export const TOOLS: ToolDefinition[] = [
       required: ['path'],
     },
     handler: toolNew,
+  },
+  {
+    name: 'foundation_import',
+    description:
+      'Harvest a real React/TSX component (a .tsx/.jsx file — ShadCN-style, cva-variant, or plain) into an '
+      + 'FdnComponent and merge it into a Foundation document (added if new, replaced if a component with that '
+      + 'name already exists there), chain-committed when the target already has a chain. Two outcomes, both '
+      + 'legitimate — check `mode` in the result, do not assume "native": '
+      + '"native" means the component became an ordinary, editable Foundation component (template body, when= '
+      + 'branches, {{ prop.x }} interpolation) you can inspect/edit exactly like a hand-written one afterward. '
+      + '"sealed" means the source component\'s behavior could not be safely expressed that way (its Tailwind '
+      + 'output could not be resolved statically, or two-or-more props interact in ways independent single-prop '
+      + 'folding cannot reproduce — see the `report` entries for which) — the ENTIRE rendered markup+css was '
+      + 'vendored verbatim as an opaque capsule instead. A sealed component still works correctly at bake time '
+      + '(same props in, same html out) but its body is not editable Foundation content; expect and accept this '
+      + 'for genuinely complex source components rather than treating it as an import failure. Pass `sealed: '
+      + 'true` to force capsule mode even when native projection would have succeeded (e.g. you want the vendored '
+      + 'source preserved byte-for-byte). Pass `props` (an array of `{name, type, values?, required?, default?}`) '
+      + 'to override auto-detected prop types, or to supply one for a prop the auto-detector could not classify '
+      + '(e.g. a `children: ReactNode` field — pass `{name: "children", type: "string"}`); overrides always win. '
+      + `${SUBSET_NOTE}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: { type: 'string', description: 'Path to the .tsx/.jsx component file to harvest' },
+        into: { type: 'string', description: 'Path to the target .fdn.html document (must already exist)' },
+        name: { type: 'string', description: 'Component name override; default is the detected export name (or the file name)' },
+        props: { type: 'array', description: 'FdnProp overrides — always win over auto-detected props; required for props the auto-detector cannot classify' },
+        sealed: { type: 'boolean', description: 'Force sealed (opaque capsule) mode even if native projection would succeed' },
+      },
+      required: ['source', 'into'],
+    },
+    handler: toolImport,
   },
   {
     name: 'foundation_project',

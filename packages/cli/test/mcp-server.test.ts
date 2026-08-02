@@ -61,6 +61,7 @@ describe('foundation mcp (real stdio child process)', () => {
         'foundation_chain_log',
         'foundation_diff',
         'foundation_freeze',
+        'foundation_import',
         'foundation_ingest',
         'foundation_inspect',
         'foundation_new',

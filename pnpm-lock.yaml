@@ -51,6 +51,9 @@ importers:
       foundation-engine:
         specifier: workspace:*
         version: link:../engine
+      foundation-importer:
+        specifier: workspace:*
+        version: link:../importer
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0

@@ -14,6 +14,7 @@ import { runNew } from './commands/new.js'
 import { runInspect } from './commands/inspect.js'
 import { runValidate } from './commands/validate.js'
 import { runIngest } from './commands/ingest.js'
+import { runImport } from './commands/import.js'
 import { runBake } from './commands/bake.js'
 import { runRender } from './commands/render.js'
 import { runDiff } from './commands/diff.js'
@@ -31,6 +32,7 @@ const COMMANDS: Record<string, (args: string[], io: CliIO) => Promise<number>> =
   inspect: runInspect,
   validate: runValidate,
   ingest: runIngest,
+  import: runImport,
   bake: runBake,
   render: runRender,
   diff: runDiff,
@@ -52,6 +54,9 @@ commands:
   inspect <file>                             summarize a document
   validate <file>                            print validation issues
   ingest <file> [--commit [-m msg] [--author A]]   normalize in place, print the report
+  import <source.tsx> --into <file.fdn.html> [--name N] [--props <json>] [--sealed] [--author A]
+                                              harvest a React component and merge it into <file>
+                                              (chain-committed when a chain exists)
   bake <file> [--state S] [-o out]           bake a state to HTML
   render <file> [--state S] [--viewport V] [-o dir]   render (Wave 2)
   diff <a.html> <b.html>                     structural (+ visual, when available) diff

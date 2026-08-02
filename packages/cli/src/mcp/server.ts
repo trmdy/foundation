@@ -18,7 +18,11 @@
  * `foundation-engine`'s root (parse/validate/project/bake/chain) plus the
  * freeze submodule eagerly; `foundation-engine/src/render` and `.../diff`
  * (which pull in playwright) are loaded lazily, inside `foundation_render`/
- * `foundation_diff`, on first use — never at server boot.
+ * `foundation_diff`, on first use — never at server boot. Same discipline
+ * for `foundation-importer` (esbuild + react/react-dom + tailwindcss, a
+ * heavier dependency than anything else this server touches): `tools.ts`
+ * only imports its type-erased helpers statically, and defers the package
+ * itself to a computed `import()` inside `foundation_import`'s handler.
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
