@@ -10,6 +10,8 @@ export function artifact(overrides: Partial<RenderArtifact> & { name: string; sa
   return {
     propSchema: [],
     classIndex: {},
+    themeVars: {},
+    unresolvedThemeVars: [],
     provenance: { source: 'fixtures/test.tsx', contentSha256: 'deadbeef' },
     ...overrides,
   }

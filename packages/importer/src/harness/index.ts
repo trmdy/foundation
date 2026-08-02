@@ -17,7 +17,7 @@ import { detectComponent, extractPropSchema } from './schema.js'
 import { compileComponent } from './compile.js'
 import { createSandbox } from './sandbox.js'
 import { buildSampleMatrix } from './samples.js'
-import { buildClassIndex } from './class-index.js'
+import { buildClassIndex, resolveThemeVars } from './class-index.js'
 
 export interface HarvestComponentOptions {
   /** path to a .tsx/.jsx component file */
@@ -44,12 +44,20 @@ export async function harvestComponent(opts: HarvestComponentOptions): Promise<R
 
   const samples = buildSampleMatrix({ propSchema, enumValues, render: (props) => sandbox.render(props) })
   const classIndex = await buildClassIndex(samples.map((s) => s.html))
+  // Follow-up wave: resolve every var(--x) the classIndex's OWN declarations
+  // reference against the design system's compiled theme, so the CLI can
+  // declare them as document tokens on import (class-index.ts's
+  // resolveThemeVars module doc has the full rationale + the D1 "report,
+  // never reject" handling for names with no theme definition).
+  const { themeVars, unresolvedThemeVars } = await resolveThemeVars(classIndex)
 
   return {
     name: detected.displayName,
     propSchema,
     samples,
     classIndex,
+    themeVars,
+    unresolvedThemeVars,
     provenance: { source: absSource, contentSha256 },
   }
 }

@@ -65,6 +65,7 @@ export interface ProjectResult {
   mode: 'native' | 'sealed'
   report: { code: string; severity: string; message: string; nodeId?: string; detail?: unknown }[]
   extraLookups: FdnLookup[]
+  extraTokens: Record<string, string>
 }
 interface HarnessErrorLike extends Error {
   code: string
@@ -181,6 +182,52 @@ export function mergeLookups(existing: FdnLookup[], extra: FdnLookup[]): { looku
   return { lookups: merged }
 }
 
+// ——— token merge (follow-up wave: "Tailwind theme vars become Foundation
+//      tokens on import" — document wins on conflict, unlike mergeLookups
+//      above) ———
+
+export interface ReportLineLike {
+  code: string
+  severity: 'error' | 'warning' | 'info'
+  message: string
+  detail?: unknown
+}
+
+/** Merges `extra` (an import's `projected.extraTokens`, i.e. resolved
+ *  Tailwind theme vars keyed like `doc.tokens`) into `existing` (the target
+ *  document's current `doc.tokens`). Unlike `mergeLookups`, a collision here
+ *  is NEVER an error: a document's own token layer is its design system —
+ *  deliberately hand-authored, deliberately meaningful (`--color-accent` is
+ *  not an accident) — so when an imported var and an existing token share a
+ *  name but disagree on value, the DOCUMENT wins and the import's value is
+ *  dropped, reported as a warning (`import-token-conflict`) rather than
+ *  silently overwriting a design decision the document's author made on
+ *  purpose. Same name + same value, or the name simply not present yet:
+ *  set it, no report needed (that's the whole point — a var the document
+ *  never mentioned is exactly what should flow in silently). */
+export function mergeTokens(existing: Record<string, string>, extra: Record<string, string>): { tokens: Record<string, string>; conflicts: ReportLineLike[] } {
+  const tokens = { ...existing }
+  const conflicts: ReportLineLike[] = []
+  for (const [name, value] of Object.entries(extra)) {
+    const cur = tokens[name]
+    if (cur === undefined) {
+      tokens[name] = value
+      continue
+    }
+    if (cur === value) continue
+    conflicts.push({
+      code: 'import-token-conflict',
+      severity: 'warning',
+      message:
+        `token --${name} already has a different value in this document ("${cur}") than the imported definition ` +
+        `("${value}") — keeping the document's value (the document's design system wins over an import).`,
+      detail: { name, documentValue: cur, importedValue: value },
+    })
+    // document wins: no assignment.
+  }
+  return { tokens, conflicts }
+}
+
 const USAGE = 'usage: foundation import <source.tsx> --into <file.fdn.html> [--name N] [--props <json>] [--sealed] [--author A]'
 
 export async function runImport(args: string[], io: CliIO): Promise<number> {
@@ -254,10 +301,12 @@ export async function runImport(args: string[], io: CliIO): Promise<number> {
     return 1
   }
 
+  const tokenResult = mergeTokens(doc.tokens, projected.extraTokens)
+
   const components =
     existingIndex === -1 ? [...doc.components, component] : doc.components.map((c, i) => (i === existingIndex ? component : c))
 
-  const nextDoc: FdnDocument = { ...doc, components, lookups: lookupResult.lookups }
+  const nextDoc: FdnDocument = { ...doc, components, lookups: lookupResult.lookups, tokens: tokenResult.tokens }
 
   // ordinary canonicalize path (API.md: "via ordinary ingest+commit" — same
   // project -> re-stamp-doc-id -> write dance as `ingest`, see ingest.ts).
@@ -266,7 +315,7 @@ export async function runImport(args: string[], io: CliIO): Promise<number> {
   const canonicalWithDocId = docId ? injectDocIdAttr(canonical, docId) : canonical
   writeFileSync(into, canonicalWithDocId, 'utf8')
 
-  for (const line of projected.report) {
+  for (const line of [...projected.report, ...tokenResult.conflicts]) {
     io.stdout(`${line.severity} ${line.code}: ${line.message}`)
   }
   io.stdout(`mode: ${projected.mode}`)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildClassIndex } from '../src/harness/class-index.js'
+import { buildClassIndex, resolveThemeVars } from '../src/harness/class-index.js'
 import { harvestComponent } from '../src/harness/index.js'
 import path from 'node:path'
 
@@ -71,5 +71,77 @@ describe('classIndex via harvestComponent (integration, button.tsx)', () => {
   it("icon.tsx (pure svg, no classes) has an empty classIndex — the degenerate case", async () => {
     const artifact = await harvestComponent({ source: path.resolve(import.meta.dirname, '../fixtures/icon.tsx') })
     expect(artifact.classIndex).toEqual({})
+  })
+})
+
+describe('resolveThemeVars (follow-up wave: Tailwind theme vars become Foundation tokens on import)', () => {
+  it('resolves a directly-referenced theme var, keyed without the leading --', async () => {
+    const index = await buildClassIndex(['<div class="bg-green-100"></div>'])
+    const { themeVars, unresolvedThemeVars } = await resolveThemeVars(index)
+    expect(themeVars['color-green-100']).toBe('oklch(96.2% 0.044 156.743)')
+    expect(unresolvedThemeVars).toEqual([])
+  })
+
+  it('resolves transitively: a var whose OWN definition references another var', async () => {
+    // text-xs emits `line-height: var(--tw-leading, var(--text-xs--line-height))` —
+    // --tw-leading has no theme definition (Tailwind cascade-plumbing var,
+    // set by a leading-* utility that wasn't used here), --text-xs--line-height
+    // does. Both must be discoverable from the ONE declaration.
+    const index = await buildClassIndex(['<div class="text-xs"></div>'])
+    const { themeVars, unresolvedThemeVars } = await resolveThemeVars(index)
+    expect(themeVars['text-xs']).toBe('0.75rem')
+    expect(themeVars['text-xs--line-height']).toBeDefined()
+    expect(unresolvedThemeVars).toContain('--tw-leading')
+  })
+
+  it('collects vars referenced from both base and state (hover/focus/…) declarations', async () => {
+    const index = await buildClassIndex(['<button class="bg-red-500 hover:bg-red-600"></button>'])
+    const { themeVars } = await resolveThemeVars(index)
+    expect(themeVars['color-red-500']).toBeDefined()
+    expect(themeVars['color-red-600']).toBeDefined()
+  })
+
+  it('a declaration with no var() reference at all (e.g. rounded-full\'s calc()) contributes nothing', async () => {
+    const index = await buildClassIndex(['<div class="rounded-full"></div>'])
+    const { themeVars, unresolvedThemeVars } = await resolveThemeVars(index)
+    expect(themeVars).toEqual({})
+    expect(unresolvedThemeVars).toEqual([])
+  })
+
+  it('returns {} / [] for an empty classIndex', async () => {
+    const { themeVars, unresolvedThemeVars } = await resolveThemeVars({})
+    expect(themeVars).toEqual({})
+    expect(unresolvedThemeVars).toEqual([])
+  })
+
+  it('is deterministic and sorted', async () => {
+    const index = await buildClassIndex(['<div class="bg-green-100 text-green-800 rounded-full text-xs"></div>'])
+    const r1 = await resolveThemeVars(index)
+    const r2 = await resolveThemeVars(index)
+    expect(r1).toStrictEqual(r2)
+    expect(Object.keys(r1.themeVars)).toEqual([...Object.keys(r1.themeVars)].sort())
+    expect(r1.unresolvedThemeVars).toEqual([...r1.unresolvedThemeVars].sort())
+  })
+
+  it('harvestComponent populates RenderArtifact.themeVars for badge.tsx (real fixture, real cva variants)', async () => {
+    const artifact = await harvestComponent({ source: path.resolve(import.meta.dirname, '../fixtures/badge.tsx') })
+    // Badge's three variants (default/success/warning) each contribute a
+    // background + text color utility, plus rounded-full/px/py/text-xs/
+    // font-semibold shared across all of them.
+    expect(artifact.themeVars['color-blue-100']).toBeDefined()
+    expect(artifact.themeVars['color-green-100']).toBeDefined()
+    expect(artifact.themeVars['color-amber-100']).toBeDefined()
+    expect(artifact.themeVars['color-blue-800']).toBeDefined()
+    expect(artifact.themeVars['color-green-800']).toBeDefined()
+    expect(artifact.themeVars['color-amber-800']).toBeDefined()
+    expect(artifact.themeVars['font-weight-semibold']).toBe('600')
+    expect(artifact.themeVars['spacing']).toBeDefined()
+    expect(artifact.unresolvedThemeVars).toContain('--tw-leading')
+  })
+
+  it("icon.tsx (empty classIndex) has empty themeVars/unresolvedThemeVars too", async () => {
+    const artifact = await harvestComponent({ source: path.resolve(import.meta.dirname, '../fixtures/icon.tsx') })
+    expect(artifact.themeVars).toEqual({})
+    expect(artifact.unresolvedThemeVars).toEqual([])
   })
 })

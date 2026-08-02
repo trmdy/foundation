@@ -243,4 +243,66 @@ describe('foundation import', () => {
     const chainAfter = loadChain(readFileSync(chainPath)).log().length
     expect(chainAfter).toBe(chainBefore)
   })
+
+  describe('theme vars become document tokens (follow-up wave)', () => {
+    it('badge.tsx import declares its Tailwind theme vars as doc.tokens, keyed without the leading --', async () => {
+      const io = captureIo()
+      const code = await runImport([fixture('badge.tsx'), '--into', file], io)
+      expect(code).toBe(0)
+      expect(io.out.some((l) => l.startsWith('info import-theme-token'))).toBe(true)
+
+      const { doc } = parseDocument(readFileSync(file, 'utf8'))
+      expect(doc.tokens['color-green-100']).toBe('oklch(96.2% 0.044 156.743)')
+      expect(doc.tokens['color-green-800']).toBeDefined()
+      expect(doc.tokens['color-amber-100']).toBeDefined()
+      expect(doc.tokens['color-blue-100']).toBeDefined()
+      expect(doc.tokens['font-weight-semibold']).toBe('600')
+      // the scaffold's own token must survive untouched
+      expect(doc.tokens['color-accent']).toBe('#B8860B')
+    })
+
+    it('reports import-unresolved-theme-var for vars with no theme definition (e.g. --tw-leading), leaving them unset', async () => {
+      const io = captureIo()
+      await runImport([fixture('badge.tsx'), '--into', file], io)
+      expect(io.out.some((l) => l.includes('import-unresolved-theme-var') && l.includes('--tw-leading'))).toBe(true)
+      const { doc } = parseDocument(readFileSync(file, 'utf8'))
+      expect(doc.tokens['tw-leading']).toBeUndefined()
+    })
+
+    it('an existing token with the SAME value merges silently (no conflict report, no change)', async () => {
+      const { doc } = parseDocument(readFileSync(file, 'utf8'))
+      doc.tokens['color-green-100'] = 'oklch(96.2% 0.044 156.743)'
+      writeFileSync(file, projectDocument(doc), 'utf8')
+
+      const io = captureIo()
+      const code = await runImport([fixture('badge.tsx'), '--into', file], io)
+      expect(code).toBe(0)
+      expect(io.out.some((l) => l.includes('import-token-conflict'))).toBe(false)
+      const { doc: after } = parseDocument(readFileSync(file, 'utf8'))
+      expect(after.tokens['color-green-100']).toBe('oklch(96.2% 0.044 156.743)')
+    })
+
+    it('an existing token with a DIFFERENT value wins over the import, with a warning report (document wins)', async () => {
+      const { doc } = parseDocument(readFileSync(file, 'utf8'))
+      doc.tokens['color-green-100'] = '#00ff00'
+      writeFileSync(file, projectDocument(doc), 'utf8')
+
+      const io = captureIo()
+      const code = await runImport([fixture('badge.tsx'), '--into', file], io)
+      expect(code).toBe(0)
+      expect(io.out.some((l) => l.includes('warning import-token-conflict') && l.includes('color-green-100'))).toBe(true)
+      const { doc: after } = parseDocument(readFileSync(file, 'utf8'))
+      expect(after.tokens['color-green-100']).toBe('#00ff00')
+      // the import still succeeds — a token conflict is a warning, not a failure
+      expect(after.components.find((c) => c.name === 'Badge')).toBeDefined()
+    })
+
+    it('does not break "repeated import is byte-identical" determinism', async () => {
+      await runImport([fixture('badge.tsx'), '--into', file], captureIo())
+      const after1 = readFileSync(file, 'utf8')
+      await runImport([fixture('badge.tsx'), '--into', file], captureIo())
+      const after2 = readFileSync(file, 'utf8')
+      expect(after2).toBe(after1)
+    })
+  })
 })

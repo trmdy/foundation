@@ -162,6 +162,35 @@ describe('Wave 4 acceptance: import all four vendored fixtures', () => {
       expect(successStyle).not.toBe(warningStyle)
     })
 
+    it("badge's imported Tailwind theme vars land in doc.tokens AND the baked :root block (follow-up wave)", async () => {
+      await importAllFour(file)
+      const { doc } = parseDocument(readFileSync(file, 'utf8'))
+
+      // doc.tokens: the theme vars a real browser needs to resolve Badge's
+      // var(--color-green-100) etc. declarations are now document tokens,
+      // not left dangling — closes the gap the Stage 3 report flagged
+      // ("badge bakes clean but renders unpigmented").
+      expect(doc.tokens['color-green-100']).toBe('oklch(96.2% 0.044 156.743)')
+      expect(doc.tokens['color-green-800']).toBeDefined()
+      expect(doc.tokens['color-amber-100']).toBeDefined()
+      expect(doc.tokens['color-blue-100']).toBeDefined()
+      // the scaffold's own pre-existing token is untouched by the merge
+      expect(doc.tokens['color-accent']).toBe('#B8860B')
+
+      const withDemo: FdnDocument = {
+        ...doc,
+        states: [...doc.states, { name: 'demo', assignments: {} }],
+        body: [...doc.body, useNode({ id: 'demoUseBadge', attrs: { component: 'Badge', 'data-fdn-prop-variant': 'success', 'data-fdn-prop-children': 'Shipped' } })],
+      }
+      const baked = bakeDocument(withDemo, { state: 'demo' })
+
+      // the BAKED :root block actually defines the var the badge's own
+      // style attribute references — this is what makes the pill render
+      // pigmented in a real browser instead of falling back to nothing.
+      expect(baked.html).toContain('--color-green-100: oklch(96.2% 0.044 156.743);')
+      expect(baked.html).toContain('background-color:var(--color-green-100)')
+    })
+
     it('a sealed component (Button) bakes with a scoped .fdn-capsule- wrapper and css present', async () => {
       await importAllFour(file)
       const { doc } = parseDocument(readFileSync(file, 'utf8'))

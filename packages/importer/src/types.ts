@@ -67,5 +67,27 @@ export interface RenderArtifact {
   propSchema: FdnProp[]
   samples: RenderSample[]
   classIndex: ClassIndex
+  /**
+   * Follow-up wave ("Tailwind theme vars become Foundation tokens on
+   * import"): every `var(--x)` referenced (directly or transitively) by
+   * any declaration in `classIndex`, resolved against the design system's
+   * compiled theme and keyed WITHOUT the leading `--` — the same
+   * convention `FdnDocument.tokens` uses, so this merges into `doc.tokens`
+   * verbatim. See harness/class-index.ts's `resolveThemeVars` module doc
+   * for why this exists: without it, an imported component's declarations
+   * reference custom properties nothing in the target document ever
+   * defines, so bake/validate report zero issues but the component renders
+   * unstyled (wrong color, no rounding, wrong size — whatever the
+   * unresolved var() was supposed to supply).
+   */
+  themeVars: Record<string, string>
+  /** `--name` (with the leading dashes) of every var() reference collected
+   *  above that has NO resolvable theme definition (e.g. Tailwind's own
+   *  `--tw-leading`/`--tw-font-weight` cascade-plumbing vars, which are SET
+   *  by a utility class's own declaration, not defined in the theme) —
+   *  left out of `themeVars`; reported at projection time
+   *  (import-unresolved-theme-var), never treated as a failure (D1:
+   *  report, never reject). */
+  unresolvedThemeVars: string[]
   provenance: { source: string; contentSha256: string }
 }

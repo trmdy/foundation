@@ -5,11 +5,11 @@
  * child process here, mcp-server.test.ts already proves the wire protocol
  * itself works end to end for the fixed tool set as a whole).
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { loadChain, parseDocument, validateDocument } from 'foundation-engine'
+import { loadChain, parseDocument, projectDocument, validateDocument } from 'foundation-engine'
 import { captureIo } from '../src/io.js'
 import { runNew } from '../src/commands/new.js'
 import { callTool, TOOLS } from '../src/mcp/tools.js'
@@ -104,13 +104,41 @@ describe('foundation_import (MCP tool)', () => {
   it('a lookup name collision fails cleanly with a hint, matching the CLI', async () => {
     const { doc } = parseDocument(readFileSync(file, 'utf8'))
     doc.lookups.push({ name: 'BadgeLookup1', entries: { bogus: 'entry' } })
-    const { writeFileSync } = await import('node:fs')
-    const { projectDocument } = await import('foundation-engine')
     writeFileSync(file, projectDocument(doc), 'utf8')
 
     const result = await callTool('foundation_import', { source: fixture('badge.tsx'), into: file })
     expect(result.isError).toBe(true)
     expect(result.content[0]?.text).toContain('lookup name collision')
     expect(result.content[0]?.text).toContain('BadgeLookup1')
+  })
+
+  describe('theme vars become document tokens (follow-up wave)', () => {
+    it('badge.tsx import declares its Tailwind theme vars as doc.tokens', async () => {
+      const result = await callTool('foundation_import', { source: fixture('badge.tsx'), into: file })
+      expect(result.isError).not.toBe(true)
+      const structured = result.structuredContent as { report: { lines: { code: string }[] } }
+      expect(structured.report.lines.some((l) => l.code === 'import-theme-token')).toBe(true)
+
+      const { doc } = parseDocument(readFileSync(file, 'utf8'))
+      expect(doc.tokens['color-green-100']).toBe('oklch(96.2% 0.044 156.743)')
+      expect(doc.tokens['color-accent']).toBe('#B8860B')
+    })
+
+    it('a conflicting existing token is kept (document wins) with a warning report, same as the CLI', async () => {
+      const { doc } = parseDocument(readFileSync(file, 'utf8'))
+      doc.tokens['color-green-100'] = '#00ff00'
+      writeFileSync(file, projectDocument(doc), 'utf8')
+
+      const result = await callTool('foundation_import', { source: fixture('badge.tsx'), into: file })
+      expect(result.isError).not.toBe(true)
+      const structured = result.structuredContent as { report: { lines: { code: string; severity: string; detail?: unknown }[] } }
+      const conflict = structured.report.lines.find((l) => l.code === 'import-token-conflict')
+      expect(conflict).toBeDefined()
+      expect(conflict?.severity).toBe('warning')
+      expect(conflict?.detail).toMatchObject({ name: 'color-green-100', documentValue: '#00ff00' })
+
+      const { doc: after } = parseDocument(readFileSync(file, 'utf8'))
+      expect(after.tokens['color-green-100']).toBe('#00ff00')
+    })
   })
 })

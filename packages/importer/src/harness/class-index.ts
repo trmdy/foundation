@@ -182,3 +182,106 @@ export async function buildClassIndex(htmls: string[]): Promise<ClassIndex> {
   }
   return out
 }
+
+// ——— theme var resolution (follow-up wave: "Tailwind theme vars become
+//      Foundation tokens on import") ———
+//
+// A resolved declaration's VALUE routinely still contains a var(--x)
+// reference — `background-color: var(--color-green-100)`,
+// `border-radius: calc(infinity * 1px)` has none, but
+// `line-height: var(--tw-leading, var(--text-xs--line-height))` has two
+// (one of which is itself a fallback arg, not a "primary" value — CSS
+// doesn't distinguish the two for our purposes, both need SOME resolution
+// path). Those var() names are never inlined into the declaration text
+// itself (D1: declarations are carried through as Tailwind emitted them,
+// arbitrary values are legal, never snapped) — instead the CLI (Stage 3)
+// declares them as document tokens (`doc.tokens`) alongside the component,
+// the same way a hand-authored document would declare `--color-accent`,
+// so the var() reference the declaration already has resolves for real in
+// a browser. Without this, a component bakes and validates clean (the
+// declaration text is syntactically fine either way) but silently renders
+// unpigmented/unsized — the exact gap flagged in the Stage 3 acceptance
+// report and closed here.
+//
+// "Theme vars may reference other vars" (e.g. `--text-xs`'s OWN definition
+// is `0.75rem`, no nesting, but `line-height` above references
+// `--text-xs--line-height`, itself a SEPARATE top-level theme entry with no
+// further nesting in this default theme) — so resolution is a small BFS:
+// seed the queue from every declaration in the classIndex, resolve each
+// name against the design system's theme, then also scan the RESOLVED
+// value text for further var(--y) references and enqueue those too. A name
+// with no theme definition (e.g. `--tw-leading`, `--tw-font-weight` — these
+// are Tailwind's own cascade-plumbing custom properties, SET by a utility
+// class's own declaration, not defined in the theme) is left unresolved,
+// not an error: the declaration already has a working CSS fallback chain
+// (`var(--tw-leading, var(--text-xs--line-height))` falls through to the
+// theme value when `--tw-leading` is unset, which is exactly the state a
+// freshly imported component is in) — D1's "report, never reject" applies
+// here exactly as it does to every other importer finding.
+const VAR_REF_RE = /var\(\s*(--[A-Za-z0-9_-]+)/g
+
+function collectVarRefs(value: string, out: Set<string>): void {
+  for (const m of value.matchAll(VAR_REF_RE)) out.add(m[1] as string)
+}
+
+function allDeclarationValues(classIndex: ClassIndex): string[] {
+  const values: string[] = []
+  for (const entry of Object.values(classIndex)) {
+    values.push(...Object.values(entry.base))
+    for (const bag of Object.values(entry.states ?? {})) {
+      if (bag) values.push(...Object.values(bag))
+    }
+  }
+  return values
+}
+
+export interface ThemeVarResolution {
+  /** Resolved theme var definitions, keyed WITHOUT the leading `--` (the
+   *  same convention `FdnDocument.tokens` already uses — see types.ts's
+   *  EXPRESSION GRAMMAR note: "doc.tokens keys are stored WITHOUT the
+   *  leading '--'"), sorted. Ready to merge into `doc.tokens` as-is. */
+  themeVars: Record<string, string>
+  /** Full `--name` (WITH the leading dashes, for a legible report message)
+   *  of every var() referenced by some declaration that has no resolvable
+   *  theme definition — left out of `themeVars` entirely; reported at
+   *  projection time (import-unresolved-theme-var), never treated as an
+   *  import failure. Sorted. */
+  unresolvedThemeVars: string[]
+}
+
+/** Resolves every `var(--x)` referenced (directly or transitively, through
+ *  other theme vars' own definitions) by any declaration in `classIndex`
+ *  against the design system's compiled theme (`tailwindcss/index.css`'s
+ *  `@theme` block — the same design system buildClassIndex already
+ *  compiled the declarations against, so a var() name found here is
+ *  guaranteed to mean what that design system says it means). */
+export async function resolveThemeVars(classIndex: ClassIndex): Promise<ThemeVarResolution> {
+  const design = await loadDesignSystem()
+
+  const seed = new Set<string>()
+  for (const value of allDeclarationValues(classIndex)) collectVarRefs(value, seed)
+
+  const resolved: Record<string, string> = {}
+  const unresolved = new Set<string>()
+  const visited = new Set<string>()
+  const queue = [...seed]
+
+  while (queue.length > 0) {
+    const name = queue.shift() as string
+    if (visited.has(name)) continue
+    visited.add(name)
+
+    const value = design.theme.get([name as `--${string}`])
+    if (value === null) {
+      unresolved.add(name)
+      continue
+    }
+    resolved[name.slice(2)] = value
+
+    const nested = new Set<string>()
+    collectVarRefs(value, nested)
+    for (const n of nested) if (!visited.has(n)) queue.push(n)
+  }
+
+  return { themeVars: sortRecord(resolved), unresolvedThemeVars: [...unresolved].sort() }
+}

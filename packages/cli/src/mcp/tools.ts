@@ -48,6 +48,7 @@ import {
   harnessErrorCode,
   loadImporterModule,
   mergeLookups,
+  mergeTokens,
   remintComponentIds,
   type ProjectResult,
   type RenderArtifact,
@@ -684,10 +685,12 @@ async function toolImport(args: Record<string, unknown>): Promise<ToolResult> {
   const lookupResult = mergeLookups(doc.lookups, projected.extraLookups)
   if ('error' in lookupResult) return fail(`foundation_import: ${lookupResult.error}`)
 
+  const tokenResult = mergeTokens(doc.tokens, projected.extraTokens)
+
   const components =
     existingIndex === -1 ? [...doc.components, component] : doc.components.map((c, i) => (i === existingIndex ? component : c))
 
-  const nextDoc: FdnDocument = { ...doc, components, lookups: lookupResult.lookups }
+  const nextDoc: FdnDocument = { ...doc, components, lookups: lookupResult.lookups, tokens: tokenResult.tokens }
 
   const canonical = projectDocument(nextDoc)
   try {
@@ -723,7 +726,7 @@ async function toolImport(args: Record<string, unknown>): Promise<ToolResult> {
     action: existingIndex === -1 ? 'added' : 'replaced',
     mode: projected.mode,
     provenance: artifact.provenance,
-    report: reportPayload(projected.report as ReportLine[]),
+    report: reportPayload([...projected.report, ...tokenResult.conflicts] as ReportLine[]),
     commit: commitInfo,
   })
 }
