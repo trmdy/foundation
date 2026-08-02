@@ -77,6 +77,7 @@ export function skeletonDocument(title: string): FdnDocument {
         ],
       },
     ],
+    annotations: [],
     body: [
       leafNode({ id: 'n1', tag: 'h1', style: { color: 'var(--color-accent)' }, text: '{{ param.title }}' }),
       leafNode({ id: 'n2', tag: 'fdn-use', attrs: { component: 'Card', 'data-fdn-prop-label': 'Hello, Foundation' } }),
@@ -104,6 +105,7 @@ export function skeletonDocumentEmpty(title: string): FdnDocument {
     matrix: [],
     namedStyles: [],
     components: [],
+    annotations: [],
     body: [],
   }
 }

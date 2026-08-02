@@ -18,6 +18,7 @@ function doc(partial: Partial<FdnDocument> = {}): FdnDocument {
     matrix: [],
     namedStyles: [],
     components: [],
+    annotations: [],
     body: [],
     ...partial,
   }

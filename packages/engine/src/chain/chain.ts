@@ -35,6 +35,13 @@
  *     blobs — matrix entries have no natural key and no PatchOp reaches them
  *     individually (only replace-document does), so this is a plain ordered
  *     list, cleared+repopulated wholesale on replace-document.
+ *   - `annotations`: LoroMap keyed by FdnAnnotation.id (same JSON-blob-per-key
+ *     shape as params/lookups/states/namedStyles/components — the three
+ *     annotation PatchOps are whole-item or single-scalar-field writes, same
+ *     grain). Concurrent annotations from different authors merge for free
+ *     (different keys); concurrent status writes to the SAME annotation
+ *     collapse to Loro's last-writer-wins on that map entry, same as any
+ *     other same-key concurrent write in this file.
  *
  * Contract findings (see final report for the full list):
  *   - No PatchOp touches `data`/`viewports`/`matrix` at all — only
@@ -91,6 +98,7 @@ import type {
   AnchorRef,
   ChangeMeta,
   EnvelopeRecord,
+  FdnAnnotation,
   FdnComponent,
   FdnDataSet,
   FdnDocument,
@@ -176,6 +184,14 @@ class LoroChain implements FdnChain {
   private matrix: LoroList
   private namedStyles: LoroMap
   private components: LoroMap
+  /** Wave "annotations first-class citizen" (SPEC D2/D4/13a, types.ts's
+   *  FdnAnnotation): LoroMap keyed by annotation `.id`, one stableStringify'd
+   *  JSON blob per key — same "whole-item replace matches the op grain"
+   *  reasoning as params/lookups/states/namedStyles/components above. The
+   *  three PatchOps (annotate/set-annotation-status/remove-annotation) are
+   *  all either whole-item or single-scalar-field writes, so a flat keyed
+   *  map (not a nested per-field container) is the right grain here too. */
+  private annotations: LoroMap
 
   private clock = new DeterministicClock()
   private idToTree = new Map<NodeId, TreeID>()
@@ -206,6 +222,7 @@ class LoroChain implements FdnChain {
     this.matrix = this.loro.getList('matrix')
     this.namedStyles = this.loro.getMap('namedStyles')
     this.components = this.loro.getMap('components')
+    this.annotations = this.loro.getMap('annotations')
   }
 
   static create(doc: FdnDocument, meta: ChangeMeta, actor: string, docId?: string): LoroChain {
@@ -482,6 +499,22 @@ class LoroChain implements FdnChain {
         this.states.set(op.state.name, stableStringify(op.state))
         break
       }
+      case 'annotate': {
+        this.annotations.set(op.annotation.id, stableStringify(op.annotation))
+        break
+      }
+      case 'set-annotation-status': {
+        const existing = this.annotations.get(op.id) as string | undefined
+        if (!existing) throw new Error(`chain: unknown annotation ${op.id}`)
+        const annotation = JSON.parse(existing) as FdnAnnotation
+        annotation.status = op.status
+        this.annotations.set(op.id, stableStringify(annotation))
+        break
+      }
+      case 'remove-annotation': {
+        this.annotations.delete(op.id)
+        break
+      }
       case 'replace-document': {
         this.replaceDocumentContent(op.doc)
         break
@@ -551,6 +584,7 @@ class LoroChain implements FdnChain {
     this.replaceKeyedMap(this.viewports, doc.viewports, (v) => v.name)
     this.replaceKeyedMap(this.namedStyles, doc.namedStyles, (s) => s.name)
     this.replaceKeyedMap(this.components, doc.components, (c) => c.name)
+    this.replaceKeyedMap(this.annotations, doc.annotations, (a) => a.id)
 
     if (this.matrix.length > 0) this.matrix.delete(0, this.matrix.length)
     for (const m of doc.matrix) this.matrix.push(stableStringify(m))
@@ -585,6 +619,7 @@ class LoroChain implements FdnChain {
       matrix: this.listValuesSorted(),
       namedStyles: this.mapValuesSorted<FdnNamedStyle>(this.namedStyles),
       components: this.mapValuesSorted<FdnComponent>(this.components),
+      annotations: this.mapValuesSortedById<FdnAnnotation>(this.annotations),
       body,
     }
   }
@@ -634,6 +669,14 @@ class LoroChain implements FdnChain {
     const items: T[] = []
     for (const [, v] of map.entries()) items.push(JSON.parse(v as string) as T)
     return items.sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  /** Same as mapValuesSorted, keyed/sorted by `.id` instead of `.name` —
+   *  annotations have no `.name` field (see FdnAnnotation, types.ts). */
+  private mapValuesSortedById<T extends { id: string }>(map: LoroMap): T[] {
+    const items: T[] = []
+    for (const [, v] of map.entries()) items.push(JSON.parse(v as string) as T)
+    return items.sort((a, b) => a.id.localeCompare(b.id))
   }
 
   private listValuesSorted(): { state: string; viewport: string }[] {

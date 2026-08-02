@@ -121,6 +121,7 @@ function writeSkeleton(targetPath: string): string {
     matrix: [],
     namedStyles: [],
     components: [],
+    annotations: [],
     body: [{ id: 'n1', tag: 'h1', attrs: {}, style: {}, styleStates: {}, text: 'hi', children: [] }],
   }
   writeFileSync(filePath, projectDocument(doc), 'utf8')

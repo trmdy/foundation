@@ -8,7 +8,7 @@ export { parseDocument } from './parse/index.js'
 export { validateDocument } from './validate/index.js'
 export { projectDocument } from './project/index.js'
 export { bakeDocument } from './bake/index.js'
-export { createChain, loadChain } from './chain/index.js'
+export { createChain, loadChain, mintAnnotationId } from './chain/index.js'
 export type { FdnChain } from './chain/index.js'
 // Wave 3 (SPEC 13a-iv, API.md "chain exchange") — additive barrel export only;
 // implementation lives entirely in src/chain/ (see exchange.ts).

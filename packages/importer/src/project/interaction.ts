@@ -55,6 +55,7 @@ function buildTempDoc(component: FdnComponent, lookups: FdnLookup[], propValues:
     matrix: [],
     namedStyles: [],
     components: [component],
+    annotations: [],
     body: [{ id: 'probe', tag: 'fdn-use', attrs, style: {}, styleStates: {}, children: [] }],
   }
 }

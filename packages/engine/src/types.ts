@@ -103,6 +103,22 @@ export interface FdnComponent {
   provenance?: { source: string; contentSha256: string }
 }
 
+/** Spatial annotation — a first-class chain citizen (Veft's founding idea):
+ *  anchored to a node (preferred) or viewport coords, resolvable, authored via
+ *  the envelope of the change that created it. No timestamps (determinism);
+ *  time lives in the chain order. */
+export interface FdnAnnotation {
+  id: string
+  /** Anchor: a data-fdn-id when available; else bake-state viewport coords. */
+  nodeId?: NodeId
+  x?: number
+  y?: number
+  /** Which declared state the annotator was viewing (context for the reader). */
+  state?: string
+  text: string
+  status: 'open' | 'resolved' | 'wontfix'
+}
+
 /** The document — template form, one file, one hash, all states (SPEC Q10). */
 export interface FdnDocument {
   specVersion: string
@@ -119,6 +135,9 @@ export interface FdnDocument {
   components: FdnComponent[]
   /** Design content (template form — fdn-use instances are NOT resolved here). */
   body: FdnNode[]
+  /** Spatial annotations (in-chain review state; hidden metadata in projection,
+   *  never baked into design output). */
+  annotations: FdnAnnotation[]
 }
 
 // ——— EXPRESSION GRAMMAR (resolved SPEC Q9; reconciled with bake v0) ———
@@ -208,6 +227,9 @@ export type PatchOp =
   | { op: 'set-param'; param: FdnParam }
   | { op: 'set-lookup'; lookup: FdnLookup }
   | { op: 'set-state'; state: FdnState }
+  | { op: 'annotate'; annotation: FdnAnnotation }
+  | { op: 'set-annotation-status'; id: string; status: FdnAnnotation['status'] }
+  | { op: 'remove-annotation'; id: string }
   | { op: 'replace-document'; doc: FdnDocument }
 
 /** Read-side structural diff, lifted to document vocabulary (SPEC §6). */
@@ -220,7 +242,7 @@ export type SemanticOp =
   | { op: 'set-text'; id: NodeId; text: string }
   | { op: 'set-style-ref'; id: NodeId; styleRef: string | null }
   | { op: 'set-when'; id: NodeId; when: string | null }
-  | { op: 'section-changed'; section: 'tokens' | 'params' | 'data' | 'lookups' | 'states' | 'viewports' | 'matrix' | 'namedStyles' | 'components' | 'meta'; name: string }
+  | { op: 'section-changed'; section: 'tokens' | 'params' | 'data' | 'lookups' | 'states' | 'viewports' | 'matrix' | 'namedStyles' | 'components' | 'meta' | 'annotations'; name: string }
 
 export type AnchorRef = string
 

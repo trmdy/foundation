@@ -37,6 +37,7 @@ function twoStatesOneViewportDoc(): FdnDocument {
     ],
     namedStyles: [],
     components: [],
+    annotations: [],
     body: [
       node({
         id: 'title',

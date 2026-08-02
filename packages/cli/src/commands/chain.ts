@@ -245,7 +245,7 @@ function requireChain(file: string, io: CliIO): FdnChain | null {
  *  uncommitted edit, so pull/sync must detect it first and skip
  *  regeneration rather than guess. Same "did the file already match the
  *  chain" comparison ingest.ts's own `--commit` no-op check makes. */
-function hasUncommittedEdits(file: string, chain: FdnChain): boolean {
+export function hasUncommittedEdits(file: string, chain: FdnChain): boolean {
   const source = readFileSync(file, 'utf8')
   const { doc } = parseDocument(source)
   return projectDocument(doc) !== projectDocument(chain.doc())
@@ -256,7 +256,7 @@ function hasUncommittedEdits(file: string, chain: FdnChain): boolean {
  *  importing blobs alone only updates `<file>.chain`, never the projected
  *  `.fdn.html` text, so a peer who only ever looks at the text would keep
  *  seeing their own edit forever even after a successful pull. */
-function regenerateTextFromChain(file: string, chain: FdnChain, io: CliIO): void {
+export function regenerateTextFromChain(file: string, chain: FdnChain, io: CliIO): void {
   let text = projectDocument(chain.doc())
   const docId = chain.docId()
   if (docId) text = injectDocIdAttr(text, docId)

@@ -9,6 +9,7 @@
  */
 
 import type {
+  FdnAnnotation,
   FdnComponent,
   FdnDataSet,
   FdnDocument,
@@ -141,6 +142,18 @@ export function invertOp(
       const prev = beforeDoc.states.find((s) => s.name === op.state.name)
       return prev ? { op: 'set-state', state: prev } : 'fallback'
     }
+    case 'annotate': {
+      const prev = beforeDoc.annotations.find((a) => a.id === op.annotation.id)
+      return prev ? { op: 'annotate', annotation: prev } : { op: 'remove-annotation', id: op.annotation.id }
+    }
+    case 'set-annotation-status': {
+      const prev = beforeDoc.annotations.find((a) => a.id === op.id)
+      return prev ? { op: 'set-annotation-status', id: op.id, status: prev.status } : 'fallback'
+    }
+    case 'remove-annotation': {
+      const prev = beforeDoc.annotations.find((a) => a.id === op.id)
+      return prev ? { op: 'annotate', annotation: prev } : null
+    }
     case 'replace-document':
       return { op: 'replace-document', doc: beforeDoc }
   }
@@ -229,6 +242,7 @@ function diffSections(a: FdnDocument, b: FdnDocument, out: SemanticOp[]): void {
   diffKeyedSection<FdnViewport>('viewports', a.viewports, b.viewports, (v) => v.name, out)
   diffKeyedSection<FdnNamedStyle>('namedStyles', a.namedStyles, b.namedStyles, (s) => s.name, out)
   diffKeyedSection<FdnComponent>('components', a.components, b.components, (c) => c.name, out)
+  diffKeyedSection<FdnAnnotation>('annotations', a.annotations, b.annotations, (an) => an.id, out)
 
   // matrix entries have no natural name (finding: section-changed.name doesn't
   // fit unnamed list sections) — synthesize "state::viewport" and diff as a set.
@@ -265,4 +279,23 @@ export function structuralDiff(a: FdnDocument, b: FdnDocument): SemanticOp[] {
 // re-exported for callers that want to sanity-check equality without a full diff
 export function documentsEqual(a: FdnDocument, b: FdnDocument): boolean {
   return structuralDiff(a, b).length === 0 && a.specVersion === b.specVersion && a.title === b.title
+}
+
+// ——— annotation id minting (shared by the CLI's `annotate` command, MCP's
+//      foundation_annotate, and engine serve's POST /api/annotate — one
+//      scheme so an id minted through any surface never collides with one
+//      minted through another) ———
+
+const MINTED_ANNOTATION_ID_RE = /^a(\d+)$/
+
+/** Mints the next `a<N>` id from a document's current annotations —
+ *  deterministic "scan max, mint max+1" scheme, same shape as parse/index.ts's
+ *  node-id IdMinter (never Date.now()/Math.random(), per SPEC D2). */
+export function mintAnnotationId(existing: FdnAnnotation[]): string {
+  let max = 0
+  for (const a of existing) {
+    const m = MINTED_ANNOTATION_ID_RE.exec(a.id)
+    if (m?.[1] !== undefined) max = Math.max(max, Number(m[1]))
+  }
+  return `a${max + 1}`
 }

@@ -20,6 +20,7 @@ import { runRender } from './commands/render.js'
 import { runDiff } from './commands/diff.js'
 import { runServe } from './commands/serve.js'
 import { runChain } from './commands/chain.js'
+import { runAnnotate, runAnnotations } from './commands/annotate.js'
 import { runFreeze } from './commands/freeze.js'
 import { runMcp } from './commands/mcp.js'
 import { runGateway } from './commands/gateway.js'
@@ -38,6 +39,8 @@ const COMMANDS: Record<string, (args: string[], io: CliIO) => Promise<number>> =
   diff: runDiff,
   serve: runServe,
   chain: runChain,
+  annotate: runAnnotate,
+  annotations: runAnnotations,
   freeze: runFreeze,
   mcp: runMcp,
   gateway: runGateway,
@@ -74,6 +77,11 @@ commands:
   chain sync <file> <dir>                    pull (same text-regeneration/uncommitted-edits behavior as
                                               'chain pull', above) then push
   chain merge <file> <theirs.chain>          merge chains, regenerate <file> text, print overlap report
+  annotate <file> --text T [--node id | --x N --y N] [--state S]   leave a new annotation
+                                              (chain-committed; requires a chain — see chain init)
+  annotate <file> --resolve <id>             mark an annotation resolved
+  annotate <file> --wontfix <id>             mark an annotation wontfix
+  annotations <file>                         list a document's annotations with status
   freeze <file> -o <dest> [--author A] [-m msg]   crystallize a lock-headered frozen file
   freeze --verify <frozenfile>               check a frozen file's lock header + pedigree
   project init [dir] [--name N]              write a fresh foundation.json manifest

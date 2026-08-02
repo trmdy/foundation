@@ -11,7 +11,7 @@
  * of true HTML void elements — every fdn-* element and every non-void HTML element
  * always gets an explicit `<tag>…</tag>`, even when empty.
  */
-import type { FdnComponent, FdnDocument, FdnNamedStyle, FdnNode, StateStyleKey } from '../types.js'
+import type { FdnAnnotation, FdnComponent, FdnDocument, FdnNamedStyle, FdnNode, StateStyleKey } from '../types.js'
 import { serializeDeclarations } from '../parse/style.js'
 import { STATE_STYLE_ATTRS } from '../grammar/schema.js'
 
@@ -212,12 +212,40 @@ function emitFdnDoc(w: Writer, depth: number, doc: FdnDocument): void {
     wroteAny = true
   }
 
+  if (doc.annotations.length > 0) {
+    w.push(depth + 1, '<fdn-annotations>')
+    for (const annotation of doc.annotations) emitAnnotation(w, depth + 2, annotation)
+    w.push(depth + 1, '</fdn-annotations>')
+    wroteAny = true
+  }
+
   if (!wroteAny) {
     // collapse trailing open tag if the header block is empty
     w.appendToLast('</fdn-doc>')
     return
   }
   w.push(depth, '</fdn-doc>')
+}
+
+/**
+ * `<fdn-annotation id=… [node-id=…|x=… y=…] [state=…] status=…>text</fdn-annotation>`
+ * (SPEC D2/D4/13a — annotations are first-class chain citizens, hidden
+ * metadata in projection, never baked into design output). Kept on ONE line
+ * (emitTextLeaf's pattern, defined further below) rather than through
+ * emitElement's normal indented-child-callback path: annotation text is
+ * extracted RAW by parse/index.ts's parseAnnotations (directTextOf, not
+ * normalizeTextWhitespace) specifically so authored whitespace round-trips
+ * byte-for-byte — re-indenting it here would inject whitespace parse can't
+ * tell apart from content, breaking the parse/project fixpoint.
+ */
+function emitAnnotation(w: Writer, depth: number, annotation: FdnAnnotation): void {
+  const a: [string, string][] = [['id', annotation.id]]
+  if (annotation.nodeId !== undefined) a.push(['node-id', annotation.nodeId])
+  if (annotation.x !== undefined) a.push(['x', String(annotation.x)])
+  if (annotation.y !== undefined) a.push(['y', String(annotation.y)])
+  if (annotation.state !== undefined) a.push(['state', annotation.state])
+  a.push(['status', annotation.status])
+  w.push(depth, `<fdn-annotation ${attrPairs(a)}>${escapeText(annotation.text)}</fdn-annotation>`)
 }
 
 // ——————————————————————————————————————————————————————————————————————————

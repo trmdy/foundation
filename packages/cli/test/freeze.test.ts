@@ -45,6 +45,7 @@ function minimalDocForChain(): FdnDocument {
     matrix: [],
     namedStyles: [],
     components: [],
+    annotations: [],
     body: [{ id: 'n1', tag: 'h1', attrs: {}, style: {}, styleStates: {}, text: 'Hello, Foundation', children: [] }],
   }
 }

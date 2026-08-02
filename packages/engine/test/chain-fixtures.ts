@@ -22,6 +22,7 @@ export function baseDocument(): FdnDocument {
     matrix: [{ state: 'default', viewport: 'desktop' }],
     namedStyles: [{ name: 'card', style: { padding: '16px' }, styleStates: {} }],
     components: [{ name: 'Button', props: [{ name: 'label', type: 'string' }], slots: [], body: [] }],
+    annotations: [],
     body: [
       el('n-root', 'div', {
         attrs: { class: 'app' },

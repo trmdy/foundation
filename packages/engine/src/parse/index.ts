@@ -16,6 +16,7 @@ import {
   STATE_STYLE_ATTRS,
 } from '../grammar/schema.js'
 import type {
+  FdnAnnotation,
   FdnComponent,
   FdnDataSet,
   FdnDocument,
@@ -584,6 +585,35 @@ function parseMatrix(fdnDoc: ElementNode): { viewports: FdnViewport[]; matrix: {
   return { viewports, matrix }
 }
 
+/**
+ * `<fdn-annotations>` (SPEC D2/D4/13a: spatial annotations are first-class
+ * chain citizens, hidden metadata in projection — never rendered, never
+ * baked). Lives inside `<fdn-doc>` alongside fdn-params/fdn-states/etc.
+ * Annotation text is extracted RAW via directTextOf (not
+ * normalizeTextWhitespace) — same reasoning as parseSealed's html/css:
+ * significant whitespace in an author's annotation text must round-trip
+ * byte-for-byte for the parse(project(doc)) fixpoint to hold, and
+ * project/index.ts's emitAnnotation mirrors this with a one-line
+ * emitTextLeaf-style emission for exactly that reason.
+ */
+function parseAnnotations(fdnDoc: ElementNode): FdnAnnotation[] {
+  const wrapper = directChildrenByTag(fdnDoc, 'fdn-annotations')[0]
+  if (!wrapper) return []
+  return directChildrenByTag(wrapper, 'fdn-annotation').map((el) => {
+    const a = attrsOf(el)
+    const annotation: FdnAnnotation = {
+      id: a.id ?? '',
+      text: directTextOf(el),
+      status: (a.status as FdnAnnotation['status']) ?? 'open',
+    }
+    if (a['node-id'] !== undefined) annotation.nodeId = a['node-id']
+    if (a.x !== undefined) annotation.x = Number(a.x)
+    if (a.y !== undefined) annotation.y = Number(a.y)
+    if (a.state !== undefined) annotation.state = a.state
+    return annotation
+  })
+}
+
 // ——————————————————————————————————————————————————————————————————————————
 // fdn-styles
 // ——————————————————————————————————————————————————————————————————————————
@@ -708,6 +738,7 @@ export function parseDocument(html: string): { doc: FdnDocument; report: Normali
   let states: FdnState[] = []
   let viewports: FdnViewport[] = []
   let matrix: { state: string; viewport: string }[] = []
+  let annotations: FdnAnnotation[] = []
 
   if (fdnDoc) {
     const a = attrsOf(fdnDoc)
@@ -726,6 +757,7 @@ export function parseDocument(html: string): { doc: FdnDocument; report: Normali
     const m = parseMatrix(fdnDoc)
     viewports = m.viewports
     matrix = m.matrix
+    annotations = parseAnnotations(fdnDoc)
   } else {
     lines.push({
       code: 'spec-version-defaulted',
@@ -773,6 +805,7 @@ export function parseDocument(html: string): { doc: FdnDocument; report: Normali
     namedStyles,
     components,
     body: bodyNodes,
+    annotations,
   }
   if (title !== undefined) doc.title = title
 

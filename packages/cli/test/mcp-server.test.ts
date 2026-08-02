@@ -56,6 +56,8 @@ describe('foundation mcp (real stdio child process)', () => {
     const names = tools.map((t) => t.name).sort()
     expect(names).toEqual(
       [
+        'foundation_annotate',
+        'foundation_annotations',
         'foundation_bake',
         'foundation_chain_anchor',
         'foundation_chain_log',
@@ -267,6 +269,72 @@ describe('foundation mcp (real stdio child process)', () => {
 
     rmSync(dir, { recursive: true, force: true })
   }, 20000)
+
+  it('foundation_annotate / foundation_annotations round-trip (create, resolve, list) and 409 without a chain', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'fdn-mcp-annotate-'))
+    const target = join(dir, 'board')
+
+    const created = await client.callTool({ name: 'foundation_new', arguments: { path: target, empty: true } })
+    expect(created.isError).not.toBe(true)
+    const filePath = (created.structuredContent as Record<string, unknown>).path as string
+
+    // annotate requires an existing chain (foundation_new empty:true still chain-inits)
+    const annotated = await client.callTool({
+      name: 'foundation_annotate',
+      arguments: { path: filePath, text: 'padding looks off', x: 12, y: 34, state: 'default' },
+    })
+    expect(annotated.isError).not.toBe(true)
+    const annotatedStructured = annotated.structuredContent as Record<string, unknown>
+    const annotation = annotatedStructured.annotation as Record<string, unknown>
+    expect(annotation.text).toBe('padding looks off')
+    expect(annotation.x).toBe(12)
+    expect(annotation.y).toBe(34)
+    expect(annotation.status).toBe('open')
+    const id = annotation.id as string
+    expect(typeof id).toBe('string')
+
+    const listed = await client.callTool({ name: 'foundation_annotations', arguments: { path: filePath } })
+    expect(listed.isError).not.toBe(true)
+    const listedAnnotations = (listed.structuredContent as Record<string, unknown>).annotations as Array<Record<string, unknown>>
+    expect(listedAnnotations).toHaveLength(1)
+    expect(listedAnnotations[0]?.id).toBe(id)
+
+    const resolved = await client.callTool({ name: 'foundation_annotate', arguments: { path: filePath, resolve: id } })
+    expect(resolved.isError).not.toBe(true)
+    expect((resolved.structuredContent as Record<string, unknown>).status).toBe('resolved')
+
+    const listedAfter = await client.callTool({ name: 'foundation_annotations', arguments: { path: filePath } })
+    const listedAfterAnnotations = (listedAfter.structuredContent as Record<string, unknown>).annotations as Array<Record<string, unknown>>
+    expect(listedAfterAnnotations[0]?.status).toBe('resolved')
+
+    // and the CLI-facing text (regenerated via the same chain path) round-trips the annotation too
+    const read = await client.callTool({ name: 'foundation_read', arguments: { path: filePath } })
+    expect((read.structuredContent as Record<string, unknown>).canonical as string).toContain('<fdn-annotations>')
+
+    rmSync(dir, { recursive: true, force: true })
+  }, 15000)
+
+  it('foundation_annotate fails (isError, not a thrown exception) when the document has no chain', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'fdn-mcp-annotate-no-chain-'))
+    const target = join(dir, 'board')
+
+    const created = await client.callTool({ name: 'foundation_new', arguments: { path: target } })
+    const filePath = (created.structuredContent as Record<string, unknown>).path as string
+    const { unlinkSync } = await import('node:fs')
+    unlinkSync(`${filePath}.chain`)
+
+    const result = await client.callTool({ name: 'foundation_annotate', arguments: { path: filePath, text: 'x' } })
+    expect(result.isError).toBe(true)
+
+    const followUp = await client.callTool({ name: 'foundation_inspect', arguments: { path: filePath } })
+    expect(followUp.isError).not.toBe(true)
+
+    rmSync(dir, { recursive: true, force: true })
+  }, 15000)
 })
 
 describe('foundation mcp: author identity (friction §6)', () => {

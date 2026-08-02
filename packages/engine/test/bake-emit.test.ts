@@ -19,6 +19,7 @@ function doc(overrides: Partial<FdnDocument> = {}): FdnDocument {
     matrix: [],
     namedStyles: [],
     components: [],
+    annotations: [],
     body: [],
     ...overrides,
   }

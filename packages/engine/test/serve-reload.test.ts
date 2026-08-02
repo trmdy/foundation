@@ -22,6 +22,7 @@ function makeDoc(text: string): FdnDocument {
     matrix: [],
     namedStyles: [],
     components: [],
+    annotations: [],
     body: [node({ id: 'n1', tag: 'div', text })],
   }
 }

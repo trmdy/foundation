@@ -27,16 +27,17 @@ import {
   bakeDocument,
   createChain,
   loadChain,
+  mintAnnotationId,
   parseDocument,
   projectDocument,
   validateDocument,
 } from 'foundation-engine'
-import type { ConformanceReport, FdnComponent, FdnDocument, FdnNode, FdnViewport, ReportLine } from 'foundation-engine'
+import type { ConformanceReport, FdnAnnotation, FdnChain, FdnComponent, FdnDocument, FdnNode, FdnViewport, ReportLine } from 'foundation-engine'
 // Deep import, not re-exported from the package root (same as commands/freeze.ts) —
 // mirrored here rather than imported from commands/freeze.ts because that file
 // only exports a CLI entry point (runFreeze), not these two.
 import { freezeDocument, verifyFrozen } from 'foundation-engine/src/freeze/index.js'
-import { chainPathFor, writeChainInit } from '../commands/chain.js'
+import { chainPathFor, hasUncommittedEdits, regenerateTextFromChain, writeChainInit } from '../commands/chain.js'
 // Bug fix (dogfood cycle 3, friction §6): the document id lives outside
 // FdnDocument entirely (see docid.ts's module doc) — parseDocument/
 // projectDocument never see it, so any parse->project round-trip silently
@@ -139,6 +140,11 @@ function optionalString(args: Record<string, unknown>, key: string): string | un
 
 function optionalBoolean(args: Record<string, unknown>, key: string): boolean {
   return args[key] === true
+}
+
+function optionalNumber(args: Record<string, unknown>, key: string): number | undefined {
+  const value = args[key]
+  return typeof value === 'number' ? value : undefined
 }
 
 function readSource(path: string): { ok: true; source: string } | { ok: false; result: ToolResult } {
@@ -546,6 +552,137 @@ async function toolChainLog(args: Record<string, unknown>): Promise<ToolResult> 
   }
 }
 
+// ——— annotations (SPEC D2/D4/13a: annotations are first-class chain
+//      citizens) — mirrors commands/annotate.ts's CLI behavior: a hard
+//      requirement on an existing chain (there is nowhere durable to put an
+//      annotation without one), commit-then-regenerate-text so the .fdn.html
+//      <fdn-annotations> block stays in sync, and the same uncommitted-edits
+//      guard chain pull/sync/annotate.ts's CLI path use so an annotate call
+//      never silently clobbers a hand-edit sitting in the text ———
+
+const NO_OP_IO = { stdout: (): void => {}, stderr: (): void => {} }
+
+function loadChainForAnnotate(path: string): { chain: FdnChain; chainPath: string } | { error: ToolResult } {
+  const chainPath = chainPathFor(path)
+  if (!existsSync(chainPath)) {
+    return {
+      error: fail(
+        `${path}: no chain yet (${chainPath} not found) — call foundation_new or ingest with commit:true first ` +
+          '(annotations need somewhere durable to live)',
+      ),
+    }
+  }
+  try {
+    return { chain: loadChain(readFileSync(chainPath), { actor: defaultAuthor() }), chainPath }
+  } catch (err) {
+    return { error: fail(`could not read ${chainPath}: ${err instanceof Error ? err.message : String(err)}`) }
+  }
+}
+
+function commitAnnotationChange(
+  path: string,
+  chain: FdnChain,
+  chainPath: string,
+  meta: { author: string; message: string },
+  ops: Parameters<FdnChain['apply']>[1],
+): { hash: string; textRegenerated: boolean } {
+  const wasDirty = existsSync(path) && hasUncommittedEdits(path, chain)
+  const envelope = chain.apply(meta, ops)
+  writeFileSync(chainPath, chain.save())
+  if (!wasDirty) regenerateTextFromChain(path, chain, NO_OP_IO)
+  return { hash: envelope.hash, textRegenerated: !wasDirty }
+}
+
+/**
+ * `foundation_annotate` — the agent-facing twin of `foundation annotate`.
+ * Two mutually exclusive modes: pass `text` to leave a NEW annotation
+ * (anchored to `nodeId`, or `x`/`y` viewport coords, plus an optional
+ * `state`); pass `resolve` or `wontfix` (an existing annotation id) to
+ * change an existing one's status instead. Humans (or other agents) leave
+ * these to flag something about the design; an agent's job when it SEES one
+ * is to fix the design the annotation describes, then mark it resolved
+ * (`resolve`) — or, if the annotation doesn't actually call for a change,
+ * mark it `wontfix` with a reason in `message` — never to just delete it.
+ */
+async function toolAnnotate(args: Record<string, unknown>): Promise<ToolResult> {
+  const path = requireString(args, 'path')
+  const text = optionalString(args, 'text')
+  const resolveId = optionalString(args, 'resolve')
+  const wontfixId = optionalString(args, 'wontfix')
+  const message = optionalString(args, 'message')
+  const author = defaultAuthor()
+
+  const modes = [text, resolveId, wontfixId].filter((v) => v !== undefined)
+  if (modes.length !== 1) {
+    return fail('foundation_annotate: pass exactly one of "text" (new annotation), "resolve" (annotation id), or "wontfix" (annotation id)')
+  }
+
+  const loaded = loadChainForAnnotate(path)
+  if ('error' in loaded) return loaded.error
+  const { chain, chainPath } = loaded
+
+  if (resolveId !== undefined || wontfixId !== undefined) {
+    const id = (resolveId ?? wontfixId) as string
+    const status: FdnAnnotation['status'] = resolveId !== undefined ? 'resolved' : 'wontfix'
+    if (!chain.doc().annotations.some((a) => a.id === id)) {
+      return fail(`foundation_annotate: no annotation "${id}" on ${path} — call foundation_annotations to list existing ones`)
+    }
+    const commitMessage = message ?? `annotation ${id}: mark ${status}`
+    const { hash, textRegenerated } = commitAnnotationChange(path, chain, chainPath, { author, message: commitMessage }, [
+      { op: 'set-annotation-status', id, status },
+    ])
+    return ok({ path, chainPath, id, status, commit: { hash, message: commitMessage }, textRegenerated })
+  }
+
+  const nodeId = optionalString(args, 'nodeId')
+  const x = optionalNumber(args, 'x')
+  const y = optionalNumber(args, 'y')
+  const state = optionalString(args, 'state')
+  if (nodeId !== undefined && (x !== undefined || y !== undefined)) {
+    return fail('foundation_annotate: pass "nodeId" OR "x"/"y", not both')
+  }
+  if ((x !== undefined) !== (y !== undefined)) {
+    return fail('foundation_annotate: "x" and "y" must be given together')
+  }
+
+  const id = mintAnnotationId(chain.doc().annotations)
+  const annotation: FdnAnnotation = { id, text: text as string, status: 'open' }
+  if (nodeId !== undefined) annotation.nodeId = nodeId
+  if (x !== undefined) annotation.x = x
+  if (y !== undefined) annotation.y = y
+  if (state !== undefined) annotation.state = state
+
+  const commitMessage = message ?? `annotate: ${annotation.text}`
+  const { hash, textRegenerated } = commitAnnotationChange(path, chain, chainPath, { author, message: commitMessage }, [
+    { op: 'annotate', annotation },
+  ])
+  return ok({ path, chainPath, annotation, commit: { hash, message: commitMessage }, textRegenerated })
+}
+
+/**
+ * `foundation_annotations` — list a document's annotations (open/resolved/
+ * wontfix), reading through the chain when one exists (the live truth),
+ * falling back to whatever's already ingested into the text's own
+ * `<fdn-annotations>` block when there is no chain yet (D4: text is always a
+ * valid read path too).
+ */
+async function toolAnnotations(args: Record<string, unknown>): Promise<ToolResult> {
+  const path = requireString(args, 'path')
+  const chainPath = chainPathFor(path)
+  if (existsSync(chainPath)) {
+    try {
+      const chain = loadChain(readFileSync(chainPath))
+      return ok({ path, chainPath, source: 'chain', annotations: chain.doc().annotations })
+    } catch (err) {
+      return fail(`could not read ${chainPath}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  const read = readSource(path)
+  if (!read.ok) return read.result
+  const { doc } = parseDocument(read.source)
+  return ok({ path, chainPath: null, source: 'text', annotations: doc.annotations })
+}
+
 async function toolChainAnchor(args: Record<string, unknown>): Promise<ToolResult> {
   const path = requireString(args, 'path')
   const name = requireString(args, 'name')
@@ -914,6 +1051,46 @@ export const TOOLS: ToolDefinition[] = [
       required: ['path', 'name'],
     },
     handler: toolChainAnchor,
+  },
+  {
+    name: 'foundation_annotate',
+    description:
+      'Leave or resolve a spatial design annotation — a first-class, in-chain review note (SPEC D2/D4/13a), not a '
+      + 'comment in some external tool. Humans (and other agents) leave these to flag something about a design; '
+      + 'when YOU see an open one, your job is to fix the design it describes, then call this again with `resolve` '
+      + 'to mark it done — or, if it genuinely does not call for a change, `wontfix` with your reasoning in '
+      + '`message`. Never just delete an annotation instead. Two mutually exclusive modes: pass `text` to leave a '
+      + 'NEW annotation (anchor it to `nodeId` — a data-fdn-id, preferred — or to `x`/`y` viewport coordinates when '
+      + 'there is no node to point at; `state` records which named state you were looking at); or pass `resolve` '
+      + 'or `wontfix` (an existing annotation id from foundation_annotations) to change its status. Requires the '
+      + 'document to already have a chain (foundation_new / foundation_chain_log) — there is nowhere durable to '
+      + 'store an annotation otherwise.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to a .fdn.html file (must already have a <path>.chain)' },
+        text: { type: 'string', description: 'New annotation text — mutually exclusive with resolve/wontfix' },
+        nodeId: { type: 'string', description: 'A data-fdn-id to anchor the new annotation to (preferred over x/y)' },
+        x: { type: 'number', description: 'Viewport x coordinate anchor, used with y when there is no nodeId' },
+        y: { type: 'number', description: 'Viewport y coordinate anchor, used with x when there is no nodeId' },
+        state: { type: 'string', description: 'Named state the annotator was viewing, for context' },
+        resolve: { type: 'string', description: 'Mark this existing annotation id resolved — mutually exclusive with text/wontfix' },
+        wontfix: { type: 'string', description: 'Mark this existing annotation id wontfix — mutually exclusive with text/resolve' },
+        message: { type: 'string', description: 'Chain commit message override' },
+      },
+      required: ['path'],
+    },
+    handler: toolAnnotate,
+  },
+  {
+    name: 'foundation_annotations',
+    description:
+      'List a document\'s annotations (open/resolved/wontfix), each with its anchor (nodeId or x/y), state, and '
+      + 'text. Reads through the chain when one exists (the live truth), else falls back to whatever is already '
+      + 'ingested into the text\'s own hidden <fdn-annotations> block. Check this before starting design work so '
+      + 'you do not miss open review feedback, and after finishing a change to confirm nothing is still open.',
+    inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'Path to a .fdn.html file' } }, required: ['path'] },
+    handler: toolAnnotations,
   },
   {
     name: 'foundation_freeze',
