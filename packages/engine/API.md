@@ -100,6 +100,79 @@ report + regenerate text) · `git-merge-driver` (three-arg git driver; install
 notes for .gitattributes) · `gateway install` (publish ~/.hive/gateways/
 foundation.json) · `mcp` (stdio MCP server exposing the verb set).
 
+## Wave 4 — component importer (packages/importer, new package)
+
+The D3 importer: external React components → FdnComponent, transparent-first.
+Two stages with a FIXED intermediate artifact so they can be built independently.
+
+```ts
+// Stage 1 — compile + sandboxed render harness (src/harness/)
+harvestComponent(opts: {
+  source: string            // path to a .tsx/.jsx component file
+  name?: string             // default: inferred from export/file
+  props?: FdnProp[]         // override; else best-effort from TS types (string |
+                            // boolean | string-literal-union → enum; else require override)
+}): Promise<RenderArtifact>
+
+interface RenderSample {
+  /** Which prop was varied from defaults for this sample; undefined = the
+   *  baseline (defaults + sentinel strings). */
+  varied?: string
+  props: Record<string, unknown>
+  html: string              // renderToStaticMarkup output
+}
+interface RenderArtifact {
+  name: string
+  propSchema: FdnProp[]
+  samples: RenderSample[]   // baseline first, then one prop varied at a time:
+                            // every enum value, both booleans. String props are
+                            // NOT varied — the baseline uses sentinel values
+                            // "⟦fdn:prop:<name>⟧" for substitution detection.
+  classIndex: Record<string, {
+    base: Record<string, string>                      // class → declarations
+    states?: Partial<Record<'hover'|'focus'|'active'|'disabled', Record<string, string>>>
+    unsupported?: string[]  // variant prefixes we cannot express (md:, dark:, …)
+  }>                        // resolved Tailwind declarations for every class
+                            // appearing in any sample (tailwindcss compiled
+                            // against exactly that class set; deterministic)
+  provenance: { source: string; contentSha256: string }
+}
+// Determinism enforced in the SSR sandbox: frozen Date, seeded Math.random,
+// banned globals (fetch/XHR/WebSocket/localStorage/timers) throw legible
+// errors. esbuild pinned; bundling resolves from the component's own package
+// context; no network ever.
+
+// Stage 2 — projection (src/project/)
+projectArtifact(artifact: RenderArtifact): {
+  component: FdnComponent   // native body when projection succeeds, else sealed
+  mode: 'native' | 'sealed'
+  report: ReportLine[]      // codes: import-sentinel-substituted, import-variant-branch,
+                            // import-attr-ternary, import-prop-interaction (→ sealed),
+                            // import-unsupported-variant (dropped md:/dark: etc.),
+                            // import-unprojectable-css (→ sealed), import-sealed
+}
+// Projection rules: sentinel strings → {{ prop.x }} in text/attrs; per-value
+// structural diffs → when= branches on the varied prop; attribute-only value
+// differences → ternary (2 values) or a generated fdn-lookup (3+); Tailwind
+// classes → inline declarations via classIndex (base → style, states →
+// style-hover/-focus/-active/-disabled), then longhand-normalized exactly like
+// D1 ingestion; class attributes are consumed (not emitted). Composed-variant
+// check: if applying two single-prop diffs independently cannot reproduce a
+// pairwise sample (harness includes a small pairwise probe set for enum×boolean
+// pairs), that is a prop interaction → sealed + report. Icons (pure-svg output,
+// no classes) project trivially — the degenerate case.
+```
+
+CLI: `foundation import <source> --into <file.fdn.html> [--name N] [--props <json>]
+[--sealed]` (--sealed forces capsule mode) — appends/replaces the component in the
+target document via ordinary ingest+commit (chain-committed when a chain exists),
+prints the report. MCP: `foundation_import { source, into, name?, props?, sealed? }`.
+Bake: sealed components emit `<div class="fdn-capsule-<name>">` + their css scoped
+under that class in the baked document's style block.
+Acceptance suite: vendored fixtures — ShadCN-style button (cva variants), badge,
+card, and a lucide icon — imported natively, validated, baked, rendered; repeated
+import byte-identical.
+
 ## CLI (packages/cli)
 
 Zero-dependency argv parsing, bin name `foundation`. Commands v0:

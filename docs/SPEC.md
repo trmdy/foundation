@@ -402,9 +402,16 @@ To fill: the fixtures.
    instance's already-flipped geometry)**, flip permission, and offset.
    `scrim`/`panel` substructure is optional — the tooltip is the minimal legal case.
    One residue became open question 13.
-3. Capsule interactivity budget: how much sandboxed behavior may a sealed capsule
-   carry (hover/focus/open states) before it stops being presentational? Current lean:
-   CSS-state + declarative variants only in v1; no event handlers.
+3. ~~Capsule interactivity budget~~ — **resolved 2026-08-02 (importer kickoff)**:
+   a sealed capsule is `{ html, css }` — its scoped stylesheet MAY use
+   `:hover/:focus/:active/:disabled` pseudo-classes and CSS transitions/animations;
+   it may NOT contain scripts, event handlers, timers, network access, or storage —
+   enforced at import compile (banned globals throw legible errors in the SSR
+   sandbox), never by convention. Bake scopes the css under a generated capsule
+   class. Internals stay excluded from edit/diff; geometry is retained for
+   annotation anchoring (D3). Transparent-first stands: sealing happens only when
+   projection fails (structural prop interactions, unrepresentable CSS) and always
+   with a report line saying why.
 4. ~~Transparent-import fidelity~~ — **resolved 2026-07-31**: no fidelity gate. The
    importer always projects to a native body via D1 normalization (canonical rewrites
    + normalization report); sealed capsules only for unrepresentable output. Values

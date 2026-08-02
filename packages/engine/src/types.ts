@@ -87,8 +87,16 @@ export interface FdnComponent {
   /** Slot names declared via <fdn-slot name="…"> in the body. */
   slots: string[]
   /** Template body: subset nodes, may interpolate and use when/each.
-   *  (Sealed capsule bodies are Q3/L1-later — not in this contract yet.) */
+   *  Empty when `sealed` is present (a sealed capsule IS the body). */
   body: FdnNode[]
+  /** Sealed capsule (SPEC Q3, resolved): raw markup + scoped CSS produced by
+   *  the importer when transparent projection fails. CSS may use interaction
+   *  pseudo-classes and transitions; never scripts (compiler-enforced). Bake
+   *  scopes the css under a generated capsule class. Excluded from edit/diff. */
+  sealed?: { html: string; css: string }
+  /** Import provenance for divergence tracking (D3): where the component came
+   *  from and the content hash of its source at import time. */
+  provenance?: { source: string; contentSha256: string }
 }
 
 /** The document — template form, one file, one hash, all states (SPEC Q10). */
