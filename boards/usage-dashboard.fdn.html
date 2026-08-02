@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Apiary — Account usage</title>
+<style>
+  :root {
+    --color-accent: #B8842E;
+    --color-bg: #F5F4F1;
+    --color-border: #E7E5E0;
+    --color-border-faint: #F0EDE7;
+    --color-border-input: #E2E0DB;
+    --color-divider: #ECEAE5;
+    --color-hover: #F6F5F2;
+    --color-selected-bg: #EEEDE9;
+    --color-status-blocked: #B0512E;
+    --color-status-done: #9B978F;
+    --color-status-review: #BD6B3C;
+    --color-status-running: #2F8738;
+    --color-status-waiting: #D4A72C;
+    --color-surface: #FFFFFF;
+    --color-surface-alt: #FAFAF8;
+    --color-surface-sunken: #F7F6F3;
+    --color-tab-active: #FAFAF8;
+    --color-text-disabled: #B5B1A9;
+    --color-text-faint: #A8A59E;
+    --color-text-ghost: #C4BFB6;
+    --color-text-muted: #8A877F;
+    --color-text-primary: #2E2B27;
+    --color-text-secondary: #4A463F;
+    --color-text-tertiary: #6B6862;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+    --font-sans: -apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-size-2xs: 9.5px;
+    --font-size-base: 12px;
+    --font-size-lg: 14.5px;
+    --font-size-md: 13px;
+    --font-size-sm: 11px;
+    --font-size-xl: 15px;
+    --font-size-xs: 10.5px;
+    --font-weight-medium: 500;
+    --font-weight-regular: 400;
+    --font-weight-semibold: 600;
+    --radius-lg: 8px;
+    --radius-md: 6px;
+    --radius-sm: 4px;
+    --shadow-pane: 0 2px 8px rgba(0,0,0,.06);
+    --spacing: 0.25rem;
+    --tracking-wider: 0.05em;
+  }
+</style>
+</head>
+<body>
+  <fdn-doc data-fdn-doc-id="4598eca9-2093-42bf-b6d3-34fcd2df017e" hidden data-fdn-spec-version="0.0.1-draft" data-fdn-title="Apiary — Account usage">
+    <fdn-params>
+      <fdn-param name="providerfilter" type="enum" values="all,anthropic,openai,other" default="all" description="which provider group the fleet pane is showing; drives the tab row and which groups render"></fdn-param>
+      <fdn-param name="selectedaccount" type="enum" values="claude-tormod-thto,claude-digitech,codex-arbeidsark" default="claude-tormod-thto" description="which account board 2 expands"></fdn-param>
+      <fdn-param name="forecast" type="enum" values="pace,flat" default="pace" description="which burn model the exhaustion forecast extrapolates — window pace (whole-window average) or flat (last 30 minutes held constant)"></fdn-param>
+    </fdn-params>
+    <fdn-data name="anthropic">
+      <fdn-item id="claude-gmail" fab="4%" h5fill="5%" h5pace="-12" h5resets="4h" h5tone="calm" h5v="5%" name="claude-tormod.haugland-gmail.com" note="" ok="true" plan="max" proj="29%" projtone="calm" verdict="deepest headroom in the fleet" wkfill="3%" wkpace="-7" wkresets="6d" wktone="calm" wkv="3%"></fdn-item>
+      <fdn-item id="claude-tormod-thto" fab="56%" h5fill="58%" h5pace="+14" h5resets="2h" h5tone="hot" h5v="58%" name="claude-tormod-thto.no" note="" ok="true" plan="max" proj="132%" projtone="hot" verdict="outruns the window — exhausts ~1h36 early" wkfill="31%" wkpace="-25" wkresets="3d" wktone="calm" wkv="31%"></fdn-item>
+      <fdn-item id="claude-ursolutions" fab="54%" h5fill="25%" h5pace="-32" h5resets="2h" h5tone="calm" h5v="25%" name="claude-tormod-ursolutions.no" note="" ok="true" plan="max" proj="44%" projtone="calm" verdict="front-loaded, now coasting" wkfill="28%" wkpace="-41" wkresets="2d" wktone="calm" wkv="28%"></fdn-item>
+      <fdn-item id="claude-digitech" fab="63%" h5fill="12%" h5pace="-29" h5resets="2h" h5tone="calm" h5v="12%" name="claude-digitech" note="" ok="true" plan="max" proj="29%" projtone="calm" verdict="fable weekly is the tighter limit" wkfill="32%" wkpace="-39" wkresets="2d" wktone="calm" wkv="32%"></fdn-item>
+      <fdn-item id="claude-kontrol" fab="" h5fill="" h5pace="" h5resets="" h5tone="calm" h5v="" name="claude-tormod-kontrol.no" note="no OAuth token found in vault, homes, or keychain" ok="false" plan="" proj="" projtone="calm" verdict="" wkfill="" wkpace="" wkresets="" wktone="calm" wkv=""></fdn-item>
+      <fdn-item id="claude-arbeidsark" fab="46%" h5fill="17%" h5pace="-54" h5resets="1h" h5tone="calm" h5v="17%" name="claude-tormod-arbeidsark.no" note="" ok="true" plan="max" proj="24%" projtone="calm" verdict="window nearly over, barely used" wkfill="27%" wkpace="-42" wkresets="2d" wktone="calm" wkv="27%"></fdn-item>
+    </fdn-data>
+    <fdn-data name="openai">
+      <fdn-item id="codex-gmail" fab="" h5fill="" h5pace="" h5resets="" h5tone="calm" h5v="" name="codex-tormod.haugland-gmail.com" note="" ok="true" plan="pro" proj="23%" projtone="calm" verdict="" wkfill="3%" wkpace="-10" wkresets="6d" wktone="calm" wkv="3%"></fdn-item>
+      <fdn-item id="codex-thto" fab="" h5fill="" h5pace="" h5resets="" h5tone="calm" h5v="" name="codex-tormod-thto.no" note="" ok="true" plan="pro" proj="26%" projtone="calm" verdict="" wkfill="5%" wkpace="-14" wkresets="5d" wktone="calm" wkv="5%"></fdn-item>
+      <fdn-item id="codex-ursolutions" fab="" h5fill="" h5pace="" h5resets="" h5tone="calm" h5v="" name="codex-tormod-ursolutions.no" note="" ok="true" plan="pro" proj="35%" projtone="calm" verdict="" wkfill="6%" wkpace="-11" wkresets="5d" wktone="calm" wkv="6%"></fdn-item>
+      <fdn-item id="codex-kontrol" fab="" h5fill="" h5pace="" h5resets="" h5tone="calm" h5v="" name="codex-tormod-kontrol.no" note="" ok="true" plan="pro" proj="6%" projtone="calm" verdict="" wkfill="1%" wkpace="-14" wkresets="5d" wktone="calm" wkv="1%"></fdn-item>
+      <fdn-item id="codex-arbeidsark" fab="" h5fill="" h5pace="" h5resets="" h5tone="calm" h5v="" name="codex-tormod-arbeidsark.no" note="" ok="true" plan="pro" proj="182%" projtone="critical" verdict="five days of quota in one — exhausts Tuesday" wkfill="31%" wkpace="+14" wkresets="5d" wktone="critical" wkv="31%"></fdn-item>
+      <fdn-item id="codex-digitech" fab="" h5fill="" h5pace="" h5resets="" h5tone="calm" h5v="" name="codex-codex-tormod-digitech" note="" ok="true" plan="pro" proj="13%" projtone="calm" verdict="" wkfill="2%" wkpace="-15" wkresets="5d" wktone="calm" wkv="2%"></fdn-item>
+    </fdn-data>
+    <fdn-data name="other">
+      <fdn-item id="cursor-gmail" fab="" h5fill="" h5pace="" h5resets="" h5tone="calm" h5v="" name="cursor-tormod.haugland-gmail.com" note="GetCurrentPeriodUsage returned no plan usage" ok="false" plan="" proj="" projtone="calm" verdict="" wkfill="" wkpace="" wkresets="" wktone="calm" wkv=""></fdn-item>
+      <fdn-item id="grok-gmail" fab="" h5fill="" h5pace="" h5resets="" h5tone="calm" h5v="" name="grok-tormod.haugland-gmail.com" note="" ok="true" plan="" proj="19%" projtone="calm" verdict="" wkfill="5%" wkpace="-27" wkresets="4d" wktone="calm" wkv="5%"></fdn-item>
+      <fdn-item id="kimi-default" fab="" h5fill="12%" h5pace="-23" h5resets="3h" h5tone="calm" h5v="12%" name="kimi-default" note="" ok="true" plan="advanced" proj="140%" projtone="hot" verdict="weekly pulling ahead of its window" wkfill="21%" wkpace="+6" wkresets="5d" wktone="hot" wkv="21%"></fdn-item>
+      <fdn-item id="opencode-minimax" fab="" h5fill="0%" h5pace="-44" h5resets="2h" h5tone="calm" h5v="0%" name="opencode-minimax" note="" ok="true" plan="" proj="0%" projtone="calm" verdict="" wkfill="0%" wkpace="-93" wkresets="11h" wktone="calm" wkv="0%"></fdn-item>
+      <fdn-item id="opencode-glm" fab="" h5fill="0%" h5pace="—" h5resets="—" h5tone="calm" h5v="0%" name="opencode-glm" note="" ok="true" plan="max" proj="0%" projtone="calm" verdict="" wkfill="" wkpace="" wkresets="" wktone="calm" wkv=""></fdn-item>
+    </fdn-data>
+    <fdn-data name="windows">
+      <fdn-item id="w5h" fill="58%" label="5h window" note="132% projected at window pace" noteflat="94% projected at the last-30-min rate" pace="+14" resets="2h48" tone="hot" value="58%"></fdn-item>
+      <fdn-item id="wweek" fill="31%" label="weekly" note="55% projected — comfortable" noteflat="55% projected — comfortable" pace="-25" resets="3d 01h" tone="calm" value="31%"></fdn-item>
+      <fdn-item id="wfable" fill="56%" label="fable weekly" note="dead on pace — lands at 100%" noteflat="dead on pace — lands at 100%" pace="±0" resets="3d 01h" tone="watch" value="56%"></fdn-item>
+    </fdn-data>
+    <fdn-data name="spillover">
+      <fdn-item id="s1" account="claude-tormod.haugland-gmail.com" headroom="95" rank="1" state="running" why="5% of 5h · resets in 4h"></fdn-item>
+      <fdn-item id="s2" account="claude-digitech" headroom="88" rank="2" state="running" why="12% of 5h · fable weekly at 63%"></fdn-item>
+      <fdn-item id="s3" account="claude-tormod-arbeidsark.no" headroom="83" rank="3" state="running" why="17% of 5h · window resets in 1h"></fdn-item>
+      <fdn-item id="s4" account="claude-tormod-kontrol.no" headroom="—" rank="—" state="blocked" why="no OAuth token — not eligible"></fdn-item>
+    </fdn-data>
+    <fdn-data name="bees">
+      <fdn-item id="b1" age="18m" bee="fdn-design-3" harness="claude · opus 5" share="41%" state="running"></fdn-item>
+      <fdn-item id="b2" age="52m" bee="review-desk-1" harness="claude · opus 5" share="34%" state="running"></fdn-item>
+      <fdn-item id="b3" age="2h07" bee="nightly-qa" harness="claude · sonnet 5" share="25%" state="done"></fdn-item>
+    </fdn-data>
+    <fdn-lookups>
+      <fdn-lookup name="statuscolor">
+        <fdn-entry key="blocked" value="var(--color-status-blocked)"></fdn-entry>
+        <fdn-entry key="done" value="var(--color-status-done)"></fdn-entry>
+        <fdn-entry key="review" value="var(--color-status-review)"></fdn-entry>
+        <fdn-entry key="running" value="var(--color-status-running)"></fdn-entry>
+        <fdn-entry key="waiting" value="var(--color-status-waiting)"></fdn-entry>
+      </fdn-lookup>
+      <fdn-lookup name="tonecolor">
+        <fdn-entry key="calm" value="var(--color-text-faint)"></fdn-entry>
+        <fdn-entry key="critical" value="var(--color-status-blocked)"></fdn-entry>
+        <fdn-entry key="hot" value="var(--color-status-review)"></fdn-entry>
+        <fdn-entry key="watch" value="var(--color-status-waiting)"></fdn-entry>
+      </fdn-lookup>
+      <fdn-lookup name="BadgeLookup1">
+        <fdn-entry key="default" value="var(--color-surface-sunken)"></fdn-entry>
+        <fdn-entry key="success" value="transparent"></fdn-entry>
+        <fdn-entry key="warning" value="rgba(176,81,46,.09)"></fdn-entry>
+      </fdn-lookup>
+      <fdn-lookup name="BadgeLookup2">
+        <fdn-entry key="default" value="var(--color-text-muted)"></fdn-entry>
+        <fdn-entry key="success" value="var(--color-text-faint)"></fdn-entry>
+        <fdn-entry key="warning" value="var(--color-status-blocked)"></fdn-entry>
+      </fdn-lookup>
+      <fdn-lookup name="UsageMeterLookup1">
+        <fdn-entry key="calm" value="var(--color-text-faint)"></fdn-entry>
+        <fdn-entry key="critical" value="var(--color-status-blocked)"></fdn-entry>
+        <fdn-entry key="hot" value="var(--color-status-review)"></fdn-entry>
+        <fdn-entry key="watch" value="var(--color-status-waiting)"></fdn-entry>
+      </fdn-lookup>
+      <fdn-lookup name="UsageMeterLookup2">
+        <fdn-entry key="calm" value="var(--color-text-ghost)"></fdn-entry>
+        <fdn-entry key="critical" value="var(--color-status-blocked)"></fdn-entry>
+        <fdn-entry key="hot" value="var(--color-status-review)"></fdn-entry>
+        <fdn-entry key="watch" value="var(--color-status-waiting)"></fdn-entry>
+      </fdn-lookup>
+    </fdn-lookups>
+    <fdn-states>
+      <fdn-state name="at-rest" forecast="pace" providerfilter="all" selectedaccount="claude-tormod-thto"></fdn-state>
+      <fdn-state name="anthropic-only" forecast="pace" providerfilter="anthropic" selectedaccount="claude-tormod-thto"></fdn-state>
+      <fdn-state name="forecast-flat" forecast="flat" providerfilter="all" selectedaccount="claude-tormod-thto"></fdn-state>
+    </fdn-states>
+    <fdn-matrix>
+      <fdn-viewport name="board" width="1560" height="2040"></fdn-viewport>
+      <fdn-cell state="at-rest" viewport="board"></fdn-cell>
+      <fdn-cell state="anthropic-only" viewport="board"></fdn-cell>
+      <fdn-cell state="forecast-flat" viewport="board"></fdn-cell>
+    </fdn-matrix>
+  </fdn-doc>
+  <fdn-styles hidden>
+    <fdn-style name="page" background="var(--color-bg)" display="flex" flex-direction="column" margin-bottom="-8px" margin-left="-8px" margin-right="-8px" margin-top="-8px" padding-bottom="48px" padding-left="32px" padding-right="32px" padding-top="40px" row-gap="46px"></fdn-style>
+    <fdn-style name="pane" background="var(--color-surface)" border-bottom-left-radius="var(--radius-lg)" border-bottom-right-radius="var(--radius-lg)" border-top-left-radius="var(--radius-lg)" border-top-right-radius="var(--radius-lg)" box-shadow="var(--shadow-pane)" display="flex" flex-direction="column" overflow="hidden"></fdn-style>
+    <fdn-style name="pane-header" align-items="center" border-bottom="1px solid var(--color-divider)" column-gap="9px" display="flex" flex="none" height="40px" padding-left="16px" padding-right="10px"></fdn-style>
+    <fdn-style name="pane-footer" align-items="center" border-top="1px solid var(--color-divider)" color="var(--color-text-ghost)" column-gap="10px" display="flex" flex="none" font-family="var(--font-mono)" font-size="10px" height="30px" padding-left="16px" padding-right="16px"></fdn-style>
+    <fdn-style name="pane-title" color="var(--color-text-primary)" font-family="var(--font-sans)" font-size="var(--font-size-xl)" font-weight="var(--font-weight-semibold)"></fdn-style>
+    <fdn-style name="section-label" color="var(--color-text-faint)" font-family="var(--font-sans)" font-size="10px" font-weight="var(--font-weight-semibold)" letter-spacing=".12em"></fdn-style>
+    <fdn-style name="meta-mono" color="var(--color-text-faint)" font-family="var(--font-mono)" font-size="var(--font-size-xs)" font-weight="var(--font-weight-regular)"></fdn-style>
+    <fdn-style name="tab-pill" align-items="center" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" column-gap="6px" cursor="pointer" display="flex" font-family="var(--font-sans)" font-size="var(--font-size-base)" font-weight="var(--font-weight-medium)" padding-bottom="3px" padding-left="9px" padding-right="9px" padding-top="3px" style-hover="background:var(--color-hover)"></fdn-style>
+    <fdn-style name="pill-btn" align-items="center" border="1px solid var(--color-border-input)" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" color="var(--color-text-tertiary)" column-gap="6px" cursor="pointer" display="flex" flex="none" font-family="var(--font-sans)" font-size="var(--font-size-base)" font-weight="var(--font-weight-medium)" height="28px" padding-left="12px" padding-right="12px" style-hover="background:var(--color-hover)"></fdn-style>
+    <fdn-style name="pill-btn-accent" align-items="center" background="var(--color-accent)" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" color="var(--color-surface)" column-gap="6px" cursor="pointer" display="flex" flex="none" font-family="var(--font-sans)" font-size="var(--font-size-base)" font-weight="var(--font-weight-medium)" height="28px" padding-left="13px" padding-right="13px" style-hover="background:#A87826"></fdn-style>
+    <fdn-style name="group-label" align-items="baseline" border-bottom="1px solid var(--color-border-faint)" column-gap="8px" display="flex" padding-bottom="5px" padding-left="10px" padding-right="10px" padding-top="12px"></fdn-style>
+    <fdn-style name="acct-row" align-items="center" border-bottom-left-radius="var(--radius-md)" border-bottom-right-radius="var(--radius-md)" border-top-left-radius="var(--radius-md)" border-top-right-radius="var(--radius-md)" column-gap="12px" cursor="pointer" display="flex" min-height="46px" padding-left="8px" padding-right="8px" style-hover="background:var(--color-hover)"></fdn-style>
+    <fdn-style name="acct-name" color="var(--color-text-primary)" font-family="var(--font-mono)" font-size="var(--font-size-base)" overflow="hidden" text-overflow="ellipsis" white-space="nowrap"></fdn-style>
+    <fdn-style name="card-block" background="var(--color-surface-alt)" border="1px solid var(--color-border-faint)" border-bottom-left-radius="var(--radius-lg)" border-bottom-right-radius="var(--radius-lg)" border-top-left-radius="var(--radius-lg)" border-top-right-radius="var(--radius-lg)" display="flex" flex-direction="column" padding-bottom="13px" padding-left="14px" padding-right="14px" padding-top="12px"></fdn-style>
+    <fdn-style name="rail-body" color="var(--color-text-secondary)" font-family="var(--font-sans)" font-size="12.5px" line-height="1.5"></fdn-style>
+    <fdn-style name="rail-head" color="var(--color-text-tertiary)" font-family="var(--font-sans)" font-size="var(--font-size-sm)" font-weight="var(--font-weight-semibold)" letter-spacing=".08em"></fdn-style>
+  </fdn-styles>
+  <fdn-component name="AccountRow" hidden>
+    <fdn-props>
+      <fdn-prop name="name" type="string" required="true"></fdn-prop>
+      <fdn-prop name="plan" type="string"></fdn-prop>
+      <fdn-prop name="ok" type="boolean" default="true"></fdn-prop>
+      <fdn-prop name="note" type="string"></fdn-prop>
+      <fdn-prop name="h5v" type="string"></fdn-prop>
+      <fdn-prop name="h5fill" type="string"></fdn-prop>
+      <fdn-prop name="h5resets" type="string"></fdn-prop>
+      <fdn-prop name="h5pace" type="string"></fdn-prop>
+      <fdn-prop name="h5tone" type="enum" default="calm"></fdn-prop>
+      <fdn-prop name="wkv" type="string"></fdn-prop>
+      <fdn-prop name="wkfill" type="string"></fdn-prop>
+      <fdn-prop name="wkresets" type="string"></fdn-prop>
+      <fdn-prop name="wkpace" type="string"></fdn-prop>
+      <fdn-prop name="wktone" type="enum" default="calm"></fdn-prop>
+      <fdn-prop name="fab" type="string"></fdn-prop>
+      <fdn-prop name="proj" type="string"></fdn-prop>
+      <fdn-prop name="projtone" type="enum" default="calm"></fdn-prop>
+      <fdn-prop name="verdict" type="string"></fdn-prop>
+      <fdn-prop name="selected" type="boolean" default="false"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n36" data-fdn-style="acct-row" style="background:{{ prop.selected ? 'var(--color-selected-bg)' : 'transparent' }}">
+      <span data-fdn-id="n37" style="align-items:center;column-gap:8px;display:flex;flex:none;min-width:0;width:240px">
+        <fdn-use data-fdn-id="n38" component="StatusDot" data-fdn-prop-size="6px" data-fdn-prop-state="{{ prop.ok ? 'running' : 'blocked' }}"></fdn-use>
+        <span data-fdn-id="n39" data-fdn-style="acct-name" style="color:{{ prop.ok ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}">
+          {{ prop.name }}
+        </span>
+      </span>
+      <span data-fdn-id="n40" style="align-items:center;display:flex;flex:none;width:56px">
+        <fdn-use data-fdn-id="n41" component="Badge" data-fdn-prop-children="{{ prop.plan }}" data-fdn-prop-variant="default" when="prop.plan"></fdn-use>
+        <fdn-use data-fdn-id="n42" component="Badge" data-fdn-prop-children="no auth" data-fdn-prop-variant="warning" when="!prop.ok"></fdn-use>
+      </span>
+      <span data-fdn-id="n43" style="align-items:center;display:flex;flex:none;width:176px">
+        <fdn-use data-fdn-id="n44" component="UsageMeter" data-fdn-prop-fill="{{ prop.h5fill }}" data-fdn-prop-label="" data-fdn-prop-pace="{{ prop.h5pace }}" data-fdn-prop-resets="{{ prop.h5resets }}" data-fdn-prop-tone="{{ prop.h5tone }}" data-fdn-prop-value="{{ prop.h5v }}" when="prop.h5v"></fdn-use>
+        <span data-fdn-id="n45" when="!prop.h5v" style="color:var(--color-text-ghost);font-family:var(--font-mono);font-size:var(--font-size-xs);padding-left:8px">
+          no 5h window
+        </span>
+      </span>
+      <span data-fdn-id="n46" style="align-items:center;display:flex;flex:none;width:176px">
+        <fdn-use data-fdn-id="n47" component="UsageMeter" data-fdn-prop-fill="{{ prop.wkfill }}" data-fdn-prop-label="" data-fdn-prop-pace="{{ prop.wkpace }}" data-fdn-prop-resets="{{ prop.wkresets }}" data-fdn-prop-tone="{{ prop.wktone }}" data-fdn-prop-value="{{ prop.wkv }}" when="prop.wkv"></fdn-use>
+        <span data-fdn-id="n48" when="!prop.wkv" style="color:var(--color-text-ghost);font-family:var(--font-mono);font-size:var(--font-size-xs);padding-left:8px">
+          —
+        </span>
+      </span>
+      <span data-fdn-id="n49" style="align-items:flex-end;display:flex;flex:none;justify-content:flex-end;width:56px">
+        <span data-fdn-id="n51" when="prop.fab" style="color:var(--color-text-muted);font-family:var(--font-mono);font-size:var(--font-size-xs)">
+          {{ prop.fab }}
+        </span>
+        <span data-fdn-id="n50" when="!prop.fab" style="color:var(--color-text-ghost);font-family:var(--font-mono);font-size:var(--font-size-xs)">
+          —
+        </span>
+      </span>
+      <span data-fdn-id="n52" when="prop.ok" style="align-items:baseline;column-gap:10px;display:flex;flex:1;min-width:0">
+        <span data-fdn-id="n53" style="color:{{ tonecolor[prop.projtone] }};flex:none;font-family:var(--font-mono);font-size:var(--font-size-xs);font-weight:var(--font-weight-medium);text-align:right;width:42px">
+          {{ prop.proj }}
+        </span>
+        <span data-fdn-id="n54" style="color:var(--color-text-faint);flex:1;font-family:var(--font-sans);font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ prop.verdict }}
+        </span>
+      </span>
+      <span data-fdn-id="n55" when="!prop.ok" style="align-items:center;column-gap:8px;display:flex;flex:1;min-width:0">
+        <span data-fdn-id="n56" style="color:var(--color-status-blocked);flex:1;font-family:var(--font-sans);font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ prop.note }}
+        </span>
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="ActionButton" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="hint" type="string"></fdn-prop>
+      <fdn-prop name="variant" type="enum" default="default"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n24" when="prop.variant == 'default'" data-fdn-style="pill-btn">
+      <span data-fdn-id="n25">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n26" when="prop.hint" style="color:var(--color-text-disabled);font-family:var(--font-mono);font-size:var(--font-size-2xs)">
+        {{ prop.hint }}
+      </span>
+    </span>
+    <span data-fdn-id="n27" when="prop.variant == 'accent'" data-fdn-style="pill-btn-accent">
+      <span data-fdn-id="n28">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n29" when="prop.hint" style="color:rgba(255,255,255,.62);font-family:var(--font-mono);font-size:var(--font-size-2xs)">
+        {{ prop.hint }}
+      </span>
+    </span>
+  </fdn-component>
+  <fdn-component name="Badge" data-fdn-import-source="/Users/trmd/Projects/honeybee/foundation/repos/foundation/packages/importer/fixtures/badge.tsx" data-fdn-import-sha256="2da46a26b6f7e15d0329fdf24561ef4c04bc03b0a6892ccc4aff0dfbedd64a86" hidden>
+    <fdn-props>
+      <fdn-prop name="variant" type="enum" required="false" default="default"></fdn-prop>
+      <fdn-prop name="children" type="string"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n5" style="align-items:center;background-color:{{ BadgeLookup1[prop.variant] }};border-bottom-left-radius:var(--radius-sm);border-bottom-right-radius:var(--radius-sm);border-top-left-radius:var(--radius-sm);border-top-right-radius:var(--radius-sm);color:{{ BadgeLookup2[prop.variant] }};display:inline-flex;flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs);font-weight:var(--font-weight-medium);letter-spacing:.06em;line-height:1.6;padding-block:1px;padding-inline:5px;text-transform:uppercase">
+      {{ prop.children }}
+    </span>
+  </fdn-component>
+  <fdn-component name="BeeRow" hidden>
+    <fdn-props>
+      <fdn-prop name="bee" type="string" required="true"></fdn-prop>
+      <fdn-prop name="harness" type="string" required="true"></fdn-prop>
+      <fdn-prop name="share" type="string" required="true"></fdn-prop>
+      <fdn-prop name="age" type="string" required="true"></fdn-prop>
+      <fdn-prop name="state" type="enum" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n79" style="align-items:center;border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:8px;display:flex;padding-bottom:5px;padding-left:8px;padding-right:8px;padding-top:4px" style-hover="background:var(--color-hover)">
+      <fdn-use data-fdn-id="n80" component="StatusDot" data-fdn-prop-size="6px" data-fdn-prop-state="{{ prop.state }}"></fdn-use>
+      <span data-fdn-id="n81" style="color:var(--color-text-primary);flex:none;font-family:var(--font-mono);font-size:11.5px">
+        {{ prop.bee }}
+      </span>
+      <span data-fdn-id="n82" style="color:var(--color-text-faint);flex:1;font-family:var(--font-mono);font-size:var(--font-size-2xs);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ prop.harness }}
+      </span>
+      <span data-fdn-id="n83" style="color:var(--color-text-muted);flex:none;font-family:var(--font-mono);font-size:var(--font-size-xs)">
+        {{ prop.share }}
+      </span>
+      <span data-fdn-id="n84" data-fdn-style="meta-mono" style="color:var(--color-text-disabled);flex:none;text-align:right;width:34px">
+        {{ prop.age }}
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="BoardCaption" hidden>
+    <fdn-props>
+      <fdn-prop name="index" type="string" required="true"></fdn-prop>
+      <fdn-prop name="title" type="string" required="true"></fdn-prop>
+      <fdn-prop name="body" type="string" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n19" style="display:flex;flex-direction:column;margin-bottom:14px;row-gap:6px">
+      <div data-fdn-id="n20" style="align-items:baseline;column-gap:10px;display:flex">
+        <span data-fdn-id="n21" style="color:var(--color-text-disabled);font-family:var(--font-mono);font-size:var(--font-size-xs);font-weight:var(--font-weight-medium);letter-spacing:.08em">
+          {{ prop.index }}
+        </span>
+        <span data-fdn-id="n22" data-fdn-style="section-label" style="color:var(--color-text-tertiary)">
+          {{ prop.title }}
+        </span>
+      </div>
+      <div data-fdn-id="n23" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:12.5px;line-height:1.5;max-width:720px">
+        {{ prop.body }}
+      </div>
+    </div>
+  </fdn-component>
+  <fdn-component name="ForecastBar" hidden>
+    <fdn-props>
+      <fdn-prop name="elapsed" type="string" required="true"></fdn-prop>
+      <fdn-prop name="tillmark" type="string" required="true"></fdn-prop>
+      <fdn-prop name="marklabel" type="string" required="true"></fdn-prop>
+      <fdn-prop name="resetlabel" type="string" required="true"></fdn-prop>
+      <fdn-prop name="tone" type="enum" default="hot"></fdn-prop>
+      <fdn-prop name="markbroken" type="boolean" default="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n57" style="display:flex;flex-direction:column;row-gap:7px;width:100%">
+      <div data-fdn-id="n58" style="align-items:center;display:flex;height:16px;width:100%">
+        <span data-fdn-id="n59" style="background:{{ tonecolor[prop.tone] }};border-bottom-left-radius:3px;border-top-left-radius:3px;flex:none;height:6px;width:{{ prop.elapsed }}"></span>
+        <span data-fdn-id="n60" style="background:repeating-linear-gradient(90deg, var(--color-border-input) 0 3px, transparent 3px 6px);flex:none;height:6px;width:{{ prop.tillmark }}"></span>
+        <span data-fdn-id="n61" style="background:{{ prop.markbroken ? 'var(--color-status-blocked)' : 'var(--color-status-running)' }};flex:none;height:16px;width:2px"></span>
+        <span data-fdn-id="n62" style="background:var(--color-surface-sunken);border-bottom-right-radius:3px;border-top-right-radius:3px;flex:1;height:6px"></span>
+      </div>
+      <div data-fdn-id="n63" style="align-items:baseline;display:flex;width:100%">
+        <span data-fdn-id="n64" style="color:var(--color-text-ghost);flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs);letter-spacing:.06em;text-align:right;width:{{ prop.elapsed }}">
+          NOW
+        </span>
+        <span data-fdn-id="n65" style="color:{{ prop.markbroken ? 'var(--color-status-blocked)' : 'var(--color-status-running)' }};flex:none;font-family:var(--font-mono);font-size:var(--font-size-xs);padding-right:5px;text-align:right;width:{{ prop.tillmark }}">
+          {{ prop.marklabel }}
+        </span>
+        <span data-fdn-id="n66" style="color:var(--color-text-ghost);flex:1;font-family:var(--font-mono);font-size:var(--font-size-2xs);text-align:right">
+          {{ prop.resetlabel }}
+        </span>
+      </div>
+    </div>
+  </fdn-component>
+  <fdn-component name="GroupLabel" hidden>
+    <fdn-props>
+      <fdn-prop name="text" type="string" required="true"></fdn-prop>
+      <fdn-prop name="trailing" type="string"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n33" data-fdn-style="group-label">
+      <span data-fdn-id="n34" data-fdn-style="section-label" style="color:var(--color-text-tertiary)">
+        {{ prop.text }}
+      </span>
+      <span data-fdn-id="n35" data-fdn-style="meta-mono" style="color:var(--color-text-disabled);margin-left:auto">
+        {{ prop.trailing }}
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="Icon" data-fdn-import-source="/Users/trmd/Projects/honeybee/foundation/repos/foundation/packages/importer/fixtures/icon.tsx" data-fdn-import-sha256="9488a746cfd40ab4c71bf4f2fcfca5240e87e5a0752fe70bd729d95cfe220d6a" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="false"></fdn-prop>
+    </fdn-props>
+    <svg data-fdn-id="n1" aria-label="{{ prop.label }}" fill="none" height="24" role="img" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg">
+      <circle data-fdn-id="n2" cx="12" cy="12" r="10"></circle>
+      <path data-fdn-id="n3" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 5"></path>
+      <path data-fdn-id="n4" d="M12 17h.01"></path>
+    </svg>
+  </fdn-component>
+  <fdn-component name="SectionLabel" hidden>
+    <fdn-props>
+      <fdn-prop name="text" type="string" required="true"></fdn-prop>
+      <fdn-prop name="trailing" type="string"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n16" style="align-items:baseline;column-gap:8px;display:flex;margin-bottom:7px">
+      <span data-fdn-id="n17" data-fdn-style="section-label">
+        {{ prop.text }}
+      </span>
+      <span data-fdn-id="n18" when="prop.trailing" data-fdn-style="meta-mono" style="color:var(--color-text-disabled);margin-left:auto">
+        {{ prop.trailing }}
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="SpilloverRow" hidden>
+    <fdn-props>
+      <fdn-prop name="rank" type="string" required="true"></fdn-prop>
+      <fdn-prop name="account" type="string" required="true"></fdn-prop>
+      <fdn-prop name="headroom" type="string" required="true"></fdn-prop>
+      <fdn-prop name="why" type="string" required="true"></fdn-prop>
+      <fdn-prop name="state" type="enum" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n73" style="align-items:center;border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);column-gap:8px;display:flex;padding-bottom:5px;padding-left:8px;padding-right:8px;padding-top:4px" style-hover="background:var(--color-hover)">
+      <span data-fdn-id="n74" style="color:var(--color-text-disabled);flex:none;font-family:var(--font-mono);font-size:var(--font-size-2xs);width:10px">
+        {{ prop.rank }}
+      </span>
+      <fdn-use data-fdn-id="n75" component="StatusDot" data-fdn-prop-size="6px" data-fdn-prop-state="{{ prop.state }}"></fdn-use>
+      <span data-fdn-id="n76" style="color:{{ prop.state == 'blocked' ? 'var(--color-text-muted)' : 'var(--color-text-primary)' }};flex:none;font-family:var(--font-mono);font-size:11.5px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ prop.account }}
+      </span>
+      <span data-fdn-id="n77" style="color:var(--color-text-ghost);flex:1;font-family:var(--font-sans);font-size:11px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        {{ prop.why }}
+      </span>
+      <span data-fdn-id="n78" style="color:var(--color-text-muted);flex:none;font-family:var(--font-mono);font-size:var(--font-size-xs)">
+        {{ prop.headroom }}
+      </span>
+    </div>
+  </fdn-component>
+  <fdn-component name="StatusDot" hidden>
+    <fdn-props>
+      <fdn-prop name="state" type="enum" required="true"></fdn-prop>
+      <fdn-prop name="size" type="string" default="7px"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n15" style="background:{{ statuscolor[prop.state] }};border-bottom-left-radius:50%;border-bottom-right-radius:50%;border-top-left-radius:50%;border-top-right-radius:50%;flex:none;height:{{ prop.size }};width:{{ prop.size }}"></span>
+  </fdn-component>
+  <fdn-component name="TabPill" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="count" type="string" required="true"></fdn-prop>
+      <fdn-prop name="active" type="boolean" default="false"></fdn-prop>
+    </fdn-props>
+    <span data-fdn-id="n30" data-fdn-style="tab-pill" style="background:{{ prop.active ? 'var(--color-tab-active)' : 'transparent' }};border:1px solid {{ prop.active ? 'var(--color-divider)' : 'transparent' }};color:{{ prop.active ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}">
+      <span data-fdn-id="n31">
+        {{ prop.label }}
+      </span>
+      <span data-fdn-id="n32" style="color:{{ prop.active ? 'var(--color-text-faint)' : 'var(--color-text-disabled)' }};font-family:var(--font-mono);font-size:var(--font-size-sm)">
+        {{ prop.count }}
+      </span>
+    </span>
+  </fdn-component>
+  <fdn-component name="UsageMeter" data-fdn-import-source="/tmp/c3-components/usage-meter.tsx" data-fdn-import-sha256="b42e2d974dfbcc06e568d9a1cfda24cefb96deae0673ed1573e3f57459ece364" hidden>
+    <fdn-props>
+      <fdn-prop name="tone" type="enum" required="false" default="calm"></fdn-prop>
+      <fdn-prop name="size" type="enum" required="false" default="sm"></fdn-prop>
+      <fdn-prop name="label" type="string" required="false"></fdn-prop>
+      <fdn-prop name="value" type="string" required="false"></fdn-prop>
+      <fdn-prop name="fill" type="string" required="false"></fdn-prop>
+      <fdn-prop name="resets" type="string" required="false"></fdn-prop>
+      <fdn-prop name="pace" type="string" required="false"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n6" style="border-bottom-left-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md);border-top-left-radius:var(--radius-md);border-top-right-radius:var(--radius-md);color:{{ UsageMeterLookup1[prop.tone] }};column-gap:var(--spacing);display:flex;flex-direction:column;font-size:{{ prop.size == 'sm' ? '10.5px' : '11.5px' }};padding-block:calc(var(--spacing) * 1.5);padding-inline:calc(var(--spacing) * 2);row-gap:var(--spacing);width:{{ prop.size == 'sm' ? 'calc(var(--spacing) * 44)' : '100%' }}" style-hover="background-color:var(--color-hover)">
+      <div data-fdn-id="n7" style="align-items:baseline;column-gap:calc(var(--spacing) * 1.5);display:flex;row-gap:calc(var(--spacing) * 1.5)">
+        <span data-fdn-id="n8" style="--tw-tracking:var(--tracking-wider);color:var(--color-text-ghost);font-family:var(--font-mono);letter-spacing:var(--tracking-wider);text-transform:uppercase">
+          {{ prop.label }}
+        </span>
+        <span data-fdn-id="n9" style="--tw-numeric-spacing:tabular-nums;font-family:var(--font-mono);font-variant-numeric:var(--tw-ordinal,) var(--tw-slashed-zero,) var(--tw-numeric-figure,) var(--tw-numeric-spacing,) var(--tw-numeric-fraction,);margin-left:auto">
+          {{ prop.value }}
+        </span>
+      </div>
+      <span data-fdn-id="n10" style="background-color:var(--color-surface-sunken);border-bottom-left-radius:calc(infinity * 1px);border-bottom-right-radius:calc(infinity * 1px);border-top-left-radius:calc(infinity * 1px);border-top-right-radius:calc(infinity * 1px);display:block;height:{{ prop.size == 'sm' ? 'var(--spacing)' : 'calc(var(--spacing) * 1.5)' }};overflow:hidden;width:100%">
+        <span data-fdn-id="n11" style="background-color:{{ UsageMeterLookup2[prop.tone] }};border-bottom-left-radius:calc(infinity * 1px);border-bottom-right-radius:calc(infinity * 1px);border-top-left-radius:calc(infinity * 1px);border-top-right-radius:calc(infinity * 1px);display:block;height:100%;width:{{ prop.fill }}"></span>
+      </span>
+      <div data-fdn-id="n12" style="align-items:baseline;color:var(--color-text-ghost);column-gap:calc(var(--spacing) * 1.5);display:flex;font-family:var(--font-mono);row-gap:calc(var(--spacing) * 1.5)">
+        <span data-fdn-id="n13">
+          ⟳ {{ prop.resets }}
+        </span>
+        <span data-fdn-id="n14" style="--tw-numeric-spacing:tabular-nums;font-variant-numeric:var(--tw-ordinal,) var(--tw-slashed-zero,) var(--tw-numeric-figure,) var(--tw-numeric-spacing,) var(--tw-numeric-fraction,);margin-left:auto">
+          {{ prop.pace }}
+        </span>
+      </div>
+    </div>
+  </fdn-component>
+  <fdn-component name="WindowBlock" hidden>
+    <fdn-props>
+      <fdn-prop name="label" type="string" required="true"></fdn-prop>
+      <fdn-prop name="value" type="string" required="true"></fdn-prop>
+      <fdn-prop name="fill" type="string" required="true"></fdn-prop>
+      <fdn-prop name="resets" type="string" required="true"></fdn-prop>
+      <fdn-prop name="pace" type="string" required="true"></fdn-prop>
+      <fdn-prop name="tone" type="enum" default="calm"></fdn-prop>
+      <fdn-prop name="note" type="string" required="true"></fdn-prop>
+    </fdn-props>
+    <div data-fdn-id="n67" style="display:flex;flex:1;flex-direction:column;min-width:0;row-gap:4px">
+      <div data-fdn-id="n68" style="align-items:baseline;column-gap:8px;display:flex">
+        <span data-fdn-id="n69" style="color:{{ tonecolor[prop.tone] }};font-family:var(--font-sans);font-size:26px;font-weight:var(--font-weight-semibold);letter-spacing:-.01em">
+          {{ prop.value }}
+        </span>
+        <span data-fdn-id="n70" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:12.5px;font-weight:var(--font-weight-medium)">
+          {{ prop.label }}
+        </span>
+      </div>
+      <fdn-use data-fdn-id="n71" component="UsageMeter" data-fdn-prop-fill="{{ prop.fill }}" data-fdn-prop-label="" data-fdn-prop-pace="{{ prop.pace }}" data-fdn-prop-resets="{{ prop.resets }}" data-fdn-prop-size="md" data-fdn-prop-tone="{{ prop.tone }}" data-fdn-prop-value=""></fdn-use>
+      <span data-fdn-id="n72" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:11.5px;line-height:1.45;padding-left:8px">
+        {{ prop.note }}
+      </span>
+    </div>
+  </fdn-component>
+  <main>
+    <div data-fdn-id="n85" data-fdn-style="page">
+      <header data-fdn-id="n86" style="display:flex;flex-direction:column;row-gap:8px">
+        <h1 data-fdn-id="n87" style="color:var(--color-text-primary);font-family:var(--font-sans);font-size:19px;font-weight:var(--font-weight-semibold);margin-bottom:0;margin-left:0;margin-right:0;margin-top:0">
+          Apiary — Account usage
+        </h1>
+        <div data-fdn-id="n88" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:var(--font-size-md);line-height:1.55;max-width:820px">
+          A fleet of agents spends one shared, invisible resource: provider quota. This pane makes it visible — every account, both rolling windows, and the one number the CLI cannot show you in a table: where the current burn rate lands you before the window resets.
+        </div>
+        <div data-fdn-id="n89" data-fdn-style="meta-mono" style="color:var(--color-text-disabled)">
+          exploration · hive usage --json · design-brief.md §2 §4 §9 · components imported via foundation_import
+        </div>
+      </header>
+      <section data-fdn-id="n90" style="display:flex;flex-direction:column">
+        <fdn-use data-fdn-id="n91" component="BoardCaption" data-fdn-prop-body="Seventeen accounts, four providers, two rolling windows each. The meter is the unit: label, used percent, fill, reset countdown and pace on one 176px block, so a whole fleet stacks without any row becoming a chart. Colour is spent only where a window is projected to run out — everything calm stays grey. Honey appears once, on Rebalance." data-fdn-prop-index="BOARD 1" data-fdn-prop-title="THE FLEET AT A GLANCE"></fdn-use>
+        <div data-fdn-id="n92" style="align-items:flex-start;column-gap:28px;display:flex">
+          <div data-fdn-id="n93" data-fdn-style="pane" style="flex:none;width:1160px">
+            <div data-fdn-id="n94" data-fdn-style="pane-header">
+              <span data-fdn-id="n95" data-fdn-style="pane-title">
+                Usage
+              </span>
+              <span data-fdn-id="n96" data-fdn-style="meta-mono">
+                17 accounts · 15 live · 2 unreachable · polled 40s ago
+              </span>
+              <span data-fdn-id="n97" style="align-items:center;column-gap:12px;display:flex;margin-left:auto">
+                <fdn-use data-fdn-id="n98" component="ActionButton" data-fdn-prop-hint="r" data-fdn-prop-label="Rebalance spawns" data-fdn-prop-variant="accent"></fdn-use>
+              </span>
+            </div>
+            <div data-fdn-id="n99" style="align-items:center;column-gap:2px;display:flex;flex:none;padding-bottom:4px;padding-left:10px;padding-right:10px;padding-top:8px">
+              <fdn-use data-fdn-id="n100" component="TabPill" data-fdn-prop-active="{{ param.providerfilter == 'all' }}" data-fdn-prop-count="17" data-fdn-prop-label="All"></fdn-use>
+              <fdn-use data-fdn-id="n101" component="TabPill" data-fdn-prop-active="{{ param.providerfilter == 'anthropic' }}" data-fdn-prop-count="6" data-fdn-prop-label="Anthropic"></fdn-use>
+              <fdn-use data-fdn-id="n102" component="TabPill" data-fdn-prop-active="{{ param.providerfilter == 'openai' }}" data-fdn-prop-count="6" data-fdn-prop-label="OpenAI"></fdn-use>
+              <fdn-use data-fdn-id="n103" component="TabPill" data-fdn-prop-active="{{ param.providerfilter == 'other' }}" data-fdn-prop-count="5" data-fdn-prop-label="Other"></fdn-use>
+              <span data-fdn-id="n104" style="flex:1"></span>
+              <span data-fdn-id="n105" data-fdn-style="meta-mono" style="color:var(--color-text-disabled);padding-right:4px">
+                projected = used% ÷ elapsed% of the window
+              </span>
+              <span data-fdn-id="n106" style="color:var(--color-text-ghost);display:flex;flex:none;height:24px;width:24px">
+                <fdn-use data-fdn-id="n107" component="Icon" data-fdn-prop-label="How the projection is computed"></fdn-use>
+              </span>
+            </div>
+            <div data-fdn-id="c1" style="align-items:baseline;border-bottom:1px solid var(--color-divider);column-gap:12px;display:flex;flex:none;margin-left:16px;margin-right:16px;padding-bottom:6px;padding-top:4px">
+              <span data-fdn-id="c2" data-fdn-style="section-label" style="flex:none;width:240px">
+                ACCOUNT
+              </span>
+              <span data-fdn-id="c3" data-fdn-style="section-label" style="flex:none;width:56px">
+                PLAN
+              </span>
+              <span data-fdn-id="c4" data-fdn-style="section-label" style="flex:none;padding-left:8px;width:176px">
+                5H WINDOW
+              </span>
+              <span data-fdn-id="c5" data-fdn-style="section-label" style="flex:none;padding-left:8px;width:176px">
+                WEEKLY
+              </span>
+              <span data-fdn-id="c6" data-fdn-style="section-label" style="flex:none;text-align:right;width:56px">
+                FABLE
+              </span>
+              <span data-fdn-id="c7" data-fdn-style="section-label" style="flex:none;text-align:right;width:42px">
+                PROJ
+              </span>
+              <span data-fdn-id="c8" data-fdn-style="section-label" style="flex:1;min-width:0;padding-left:10px">
+                READING
+              </span>
+            </div>
+            <div data-fdn-id="n108" style="display:flex;flex-direction:column;padding-bottom:8px;padding-left:8px;padding-right:8px">
+              <div data-fdn-id="n109" when="param.providerfilter == 'all' || param.providerfilter == 'anthropic'" style="display:flex;flex-direction:column">
+                <fdn-use data-fdn-id="n110" component="GroupLabel" data-fdn-prop-text="ANTHROPIC · CLAUDE" data-fdn-prop-trailing="6 accounts · 5h + weekly + fable weekly"></fdn-use>
+                <fdn-use data-fdn-id="n111" component="AccountRow" data-fdn-prop-fab="{{ a.fab }}" data-fdn-prop-h5fill="{{ a.h5fill }}" data-fdn-prop-h5pace="{{ a.h5pace }}" data-fdn-prop-h5resets="{{ a.h5resets }}" data-fdn-prop-h5tone="{{ a.h5tone }}" data-fdn-prop-h5v="{{ a.h5v }}" data-fdn-prop-name="{{ a.name }}" data-fdn-prop-note="{{ a.note }}" data-fdn-prop-ok="{{ a.ok }}" data-fdn-prop-plan="{{ a.plan }}" data-fdn-prop-proj="{{ a.proj }}" data-fdn-prop-projtone="{{ a.projtone }}" data-fdn-prop-selected="{{ a.id == param.selectedaccount }}" data-fdn-prop-verdict="{{ a.verdict }}" data-fdn-prop-wkfill="{{ a.wkfill }}" data-fdn-prop-wkpace="{{ a.wkpace }}" data-fdn-prop-wkresets="{{ a.wkresets }}" data-fdn-prop-wktone="{{ a.wktone }}" data-fdn-prop-wkv="{{ a.wkv }}" each="a in data.anthropic"></fdn-use>
+              </div>
+              <div data-fdn-id="n112" when="param.providerfilter == 'all' || param.providerfilter == 'openai'" style="display:flex;flex-direction:column">
+                <fdn-use data-fdn-id="n113" component="GroupLabel" data-fdn-prop-text="OPENAI · CODEX" data-fdn-prop-trailing="6 accounts · weekly only"></fdn-use>
+                <fdn-use data-fdn-id="n114" component="AccountRow" data-fdn-prop-fab="{{ a.fab }}" data-fdn-prop-h5fill="{{ a.h5fill }}" data-fdn-prop-h5pace="{{ a.h5pace }}" data-fdn-prop-h5resets="{{ a.h5resets }}" data-fdn-prop-h5tone="{{ a.h5tone }}" data-fdn-prop-h5v="{{ a.h5v }}" data-fdn-prop-name="{{ a.name }}" data-fdn-prop-note="{{ a.note }}" data-fdn-prop-ok="{{ a.ok }}" data-fdn-prop-plan="{{ a.plan }}" data-fdn-prop-proj="{{ a.proj }}" data-fdn-prop-projtone="{{ a.projtone }}" data-fdn-prop-selected="{{ a.id == param.selectedaccount }}" data-fdn-prop-verdict="{{ a.verdict }}" data-fdn-prop-wkfill="{{ a.wkfill }}" data-fdn-prop-wkpace="{{ a.wkpace }}" data-fdn-prop-wkresets="{{ a.wkresets }}" data-fdn-prop-wktone="{{ a.wktone }}" data-fdn-prop-wkv="{{ a.wkv }}" each="a in data.openai"></fdn-use>
+              </div>
+              <div data-fdn-id="n115" when="param.providerfilter == 'all' || param.providerfilter == 'other'" style="display:flex;flex-direction:column">
+                <fdn-use data-fdn-id="n116" component="GroupLabel" data-fdn-prop-text="OTHER RUNNERS" data-fdn-prop-trailing="5 accounts · cursor · grok · kimi · opencode"></fdn-use>
+                <fdn-use data-fdn-id="n117" component="AccountRow" data-fdn-prop-fab="{{ a.fab }}" data-fdn-prop-h5fill="{{ a.h5fill }}" data-fdn-prop-h5pace="{{ a.h5pace }}" data-fdn-prop-h5resets="{{ a.h5resets }}" data-fdn-prop-h5tone="{{ a.h5tone }}" data-fdn-prop-h5v="{{ a.h5v }}" data-fdn-prop-name="{{ a.name }}" data-fdn-prop-note="{{ a.note }}" data-fdn-prop-ok="{{ a.ok }}" data-fdn-prop-plan="{{ a.plan }}" data-fdn-prop-proj="{{ a.proj }}" data-fdn-prop-projtone="{{ a.projtone }}" data-fdn-prop-selected="{{ a.id == param.selectedaccount }}" data-fdn-prop-verdict="{{ a.verdict }}" data-fdn-prop-wkfill="{{ a.wkfill }}" data-fdn-prop-wkpace="{{ a.wkpace }}" data-fdn-prop-wkresets="{{ a.wkresets }}" data-fdn-prop-wktone="{{ a.wktone }}" data-fdn-prop-wkv="{{ a.wkv }}" each="a in data.other"></fdn-use>
+              </div>
+            </div>
+            <div data-fdn-id="n118" data-fdn-style="pane-footer">
+              <span data-fdn-id="n119">
+                ↵ expand
+              </span>
+              <span data-fdn-id="n120">
+                r rebalance
+              </span>
+              <span data-fdn-id="n121">
+                p park spawns
+              </span>
+              <span data-fdn-id="n122" style="margin-left:auto">
+                hive usage · oauth-api · 2 accounts need re-auth
+              </span>
+            </div>
+          </div>
+          <aside data-fdn-id="n123" style="display:flex;flex:1;flex-direction:column;min-width:0;padding-top:4px;row-gap:18px">
+            <div data-fdn-id="n124">
+              <fdn-use data-fdn-id="n125" component="SectionLabel" data-fdn-prop-text="WHAT A ROW SAYS"></fdn-use>
+              <div data-fdn-id="n126" style="display:flex;flex-direction:column;row-gap:16px">
+                <div data-fdn-id="n127" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n128" data-fdn-style="rail-head">
+                    TWO WINDOWS, NOT ONE NUMBER
+                  </span>
+                  <span data-fdn-id="n129" data-fdn-style="rail-body">
+                    A 5h window and a weekly window fail differently: the 5h one strands a bee mid-task and refills by dinner; the weekly one ends your week. They get equal width because neither is the summary of the other.
+                  </span>
+                </div>
+                <div data-fdn-id="n130" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n131" data-fdn-style="rail-head">
+                    PACE IS THE SIGNAL
+                  </span>
+                  <span data-fdn-id="n132" data-fdn-style="rail-body">
+                    Used percent alone says nothing — 58% is fine four hours in and alarming forty minutes in. Pace is used% minus elapsed%, so the sign is the whole message: negative is headroom, positive is a window you will not finish.
+                  </span>
+                </div>
+                <div data-fdn-id="n133" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n134" data-fdn-style="rail-head">
+                    COLOUR IS RATIONED
+                  </span>
+                  <span data-fdn-id="n135" data-fdn-style="rail-body">
+                    Fifteen of seventeen accounts are grey. Tone only leaves calm when the projection crosses 100% — that is the whole colour budget, and it is why the two rows that matter find you instead of the other way round.
+                  </span>
+                </div>
+                <div data-fdn-id="n136" style="display:flex;flex-direction:column;row-gap:5px">
+                  <span data-fdn-id="n137" style="color:var(--color-status-blocked);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);letter-spacing:.08em">
+                    UNREACHABLE ≠ IDLE
+                  </span>
+                  <span data-fdn-id="n138" data-fdn-style="rail-body">
+                    An account with no OAuth token has no usage, not zero usage. It keeps its row and carries the CLI's own error text verbatim, because the fix is a re-auth, not a rebalance.
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div data-fdn-id="n139" data-fdn-style="card-block" style="align-items:flex-start;column-gap:10px;flex-direction:row">
+              <span data-fdn-id="n140" style="color:var(--color-status-blocked);display:flex;flex:none;height:24px;width:24px">
+                <fdn-use data-fdn-id="n141" component="Icon" data-fdn-prop-label="Two accounts are unreachable"></fdn-use>
+              </span>
+              <span data-fdn-id="n142" style="color:var(--color-text-secondary);flex:1;font-family:var(--font-sans);font-size:12px;line-height:1.5;min-width:0">
+                Two accounts report no usage at all — one has no OAuth token in the vault, one returned no plan. Their rows stay in place, greyed, with the error verbatim: quota you cannot see is not quota you have.
+              </span>
+            </div>
+            <div data-fdn-id="n143" style="border-top:1px solid var(--color-border);display:flex;flex-direction:column;padding-top:14px;row-gap:5px">
+              <span data-fdn-id="n144" style="color:var(--color-text-muted);font-family:var(--font-sans);font-size:12.5px;line-height:1.5">
+                One honey moment per pane: the filled Rebalance spawns. Every tab, meter, badge and dot here is neutral gray or a status colour.
+              </span>
+            </div>
+          </aside>
+        </div>
+      </section>
+      <section data-fdn-id="n145" style="display:flex;flex-direction:column">
+        <fdn-use data-fdn-id="n146" component="BoardCaption" data-fdn-prop-body="Expanding one account answers a different question: not how much is left, but when it runs out and what happens then. Three windows get real size, the 5h window gets a timeline showing now, the projected exhaustion, and the reset it will not reach — and the right rail names the accounts the fleet spills onto, ranked by headroom, because that is the actual decision waiting behind the number." data-fdn-prop-index="BOARD 2" data-fdn-prop-title="ONE ACCOUNT EXPANDED — LIMITS &amp; EXHAUSTION FORECAST"></fdn-use>
+        <div data-fdn-id="n147" data-fdn-style="pane" style="width:1496px">
+          <div data-fdn-id="n148" data-fdn-style="pane-header">
+            <fdn-use data-fdn-id="n149" component="StatusDot" data-fdn-prop-size="7px" data-fdn-prop-state="running"></fdn-use>
+            <span data-fdn-id="n150" data-fdn-style="pane-title" style="font-family:var(--font-mono);font-size:var(--font-size-lg)">
+              claude-tormod-thto.no
+            </span>
+            <fdn-use data-fdn-id="n151" component="Badge" data-fdn-prop-children="max" data-fdn-prop-variant="default"></fdn-use>
+            <fdn-use data-fdn-id="n152" component="Badge" data-fdn-prop-children="oauth-api" data-fdn-prop-variant="success"></fdn-use>
+            <span data-fdn-id="n153" data-fdn-style="meta-mono" style="padding-left:2px">
+              the account this session is spending
+            </span>
+            <span data-fdn-id="n154" style="align-items:center;column-gap:10px;display:flex;margin-left:auto">
+              <fdn-use data-fdn-id="n155" component="ActionButton" data-fdn-prop-hint="d" data-fdn-prop-label="Drain to spillover" data-fdn-prop-variant="default"></fdn-use>
+              <fdn-use data-fdn-id="n156" component="ActionButton" data-fdn-prop-hint="p" data-fdn-prop-label="Park new spawns" data-fdn-prop-variant="accent"></fdn-use>
+            </span>
+          </div>
+          <div data-fdn-id="n157" style="display:flex;flex:1;min-height:0">
+            <div data-fdn-id="n158" style="display:flex;flex:1;flex-direction:column;min-width:0;padding-bottom:16px;padding-left:16px;padding-right:16px;padding-top:14px;row-gap:22px">
+              <div data-fdn-id="n159" style="display:flex;flex-direction:column">
+                <fdn-use data-fdn-id="n160" component="SectionLabel" data-fdn-prop-text="LIMITS" data-fdn-prop-trailing="live · oauth-api"></fdn-use>
+                <div data-fdn-id="n161" style="column-gap:28px;display:grid;grid-template-columns:1fr 1fr 1fr">
+                  <fdn-use data-fdn-id="n162" component="WindowBlock" data-fdn-prop-fill="{{ w.fill }}" data-fdn-prop-label="{{ w.label }}" data-fdn-prop-note="{{ param.forecast == 'pace' ? w.note : w.noteflat }}" data-fdn-prop-pace="{{ w.pace }}" data-fdn-prop-resets="{{ w.resets }}" data-fdn-prop-tone="{{ w.tone }}" data-fdn-prop-value="{{ w.value }}" each="w in data.windows"></fdn-use>
+                </div>
+              </div>
+              <div data-fdn-id="n163" style="display:flex;flex-direction:column">
+                <div data-fdn-id="n164" style="align-items:center;column-gap:8px;display:flex;margin-bottom:9px">
+                  <span data-fdn-id="n165" data-fdn-style="section-label">
+                    EXHAUSTION FORECAST · 5H WINDOW
+                  </span>
+                  <span data-fdn-id="n166" style="color:var(--color-text-ghost);display:flex;flex:none;height:24px;width:24px">
+                    <fdn-use data-fdn-id="n167" component="Icon" data-fdn-prop-label="How the exhaustion forecast is computed"></fdn-use>
+                  </span>
+                  <span data-fdn-id="n168" style="flex:1"></span>
+                  <span data-fdn-id="n169" data-fdn-style="meta-mono" style="color:var(--color-text-disabled)">
+                    {{ param.forecast == 'pace' ? 'model · window pace' : 'model · last 30 minutes held flat' }}
+                  </span>
+                </div>
+                <fdn-use data-fdn-id="n170" component="ForecastBar" data-fdn-prop-elapsed="44%" data-fdn-prop-markbroken="true" data-fdn-prop-marklabel="exhausts in ~1h36" data-fdn-prop-resetlabel="RESETS IN 2H48" data-fdn-prop-tillmark="32%" data-fdn-prop-tone="hot" when="param.forecast == 'pace'"></fdn-use>
+                <fdn-use data-fdn-id="n171" component="ForecastBar" data-fdn-prop-elapsed="44%" data-fdn-prop-markbroken="false" data-fdn-prop-marklabel="lands at 94% · at reset, 2h48" data-fdn-prop-resetlabel="" data-fdn-prop-tillmark="56%" data-fdn-prop-tone="hot" when="param.forecast == 'flat'"></fdn-use>
+                <div data-fdn-id="n172" style="align-items:flex-start;column-gap:10px;display:flex;margin-top:14px">
+                  <span data-fdn-id="n173" when="param.forecast == 'pace'" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.55;max-width:640px">
+                    58% of the 5h limit is gone 44% of the way in. Held at that rate the window ends at 132% — the account stops answering roughly an hour and a half before it refills, and every bee attached to it stalls at once rather than degrading.
+                  </span>
+                  <span data-fdn-id="n174" when="param.forecast == 'flat'" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12.5px;line-height:1.55;max-width:640px">
+                    The last thirty minutes ran quieter than the window average. Held at that rate instead, the window lands at 94% — no exhaustion, but no margin either: one more fan-out puts it back over.
+                  </span>
+                  <span data-fdn-id="n175" style="flex:1"></span>
+                  <span data-fdn-id="n176" style="align-items:flex-end;display:flex;flex:none;flex-direction:column;row-gap:3px">
+                    <span data-fdn-id="n177" style="color:{{ param.forecast == 'pace' ? 'var(--color-status-blocked)' : 'var(--color-status-running)' }};font-family:var(--font-sans);font-size:22px;font-weight:var(--font-weight-semibold)">
+                      {{ param.forecast == 'pace' ? '132%' : '94%' }}
+                    </span>
+                    <span data-fdn-id="n178" data-fdn-style="meta-mono" style="color:var(--color-text-disabled)">
+                      projected at reset
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <div data-fdn-id="n179" style="border-top:1px solid var(--color-border-faint);display:flex;flex-direction:column;margin-top:auto;padding-top:12px">
+                <span data-fdn-id="n180" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:11.5px;line-height:1.5;max-width:760px">
+                  Both models are shown as models. A forecast that hides which curve it assumed is a number you cannot argue with — and the two disagree by 38 points on the same account, which is exactly the size of decision this pane exists to make.
+                </span>
+              </div>
+            </div>
+            <div data-fdn-id="n181" style="border-left:1px solid var(--color-divider);display:flex;flex:none;flex-direction:column;padding-bottom:16px;padding-left:14px;padding-right:14px;padding-top:14px;row-gap:20px;width:440px">
+              <div data-fdn-id="n182" style="display:flex;flex-direction:column">
+                <fdn-use data-fdn-id="n183" component="SectionLabel" data-fdn-prop-text="SPILLS ONTO" data-fdn-prop-trailing="ranked by 5h headroom"></fdn-use>
+                <fdn-use data-fdn-id="n184" component="SpilloverRow" data-fdn-prop-account="{{ s.account }}" data-fdn-prop-headroom="{{ s.headroom }}" data-fdn-prop-rank="{{ s.rank }}" data-fdn-prop-state="{{ s.state }}" data-fdn-prop-why="{{ s.why }}" each="s in data.spillover"></fdn-use>
+                <span data-fdn-id="n185" style="color:var(--color-text-faint);font-family:var(--font-sans);font-size:11.5px;line-height:1.5;padding-left:8px;padding-top:8px">
+                  Drain moves queued spawns down this list in order. Nothing already running is moved — a bee cannot change accounts mid-task.
+                </span>
+              </div>
+              <div data-fdn-id="n186" style="display:flex;flex-direction:column">
+                <fdn-use data-fdn-id="n187" component="SectionLabel" data-fdn-prop-text="SPENDING IT NOW" data-fdn-prop-trailing="3 bees · this window"></fdn-use>
+                <fdn-use data-fdn-id="n188" component="BeeRow" data-fdn-prop-age="{{ b.age }}" data-fdn-prop-bee="{{ b.bee }}" data-fdn-prop-harness="{{ b.harness }}" data-fdn-prop-share="{{ b.share }}" data-fdn-prop-state="{{ b.state }}" each="b in data.bees"></fdn-use>
+              </div>
+              <div data-fdn-id="n189" data-fdn-style="card-block">
+                <fdn-use data-fdn-id="n190" component="SectionLabel" data-fdn-prop-text="WHY NOT A GAUGE" data-fdn-prop-trailing=""></fdn-use>
+                <span data-fdn-id="n191" style="color:var(--color-text-secondary);font-family:var(--font-sans);font-size:12px;line-height:1.5">
+                  A dial shows one instant. Every real question here is about a rate against a deadline, so the primitive is a bar with a clock on it — the same meter at two sizes, never a second chart type.
+                </span>
+              </div>
+            </div>
+          </div>
+          <div data-fdn-id="n192" data-fdn-style="pane-footer">
+            <span data-fdn-id="n193">
+              d drain
+            </span>
+            <span data-fdn-id="n194">
+              p park spawns
+            </span>
+            <span data-fdn-id="n195">
+              m switch model
+            </span>
+            <span data-fdn-id="n196">
+              esc back to fleet
+            </span>
+            <span data-fdn-id="n197" style="margin-left:auto">
+              hive usage --json · 5h window resets 14:59 · weekly resets Wed 14:00
+            </span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
