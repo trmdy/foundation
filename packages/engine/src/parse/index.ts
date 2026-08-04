@@ -242,6 +242,9 @@ interface ConvertCtx {
   /** Count of text nodes whose whitespace was collapsed/trimmed — summarized
    *  once at the end rather than per-node (see normalizeTextWhitespace). */
   textNormalizedCount: number
+  /** Single-class flat selectors (+ state variants) lifted from the
+   *  document's <style> block, keyed by class name (see parseStylesheet). */
+  classStyles: Map<string, LiftedClassStyle>
 }
 
 /**
@@ -299,6 +302,7 @@ function convertElement(el: ElementNode, ctx: ConvertCtx): FdnNode | null {
   let when: string | undefined
   let each: string | undefined
   const legacyWhenParts: string[] = []
+  let classAttrValue: string | undefined
 
   for (const [name, value] of Object.entries(rawAttrs)) {
     const lower = name.toLowerCase()
@@ -309,6 +313,13 @@ function convertElement(el: ElementNode, ctx: ConvertCtx): FdnNode | null {
     }
     if (lower === 'data-fdn-style') {
       styleRef = value
+      continue
+    }
+    if (lower === 'class') {
+      // held aside — resolved once the rest of the attrs (in particular any
+      // explicit style="" / data-fdn-style="") are known; see class-CSS
+      // lifting below.
+      classAttrValue = value
       continue
     }
     if (lower === 'when') {
@@ -360,6 +371,62 @@ function convertElement(el: ElementNode, ctx: ConvertCtx): FdnNode | null {
       nodeId: id,
       detail: { when },
     })
+  }
+
+  // ——— class-CSS lifting (SPEC D1) ———
+  // A single class, backed by a lifted single-class rule, becomes a named-style
+  // ref and the class attribute is fully consumed. Two or more classes (or a
+  // single class colliding with an explicit data-fdn-style already on this
+  // node) merge their lifted declarations into the node's own inline style,
+  // in stylesheet order (first-declared class loses ties, matching cascade
+  // order for equal specificity) — the node's own pre-existing style="" /
+  // style-state attrs always win on conflicting properties (inline beats
+  // class, same as real CSS), and the class attribute is kept + reported
+  // since it was only partially understood.
+  if (classAttrValue !== undefined) {
+    const classTokens = classAttrValue.trim().split(/\s+/).filter(Boolean)
+    const liftable = classTokens.filter((t) => ctx.classStyles.has(t))
+    if (classTokens.length === 1 && liftable.length === 1 && styleRef === undefined) {
+      const className = liftable[0] as string
+      styleRef = className
+      ctx.lines.push({
+        code: 'class-attr-consumed',
+        severity: 'info',
+        message: `class="${className}" fully lifted to data-fdn-style="${className}" — class attribute consumed`,
+        nodeId: id,
+        detail: { class: className },
+      })
+    } else if (liftable.length > 0) {
+      const sorted = [...liftable].sort((a, b) => (ctx.classStyles.get(a)?.order ?? 0) - (ctx.classStyles.get(b)?.order ?? 0))
+      const mergedBase: Record<string, string> = {}
+      const mergedStates: Partial<Record<StateStyleKey, Record<string, string>>> = {}
+      for (const cls of sorted) {
+        const entry = ctx.classStyles.get(cls)
+        if (!entry) continue
+        Object.assign(mergedBase, entry.base)
+        for (const state of STATE_PLANES) {
+          const decls = entry.states[state]
+          if (decls) mergeStateInto(mergedStates, state, decls)
+        }
+      }
+      style = { ...mergedBase, ...style }
+      for (const state of STATE_PLANES) {
+        const decls = mergedStates[state]
+        if (decls) styleStates[state] = { ...decls, ...(styleStates[state] ?? {}) }
+      }
+      attrs.class = classAttrValue
+      ctx.lines.push({
+        code: 'class-styles-merged',
+        severity: 'info',
+        message: `class="${classAttrValue}" merged ${liftable.length} of ${classTokens.length} class rule(s) (${sorted.join(', ')}) into this node's inline style, in stylesheet order — class attribute kept (only partially lifted)`,
+        nodeId: id,
+        detail: { class: classAttrValue, merged: sorted },
+      })
+    } else {
+      // none of the classes on this element ever matched a liftable rule —
+      // nothing to lift, kept as an ordinary attribute.
+      attrs.class = classAttrValue
+    }
   }
 
   const node: FdnNode = {
@@ -446,7 +513,8 @@ function convertChildren(parent: Node, ctx: ConvertCtx): FdnNode[] {
 }
 
 // ——————————————————————————————————————————————————————————————————————————
-// :root token block
+// :root token block + class-CSS lifting (SPEC D1: "classes, stylesheets LIFTED
+// into the node/named-style model")
 // ——————————————————————————————————————————————————————————————————————————
 
 function splitTopLevelRules(css: string): { selector: string; body: string }[] {
@@ -470,35 +538,195 @@ function splitTopLevelRules(css: string): { selector: string; body: string }[] {
   return rules
 }
 
-function parseTokens(headEl: ElementNode | undefined, lines: ReportLine[]): Record<string, string> {
+/** A single-class flat selector (`.foo`), lifted from the stylesheet into a
+ *  named-style-shaped bag: base declarations plus the four sanctioned
+ *  interaction-state planes (Q11), gathered across every rule that targeted
+ *  `.foo` or `.foo:hover`/`:focus`/`:active`/`:disabled`. `order` is this
+ *  class's first-appearance index in the stylesheet — used both to order the
+ *  emitted named styles and, for multi-class elements, to merge each class's
+ *  declarations onto the node in the same order the cascade would have. */
+interface LiftedClassStyle {
+  order: number
+  base: Record<string, string>
+  states: Partial<Record<StateStyleKey, Record<string, string>>>
+}
+
+const SUPPORTED_PSEUDO_STATES: Partial<Record<string, StateStyleKey>> = {
+  hover: 'hover',
+  focus: 'focus',
+  active: 'active',
+  disabled: 'disabled',
+}
+
+type SelectorClassification =
+  | { kind: 'single-class'; className: string }
+  | { kind: 'single-class-state'; className: string; state: StateStyleKey }
+  | { kind: 'unliftable'; reason: string }
+
+const SINGLE_CLASS_RE = /^\.([A-Za-z_][\w-]*)$/
+const SINGLE_CLASS_STATE_RE = /^\.([A-Za-z_][\w-]*):([A-Za-z-]+)$/
+
+/**
+ * Classify one comma-separated selector segment. Only a bare single-class
+ * selector or one of its four sanctioned pseudo-class state variants is
+ * liftable (SPEC D1/Q11) — everything else (element/type, universal, id,
+ * compound-class, descendant/child/sibling, attribute, pseudo-element,
+ * structural/functional pseudo-class) is reported and dropped, per rule,
+ * with a corrective message naming the sanctioned alternative.
+ */
+function classifySelectorPart(part: string): SelectorClassification {
+  const trimmed = part.trim()
+  const single = SINGLE_CLASS_RE.exec(trimmed)
+  if (single?.[1]) return { kind: 'single-class', className: single[1] }
+  const singleState = SINGLE_CLASS_STATE_RE.exec(trimmed)
+  if (singleState?.[1] && singleState[2]) {
+    const state = SUPPORTED_PSEUDO_STATES[singleState[2].toLowerCase()]
+    if (state) return { kind: 'single-class-state', className: singleState[1], state }
+    return {
+      kind: 'unliftable',
+      reason: `pseudo-class ":${singleState[2]}" is not one of the sanctioned interaction-state planes (:hover, :focus, :active, :disabled) — express other state via when/data-fdn-* attributes on the node`,
+    }
+  }
+  if (trimmed.includes('::')) {
+    return { kind: 'unliftable', reason: 'pseudo-element selectors (::before, ::after, …) are not liftable — the subset has no pseudo-element concept' }
+  }
+  if (trimmed.includes('[')) {
+    return { kind: 'unliftable', reason: 'attribute selectors are not liftable — express conditional presence/state via when/data-fdn-* attributes on the node instead' }
+  }
+  if (/[\s>+~]/.test(trimmed)) {
+    return {
+      kind: 'unliftable',
+      reason: "descendant/child/sibling combinator selectors are not liftable — the subset's cascade is local to each node (D1); style the descendant node directly or via its own named style",
+    }
+  }
+  if (/^\.[\w-]+\.[\w-]+/.test(trimmed)) {
+    return {
+      kind: 'unliftable',
+      reason: 'compound class selector (multiple classes chained on one selector, e.g. ".a.b") is not a single-class flat selector — elements carrying multiple classes have their matching class rules merged into inline style instead',
+    }
+  }
+  if (trimmed.startsWith('#')) {
+    return { kind: 'unliftable', reason: 'id selectors are not liftable — the subset has no id-based styling channel; use a single-class named style instead' }
+  }
+  if (trimmed === '*') {
+    return { kind: 'unliftable', reason: 'the universal selector (*) styles every element — the subset has no ambient/global styling channel; author it on the node or a named style directly' }
+  }
+  if (trimmed.includes(':')) {
+    return { kind: 'unliftable', reason: 'structural/functional pseudo-classes (:nth-child(), :not(), …) are not liftable' }
+  }
+  return {
+    kind: 'unliftable',
+    reason: `element/type selector "${trimmed}" is not liftable — the subset carries styles on nodes and single-class named styles, not element-wide stylesheet rules`,
+  }
+}
+
+/** Split a selector list on top-level commas (not inside `[...]`/`(...)`) —
+ *  `.a, .b { … }` is exactly two independent selectors for lifting purposes. */
+function splitSelectorList(selector: string): string[] {
+  const out: string[] = []
+  let depth = 0
+  let cur = ''
+  for (const c of selector) {
+    if (c === '(' || c === '[') depth++
+    else if (c === ')' || c === ']') depth--
+    if (c === ',' && depth <= 0) {
+      out.push(cur)
+      cur = ''
+    } else {
+      cur += c
+    }
+  }
+  if (cur.trim()) out.push(cur)
+  return out
+}
+
+function mergeStateInto(
+  target: Partial<Record<StateStyleKey, Record<string, string>>>,
+  state: StateStyleKey,
+  decls: Record<string, string>,
+): void {
+  target[state] = { ...(target[state] ?? {}), ...decls }
+}
+
+function parseStylesheet(
+  headEl: ElementNode | undefined,
+  lines: ReportLine[],
+): { tokens: Record<string, string>; classStyles: Map<string, LiftedClassStyle> } {
   const tokens: Record<string, string> = {}
-  if (!headEl) return tokens
+  const classStyles = new Map<string, LiftedClassStyle>()
+  let order = 0
+  const classEntry = (name: string): LiftedClassStyle => {
+    let entry = classStyles.get(name)
+    if (!entry) {
+      entry = { order: order++, base: {}, states: {} }
+      classStyles.set(name, entry)
+    }
+    return entry
+  }
+  if (!headEl) return { tokens, classStyles }
   for (const styleEl of directChildrenByTag(headEl, 'style')) {
     const css = directTextOf(styleEl)
     for (const rule of splitTopLevelRules(css)) {
-      if (rule.selector !== ':root') {
+      if (rule.selector === ':root') {
+        for (const raw of splitDeclarations(rule.body)) {
+          const decl = raw.trim()
+          if (!decl) continue
+          const colon = decl.indexOf(':')
+          if (colon === -1) continue
+          const name = decl.slice(0, colon).trim()
+          const value = decl.slice(colon + 1).trim()
+          if (!name.startsWith('--') || !value) continue
+          // API contract (types.ts): tokens are stored WITHOUT the leading `--`.
+          tokens[name.slice(2)] = value
+        }
+        continue
+      }
+      if (rule.selector.startsWith('@')) {
         lines.push({
           code: 'non-root-style-rule-dropped',
           severity: 'warning',
-          message: `<style> rule "${rule.selector}" is not a :root token declaration and was dropped — the subset carries styles on nodes/named styles, not stylesheets`,
+          message: `<style> rule "${rule.selector}" is a media/at-rule and was dropped — the subset expresses per-viewport styling via the states × viewports matrix (<fdn-matrix>), not CSS breakpoints`,
           detail: { selector: rule.selector },
         })
         continue
       }
-      for (const raw of splitDeclarations(rule.body)) {
-        const decl = raw.trim()
-        if (!decl) continue
-        const colon = decl.indexOf(':')
-        if (colon === -1) continue
-        const name = decl.slice(0, colon).trim()
-        const value = decl.slice(colon + 1).trim()
-        if (!name.startsWith('--') || !value) continue
-        // API contract (types.ts): tokens are stored WITHOUT the leading `--`.
-        tokens[name.slice(2)] = value
+      for (const part of splitSelectorList(rule.selector)) {
+        const partTrimmed = part.trim()
+        if (!partTrimmed) continue
+        const classification = classifySelectorPart(partTrimmed)
+        if (classification.kind === 'unliftable') {
+          lines.push({
+            code: 'non-root-style-rule-dropped',
+            severity: 'warning',
+            message: `<style> rule "${partTrimmed}" was dropped — ${classification.reason}`,
+            detail: { selector: partTrimmed },
+          })
+          continue
+        }
+        const decls = normalizeDeclBag(parseDeclarations(rule.body), undefined, lines)
+        if (classification.kind === 'single-class') {
+          const entry = classEntry(classification.className)
+          Object.assign(entry.base, decls)
+          lines.push({
+            code: 'class-style-lifted',
+            severity: 'info',
+            message: `.${classification.className} { … } lifted into named style "${classification.className}"`,
+            detail: { className: classification.className, properties: Object.keys(decls) },
+          })
+        } else {
+          const entry = classEntry(classification.className)
+          mergeStateInto(entry.states, classification.state, decls)
+          lines.push({
+            code: 'class-style-state-lifted',
+            severity: 'info',
+            message: `.${classification.className}:${classification.state} { … } lifted into named style "${classification.className}"'s ${classification.state} state`,
+            detail: { className: classification.className, state: classification.state, properties: Object.keys(decls) },
+          })
+        }
       }
     }
   }
-  return tokens
+  return { tokens, classStyles }
 }
 
 // ——————————————————————————————————————————————————————————————————————————
@@ -726,7 +954,7 @@ export function parseDocument(html: string): { doc: FdnDocument; report: Normali
   const headEl = htmlEl ? directChildrenByTag(htmlEl, 'head')[0] : undefined
   const bodyEl = htmlEl ? directChildrenByTag(htmlEl, 'body')[0] : (findDeep(document, 'body') ?? undefined)
 
-  const tokens = parseTokens(headEl, lines)
+  const { tokens, classStyles } = parseStylesheet(headEl, lines)
 
   const fdnDoc = bodyEl ? (directChildrenByTag(bodyEl, 'fdn-doc')[0] ?? findDeep(bodyEl, 'fdn-doc')) : null
 
@@ -768,10 +996,29 @@ export function parseDocument(html: string): { doc: FdnDocument; report: Normali
 
   const namedStyles = bodyEl ? parseNamedStyles(bodyEl, lines) : []
 
+  // Lifted single-class CSS rules become named styles too (appended after any
+  // explicitly declared <fdn-style>, in stylesheet order — see parseStylesheet
+  // and the class-CSS lifting block in convertElement). An explicit <fdn-style
+  // name="foo"> wins over a same-named lifted `.foo` rule; the collision is
+  // named rather than silently overwritten or duplicated.
+  const explicitStyleNames = new Set(namedStyles.map((s) => s.name))
+  for (const [className, entry] of classStyles) {
+    if (explicitStyleNames.has(className)) {
+      lines.push({
+        code: 'class-style-name-collision',
+        severity: 'warning',
+        message: `lifted class-CSS style "${className}" collides with an explicitly declared <fdn-style name="${className}"> — the explicit declaration wins`,
+        detail: { name: className },
+      })
+      continue
+    }
+    namedStyles.push({ name: className, style: entry.base, styleStates: entry.states })
+  }
+
   // node-id minting: continue from the highest existing minted id anywhere in the
   // raw document (API.md "node identity" — deterministic for a given input text).
   const minter = new IdMinter(scanMaxMintedId(document))
-  const ctx: ConvertCtx = { minter, lines, textNormalizedCount: 0 }
+  const ctx: ConvertCtx = { minter, lines, textNormalizedCount: 0, classStyles }
 
   const components = bodyEl ? parseComponents(bodyEl, ctx) : []
   components.sort((a, b) => a.name.localeCompare(b.name))

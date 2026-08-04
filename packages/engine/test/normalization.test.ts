@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { parseDocument } from '../src/parse/index.js'
+import { projectDocument } from '../src/project/index.js'
 
 function wrap(bodyHtml: string): string {
   return `<!DOCTYPE html><html><head><style>:root{--x:1px}</style></head><body><main>${bodyHtml}</main></body></html>`
+}
+
+function wrapCss(css: string, bodyHtml: string): string {
+  return `<!DOCTYPE html><html><head><style>${css}</style></head><body><main>${bodyHtml}</main></body></html>`
 }
 
 function reportCodes(lines: { code: string }[]): string[] {
@@ -361,5 +366,177 @@ describe('normalization v0: style lifting and text/children carrying', () => {
     const { doc } = parseDocument(html)
     expect(doc.body[0]?.text).toBe('{{ prop.text }}')
     expect(doc.body[0]?.children.map((c) => c.tag)).toEqual(['span'])
+  })
+})
+
+describe('normalization v0: class-CSS lifting (SPEC D1 — classes/stylesheets lifted into node/named-style model)', () => {
+  it('lifts a single-class flat selector into a named style and refs it via data-fdn-style, consuming the class attr', () => {
+    const html = wrapCss('.card { color: red; background: blue; }', '<div class="card"></div>')
+    const { doc, report } = parseDocument(html)
+    const node = doc.body[0]
+    expect(node?.attrs.class).toBeUndefined()
+    expect(node?.styleRef).toBe('card')
+    const named = doc.namedStyles.find((s) => s.name === 'card')
+    expect(named?.style).toEqual({ color: 'red', background: 'blue' })
+    expect(reportCodes(report.lines)).toContain('class-style-lifted')
+    expect(reportCodes(report.lines)).toContain('class-attr-consumed')
+  })
+
+  it('longhand-normalizes lifted class declarations through the existing shorthand pipeline', () => {
+    const html = wrapCss('.box { padding: 1px 2px 3px 4px; }', '<div class="box"></div>')
+    const { doc, report } = parseDocument(html)
+    const named = doc.namedStyles.find((s) => s.name === 'box')
+    expect(named?.style).toEqual({
+      'padding-top': '1px',
+      'padding-right': '2px',
+      'padding-bottom': '3px',
+      'padding-left': '4px',
+    })
+    expect(reportCodes(report.lines)).toContain('shorthand-expanded')
+  })
+
+  it('merges multi-class elements into the node\'s own inline style instead of a named-style ref, and keeps the class attr', () => {
+    const html = wrapCss('.a { color: red; } .b { background: blue; }', '<div class="a b"></div>')
+    const { doc, report } = parseDocument(html)
+    const node = doc.body[0]
+    expect(node?.styleRef).toBeUndefined()
+    expect(node?.style).toEqual({ color: 'red', background: 'blue' })
+    expect(node?.attrs.class).toBe('a b')
+    const line = report.lines.find((l) => l.code === 'class-styles-merged')
+    expect(line).toBeDefined()
+    expect(line?.detail).toMatchObject({ class: 'a b', merged: ['a', 'b'] })
+  })
+
+  it('multi-class merge follows stylesheet order for conflicting properties, later rule wins', () => {
+    const html = wrapCss('.a { color: red; } .b { color: blue; }', '<div class="b a"></div>')
+    const { doc } = parseDocument(html)
+    // .b is declared AFTER .a in the stylesheet, so .b wins on the shared
+    // "color" property regardless of the order the classes are listed on
+    // the element itself (class="b a") — merge order follows the cascade
+    // (stylesheet order), not attribute-string order.
+    expect(doc.body[0]?.style.color).toBe('blue')
+  })
+
+  it('the node\'s own inline style="" wins over merged class declarations on conflicting props', () => {
+    const html = wrapCss('.a { color: red; } .b { background: blue; }', '<div class="a b" style="color:green"></div>')
+    const { doc } = parseDocument(html)
+    expect(doc.body[0]?.style).toEqual({ color: 'green', background: 'blue' })
+  })
+
+  it('a multi-class element merges only the classes that matched a lifted rule; unmatched classes are inert', () => {
+    const html = wrapCss('.turn-line { width: 76%; }', '<div class="turn-line short"></div>')
+    const { doc, report } = parseDocument(html)
+    const node = doc.body[0]
+    expect(node?.style).toEqual({ width: '76%' })
+    expect(node?.attrs.class).toBe('turn-line short')
+    const line = report.lines.find((l) => l.code === 'class-styles-merged')
+    expect(line?.detail).toMatchObject({ merged: ['turn-line'] })
+  })
+
+  it('lifts .foo:hover/:focus/:active/:disabled into the named style\'s state planes', () => {
+    const html = wrapCss(
+      '.row { padding: 4px; } .row:hover { background: red; } .row:focus { outline: 1px solid blue; }',
+      '<div class="row"></div>',
+    )
+    const { doc, report } = parseDocument(html)
+    const named = doc.namedStyles.find((s) => s.name === 'row')
+    expect(named?.styleStates.hover).toEqual({ background: 'red' })
+    expect(named?.styleStates.focus).toEqual({ outline: '1px solid blue' })
+    expect(reportCodes(report.lines)).toContain('class-style-state-lifted')
+  })
+
+  it('a class with ONLY a pseudo-state rule (no base rule) still lifts into a named style', () => {
+    const html = wrapCss('.ghost:hover { color: red; }', '<div class="ghost"></div>')
+    const { doc } = parseDocument(html)
+    expect(doc.body[0]?.styleRef).toBe('ghost')
+    const named = doc.namedStyles.find((s) => s.name === 'ghost')
+    expect(named?.style).toEqual({})
+    expect(named?.styleStates.hover).toEqual({ color: 'red' })
+  })
+
+  it('a class with no matching CSS rule is left as an ordinary, unreported class attribute', () => {
+    const html = wrapCss(':root{--x:1px}', '<div class="mystery"></div>')
+    const { doc, report } = parseDocument(html)
+    expect(doc.body[0]?.attrs.class).toBe('mystery')
+    expect(doc.body[0]?.styleRef).toBeUndefined()
+    expect(reportCodes(report.lines)).not.toContain('class-styles-merged')
+    expect(reportCodes(report.lines)).not.toContain('class-attr-consumed')
+  })
+
+  describe('unliftable selectors are reported and dropped with a corrective message', () => {
+    const cases: { css: string; selector: string; snippet: string }[] = [
+      { css: '* { box-sizing: border-box; }', selector: '*', snippet: 'universal selector' },
+      { css: 'body { margin: 0; }', selector: 'body', snippet: 'element/type selector' },
+      { css: '.a.b { color: red; }', selector: '.a.b', snippet: 'compound class selector' },
+      { css: '.a .b { color: red; }', selector: '.a .b', snippet: 'descendant/child/sibling combinator' },
+      { css: '.a > .b { color: red; }', selector: '.a > .b', snippet: 'descendant/child/sibling combinator' },
+      { css: '.a::before { content: ""; }', selector: '.a::before', snippet: 'pseudo-element' },
+      { css: '.a[data-x="y"] { color: red; }', selector: '.a[data-x="y"]', snippet: 'attribute selector' },
+      { css: '#a { color: red; }', selector: '#a', snippet: 'id selector' },
+      { css: '.a:nth-child(2) { color: red; }', selector: '.a:nth-child(2)', snippet: 'structural/functional pseudo-class' },
+      { css: '.a:visited { color: red; }', selector: '.a:visited', snippet: 'sanctioned interaction-state planes' },
+    ]
+    for (const { css, snippet } of cases) {
+      it(`drops "${css.split('{')[0]?.trim()}" — ${snippet}`, () => {
+        const html = wrapCss(css, '<div class="a"></div>')
+        const { report } = parseDocument(html)
+        const line = report.lines.find((l) => l.code === 'non-root-style-rule-dropped')
+        expect(line).toBeDefined()
+        expect(line?.message).toContain(snippet)
+      })
+    }
+  })
+
+  it('drops @media rules with a corrective message pointing at the states × viewports matrix', () => {
+    const html = wrapCss('@media (max-width: 850px) { .a { color: red; } }', '<div class="a"></div>')
+    const { doc, report } = parseDocument(html)
+    // the nested .a inside the dropped @media block is never reached/lifted
+    expect(doc.namedStyles.find((s) => s.name === 'a')).toBeUndefined()
+    const line = report.lines.find((l) => l.code === 'non-root-style-rule-dropped' && l.message.includes('@media'))
+    expect(line?.message).toContain('states × viewports matrix')
+  })
+
+  it('a grouped selector (.a, .b) lifts each comma-separated class independently', () => {
+    const html = wrapCss('.a, .b { color: red; }', '<div class="a"></div><div class="b"></div>')
+    const { doc } = parseDocument(html)
+    expect(doc.body[0]?.styleRef).toBe('a')
+    expect(doc.body[1]?.styleRef).toBe('b')
+    expect(doc.namedStyles.map((s) => s.name).sort()).toEqual(['a', 'b'])
+  })
+
+  it('an explicitly declared <fdn-style> wins over a same-named lifted class rule, with a collision report', () => {
+    // <fdn-styles> must be a DIRECT child of <body> (sibling of <main>), same
+    // as any other board — not nested inside the content tree.
+    const html =
+      '<!DOCTYPE html><html><head><style>.card { color: red; }</style></head>' +
+      '<body><fdn-styles hidden><fdn-style name="card" color="green"></fdn-style></fdn-styles>' +
+      '<main><div class="card"></div></main></body></html>'
+    const { doc, report } = parseDocument(html)
+    const cardStyles = doc.namedStyles.filter((s) => s.name === 'card')
+    expect(cardStyles).toHaveLength(1)
+    expect(cardStyles[0]?.style).toEqual({ color: 'green' })
+    expect(reportCodes(report.lines)).toContain('class-style-name-collision')
+  })
+
+  it('determinism/fixpoint: re-parsing the projected output of a lifted document produces zero further lifting activity', () => {
+    const html = wrapCss(
+      '.card { padding: 4px; } .card:hover { color: red; } .a { color: blue; } .b { background: aqua; }',
+      '<div class="card"></div><div class="a b"></div>',
+    )
+    const first = parseDocument(html)
+    const projected = projectDocument(first.doc)
+    const second = parseDocument(projected)
+
+    // the document itself is stable (no further transformation possible)
+    expect(second.doc.body).toEqual(first.doc.body)
+    expect(second.doc.namedStyles).toEqual(first.doc.namedStyles)
+
+    // and no class-lifting activity happens on the second pass — there is no
+    // more class-only CSS left in the projected <style> block to lift from
+    const liftCodes = ['class-style-lifted', 'class-style-state-lifted', 'class-attr-consumed', 'class-styles-merged']
+    expect(second.report.lines.filter((l) => liftCodes.includes(l.code))).toHaveLength(0)
+
+    // re-projecting the second parse is byte-identical to the first projection
+    expect(projectDocument(second.doc)).toBe(projected)
   })
 })

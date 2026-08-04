@@ -53,7 +53,7 @@ import { bakeDocument } from '../bake/index.js'
 import { loadChain, mintAnnotationId } from '../chain/index.js'
 import type { FdnChain } from '../chain/index.js'
 import { validateDocument } from '../validate/index.js'
-import type { ConformanceReport, FdnAnnotation, FdnDocument } from '../types.js'
+import type { ConformanceReport, FdnAnnotation, FdnDocument, ValidationResult } from '../types.js'
 
 export interface ServeOptions {
   port?: number
@@ -90,11 +90,17 @@ function loadAndBake(filePath: string, state: string | null): {
   doc: FdnDocument
   html: string
   report: ConformanceReport
+  validation: ValidationResult
 } {
   const source = readSource(filePath)
   const { doc } = parseDocument(source)
   const baked = bakeDocument(doc, state !== null ? { state } : undefined)
-  return { source, doc, html: baked.html, report: baked.report }
+  // report-never-reject (D1): a document with validation ERRORS still bakes
+  // best-effort and gets served — validateDocument() runs alongside bake
+  // purely to surface those errors as a banner (see validationBanner below),
+  // never to block rendering.
+  const validation = validateDocument(doc)
+  return { source, doc, html: baked.html, report: baked.report, validation }
 }
 
 /** Chain is truth when `<file>.chain` exists (SPEC D4) — GET /api/doc and
@@ -155,11 +161,37 @@ function reportBadge(report: ConformanceReport): string {
   return `<a href="/report" class="fdn-serve-errors">${errors} error${errors === 1 ? '' : 's'}</a>`
 }
 
+/**
+ * Report-never-reject (D1), made visible: when the parsed document has
+ * validation ERRORS, the served page still renders the baked content
+ * best-effort below, but a fixed banner at the very top makes the breakage
+ * impossible to miss — never silently broken, never a hard 500. Rendered in
+ * BOTH normal and `?embed=1` modes (unlike the floating state-switcher strip,
+ * which `?embed=1` suppresses because the pane provides its own chrome —
+ * a pane has no substitute yet for "this document doesn't validate").
+ */
+function validationBanner(validation: ValidationResult): string {
+  const errors = validation.issues.filter((l) => l.severity === 'error')
+  if (errors.length === 0) return ''
+  const first3 = errors
+    .slice(0, 3)
+    .map((e) => `<li>${htmlEscape(e.message)}</li>`)
+    .join('\n      ')
+  return `<div data-foundation-validate-banner style="position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#3a1414;color:#ffd9d9;padding:10px 16px 12px;font:13px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.45);">
+  <strong>${errors.length} validation error${errors.length === 1 ? '' : 's'}</strong>
+  <ul style="margin:6px 0 0;padding-left:1.2em;">
+      ${first3}
+  </ul>
+  <div style="margin-top:6px;opacity:.85;">Run <code>foundation validate &lt;file&gt;</code> for the full list.</div>
+</div>`
+}
+
 function wrapPage(
   filePath: string,
   doc: FdnDocument,
   bakedHtml: string,
   report: ConformanceReport,
+  validation: ValidationResult,
   activeState: string | null,
   embed: boolean,
 ): string {
@@ -190,6 +222,7 @@ function wrapPage(
 <title>${doc.title ? htmlEscape(doc.title) : htmlEscape(name)} — foundation serve</title>
 </head>
 <body>
+${validationBanner(validation)}
 ${bakedHtml}
 ${strip}
 <style>
@@ -338,9 +371,9 @@ export async function serveDocument(filePath: string, opts?: ServeOptions): Prom
 
   function handleGetRoot(req: IncomingMessage, res: ServerResponse, state: string | null, embed: boolean): void {
     try {
-      const { doc, html, report } = loadAndBake(filePath, state)
+      const { doc, html, report, validation } = loadAndBake(filePath, state)
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(wrapPage(filePath, doc, html, report, state, embed))
+      res.end(wrapPage(filePath, doc, html, report, validation, state, embed))
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' })
       res.end(errorPage(err instanceof Error ? (err.stack ?? err.message) : String(err)))
